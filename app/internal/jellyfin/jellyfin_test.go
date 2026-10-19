@@ -508,6 +508,18 @@ func TestWatchedAndPlayback(t *testing.T) {
 		selected["EnableDirectPlay"] != false || selected["EnableDirectStream"] != false {
 		t.Fatalf("selected subtitle request %v", selected)
 	}
+	_, err = c.PlaybackInfo(ctx, "358f1b71dbd1eb6238744f21a9a01f14", PlaybackRequest{
+		SubtitleStream: "-1", MaxStreamingBitrate: 5000000, ForceTranscode: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var forced map[string]any
+	json.Unmarshal(f.body["POST /Items/358f1b71dbd1eb6238744f21a9a01f14/PlaybackInfo"], &forced)
+	if forced["EnableDirectPlay"] != false || forced["EnableDirectStream"] != false ||
+		forced["AlwaysBurnInSubtitleWhenTranscoding"] != nil || forced["MaxStreamingBitrate"] != float64(5000000) {
+		t.Fatalf("forced transcode request %v", forced)
+	}
 	ds := c.DirectStreamURL("abc", MediaSource{ID: "abc", Container: "mkv"}, "ps")
 	if !strings.HasPrefix(ds, c.Host+"/Videos/abc/stream.mkv?") || !strings.Contains(ds, "static=true") {
 		t.Fatalf("direct stream %s", ds)

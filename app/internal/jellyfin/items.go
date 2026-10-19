@@ -170,6 +170,14 @@ type MediaStream struct {
 	Width        int    `json:"Width"`
 	Height       int    `json:"Height"`
 	Channels     int    `json:"Channels"`
+	// Video details Jellyfin probed; zero when the server does not know.
+	Profile          string  `json:"Profile"`
+	Level            float64 `json:"Level"`
+	BitDepth         int     `json:"BitDepth"`
+	BitRate          int     `json:"BitRate"`
+	RealFrameRate    float64 `json:"RealFrameRate"`
+	AverageFrameRate float64 `json:"AverageFrameRate"`
+	IsInterlaced     bool    `json:"IsInterlaced"`
 }
 
 // listing is a QueryResult; Latest answers with a bare array instead.

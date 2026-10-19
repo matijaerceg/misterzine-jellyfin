@@ -22,6 +22,9 @@ type PlaybackRequest struct {
 	// subtitles into the video when preparing a transcode.
 	AlwaysBurnInSubtitleWhenTranscoding bool
 	MediaSourceID                       string // Item.SourceID, "" for the first
+	// ForceTranscode asks for a server transcode even when the source could
+	// be played as stored: the client decided the core cannot play it.
+	ForceTranscode bool
 }
 
 // MediaSource is one way the server offers to play an item.
@@ -75,9 +78,10 @@ func (c *Client) PlaybackInfo(ctx context.Context, id string, r PlaybackRequest)
 	if r.AlwaysBurnInSubtitleWhenTranscoding || selectedSubtitle {
 		body["AlwaysBurnInSubtitleWhenTranscoding"] = true
 	}
-	if selectedSubtitle || r.AlwaysBurnInSubtitleWhenTranscoding {
-		// The subtitle renderer needs a video transcode. Ask Jellyfin not to
-		// return a direct-play or remux stream for this request.
+	if selectedSubtitle || r.AlwaysBurnInSubtitleWhenTranscoding || r.ForceTranscode {
+		// The subtitle renderer needs a video transcode, and a forced
+		// transcode is one by definition. Ask Jellyfin not to return a
+		// direct-play or remux stream for this request.
 		body["EnableDirectPlay"] = false
 		body["EnableDirectStream"] = false
 	}
