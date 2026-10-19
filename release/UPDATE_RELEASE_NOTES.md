@@ -10,6 +10,12 @@ First packaged beta of the CRT-first Jellyfin application.
   as the app can draw. A brief pattern during FPGA startup can still appear.
 - Direct streaming and Jellyfin transcoding, burned-in subtitles, pause/resume,
   seeking, buffered-range display and surround downmix boost.
+- Files the decoder can take as stored play directly. Others are checked
+  before playback and transcoded from the start. If a direct stream cannot keep
+  up, playback switches to a transcode once, at the same position.
+- Turning subtitles on restarts the stream as a server transcode, which can
+  take tens of seconds to resume depending on the server.
+- Three breathing dots show while playback starts or waits for data.
 - 4:3/16:9 display shape, saved calibration and crop, vertical de-flicker,
   menu/paused dimming and playback-only 240p/288p.
 - NTSC/PAL output with optional 50/60 refresh matching. No 48 Hz mode.
@@ -17,7 +23,7 @@ First packaged beta of the CRT-first Jellyfin application.
 
 Playback updates Jellyfin watched state and resume positions. Network seeking,
 server compatibility and different hardware setups remain beta test areas.
-The included FPGA image reports `dev-crt`; its original qualification manifest
+The included FPGA image reports `dev-jfbeta1`; its original qualification manifest
 is included so the image remains traceable.
 
 Installers and update notices become available when this release and its

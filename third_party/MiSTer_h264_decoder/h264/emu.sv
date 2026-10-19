@@ -170,7 +170,7 @@ assign LOCKED    = locked & vid_locked;
 //     30 chars and splits CONF_STR on those characters.
 //   * This string is INSIDE CONF_STR = inside the netlist. Changing it re-rolls the
 //     pinned fitter SEED, so change it once per branch and never per commit.
-`define CORE_VERSION "dev-ditherreg"
+`define CORE_VERSION "dev-jfbeta1"
 
 // The OSD definition. Every option, button and file extension here MUST be documented
 // in the manual: tools/docs_check.py parses this block (by its terminator, never a

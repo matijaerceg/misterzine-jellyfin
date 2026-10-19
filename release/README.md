@@ -50,7 +50,12 @@ Start with a low video bitrate on Wi-Fi and raise it if playback remains smooth.
 A high bitrate needs adequate sustained throughput, not just a strong signal.
 The buffered section of the playback bar shows the available seek range;
 seeks outside it may require a fresh server request. Subtitles are burned into
-the video by Jellyfin and require server-side transcoding.
+the video by Jellyfin and require server-side transcoding. Turning them on
+restarts the stream, and the server can take tens of seconds to resume.
+
+Files the decoder supports play directly. Others are transcoded from the
+start. If a direct stream falls behind, playback switches to a transcode once
+at the same position.
 
 This is beta software. Playback updates watched state and resume positions in
 your Jellyfin library. Network interruptions, server behavior and different
