@@ -890,6 +890,8 @@ reg [11:0] vmin;
 reg [11:0] vmax;
 reg [11:0] hdmi_height;
 reg [11:0] hdmi_width;
+reg [11:0] hdmi_mode_h;                    // H264-FORK: the mode's size, unclipped by VSET / HSET
+reg [11:0] hdmi_mode_w;
 
 reg [11:0] arx;
 reg [11:0] ary;
@@ -903,6 +905,8 @@ always @(posedge clk_vid) begin
 
 	hdmi_height <= (VSET && (VSET < HEIGHT)) ? VSET : HEIGHT;
 	hdmi_width  <= (HSET && (HSET < WIDTH))  ? HSET << HDMI_PR : WIDTH << HDMI_PR;
+	hdmi_mode_h <= HEIGHT;                 // H264-FORK: emu's HDMI_HEIGHT (at its port below)
+	hdmi_mode_w <= WIDTH << HDMI_PR;
 
 	if(!ARY) begin
 		if(ARX == 1) begin
@@ -1837,8 +1841,13 @@ emu emu
 	.VGA_DISABLE(VGA_DISABLE),
 `endif
 
-	.HDMI_WIDTH(direct_video ? 12'd0 : hdmi_width),
-	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_height),
+	// H264-FORK (2026-10-19): the HDMI mode's own size, not hdmi_width / hdmi_height. Those are
+	// clipped to HSET / VSET, which Main sets from the core's raster under integer scaling
+	// (vscale_mode 1-3). The core reads this as the display's shape and sizes the Native (HDMI)
+	// raster from it, so the clipped size fed back into the raster: a scope film flipped between
+	// 1280x715 and 1439x536 about twice a second on the DE10.
+	.HDMI_WIDTH(direct_video ? 12'd0 : hdmi_mode_w),
+	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_mode_h),
 	.HDMI_FREEZE(freeze),
 	.HDMI_BLACKOUT(hdmi_blackout),
 	.HDMI_BOB_DEINT(bob_deint),

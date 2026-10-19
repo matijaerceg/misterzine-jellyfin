@@ -1718,6 +1718,13 @@ This core's own (`H264-FORK`):
   `emu`'s `VGA_DITHER` (OSD Analog Dither, `status[19]`). What remains from 2026-10-19 is the analog
   output register: `vga_od` registers `vga_o` (and the syncs / DE with it), so every analog pin and
   SOG leaves a flip-flop. HDMI and the scaler-to-VGA path (`vgas_o`) are untouched.
+- **`sys_top.v`: `emu`'s `HDMI_WIDTH` / `HDMI_HEIGHT` are the HDMI mode's own size** (2026-10-19).
+  Stock passes `hdmi_width` / `hdmi_height`, clipped to Main's `HSET` / `VSET`, which under integer
+  scaling (`vscale_mode` 1-3) Main derives from the core's raster. The core reads the pair as the
+  display's shape (A', `raster_geom`), so in Native (HDMI) the clipped height fed back into the raster:
+  on the DE10 with `vscale_mode=1` a 2.39:1 film flipped between 1280x715 (shown x1) and 1439x536
+  (shown x2) about twice a second. `hdmi_mode_w` / `hdmi_mode_h` register the unclipped mode in the
+  same `clk_vid` block, so the crossing into `emu` is the one it was.
 - **`sys.tcl`: `pll_hdmi` pinned to `FRACTIONALPLL_X0_Y1_N0`, its output to
   `PLLOUTPUTCOUNTER_X0_Y5_N1`** (2026-10-11, `history.md` §47). Main sets each HDMI mode's pixel clock
   by rewriting the PLL's physical C counter 0 (and its VCO). A fit that put the output on another

@@ -311,6 +311,14 @@ def main():
         # CLK_MEM: an emu output stock sys_top.v leaves commented out (unconnected, harmless)
         if ports - driven - {'CLK_MEM'}:
             bad('ports', 'emu ports sys_top.v leaves unconnected: %s' % sorted(ports - driven - {'CLK_MEM'}))
+        # H264-FORK: the HDMI mode's own size. hdmi_width / hdmi_height are clipped to Main's
+        # HSET / VSET, set from this core's raster under integer scaling: a feedback loop in Native.
+        tconn = connections(tbody)
+        for port, reg, rhs in (('HDMI_WIDTH', 'hdmi_mode_w', 'WIDTH<<HDMI_PR'),
+                               ('HDMI_HEIGHT', 'hdmi_mode_h', 'HEIGHT')):
+            m = re.search(r'\b%s\s*<=\s*([^;]+);' % reg, top)
+            if reg not in terms(tconn.get(port, '')) or not m or m.group(1).replace(' ', '') != rhs:
+                bad('sys_top.' + port, 'must be %s, the unclipped mode (%s), not VSET / HSET-clipped' % (reg, rhs))
     # ram2's nets must be declared before sysmem_lite connects them (Verilog declaration
     # order: an earlier use makes an implicit 1-bit net), and ram2 must be the core's
     m_sys = re.search(r'\bsysmem_lite\s+sysmem\b', top)
@@ -882,9 +890,11 @@ def main():
         elif terms(fconn.get('mode', '')) != {'fit_mode_l'} or not re.search(r'\bfit_mode_l\s*<=\s*fit_mode_want\s*;', src):
             bad('disp_fit.mode', 'must be fit_mode_l, latched from fit_mode_want once a refresh')
         else:
+            # Display Shape alone, on every output family: 16:9 the anamorphic fit, 4:3
+            # Letterbox. HDMI is told that same shape, so Fill (3) would mis-shape it.
             want = assign_of(src, 'fit_mode_want') or ''
-            if 'status[2]' not in want.replace(' ', '') or 'interlaced_eff' not in terms(want):
-                bad('fit_mode_want', 'must use shared Display Shape and output family')
+            if want.replace(' ', '') != "status[2]?2'd2:2'd0":
+                bad('fit_mode_want', "must be status[2] ? 2'd2 : 2'd0 (Display Shape on every output)")
         # Global De-flicker is enabled by status[29] low, latched at pickup, and only used
         # on interlaced frame stores; progressive output must leave the vertical filter inactive.
         if not re.search(r'"O\[29\],De-flicker,On,Off;"', src):

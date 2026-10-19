@@ -108,6 +108,9 @@
 #   W109, W110 (interface 0.17, F5) word 30's fit_valid tied 1; fit_clamp reported with no picture shown
 #   W111 (issue #11) HDMI's Auto aspect 4:3 under Analog Aspect Fit (the anamorphic 16:9 fit) -> check_emu_wiring (ar_wide)
 #   W112, W113 (issue #11) Fit on an SD HDMI mode not filled (16:9 there: a letterboxed window); 720x576 left out -> check_emu_wiring (fit_fill)
+#   W114 (2026-10-19) progressive 4:3 back on Fill (480p at 4:3 too narrow on HDMI) -> check_emu_wiring (fit_mode_want)
+#   W115, W116 (2026-10-19) emu's HDMI_HEIGHT / HDMI_WIDTH back on the VSET / HSET-clipped size (Native's
+#           raster fed back through integer scaling) -> check_emu_wiring (sys_top.HDMI_HEIGHT / _WIDTH)
 #       -> check_emu_wiring (st_fit_valid / st_fit_clamp)
 #   W80-W90 (hd_raster, docs/hd_raster.md S3) CLK_VIDEO back on clk_sys, the dot two clocks in three, a
 #           raster module on clk_sys, two bundle fields swapped, the bundle truncated, frame0 without its
@@ -249,7 +252,7 @@ PYEOF
     # WFILE=h264/vid_out.sv: mutate the output stage instead (hd_raster: factored out of emu.sv)
     local name=$1 old=$2 new=$3 tool=$4 want=${5:-} wf=${WFILE:-h264/emu.sv}
     local d; d=$(mktemp -d)
-    cp h264/emu.sv h264/vid_out.sv "$d/"
+    cp h264/emu.sv h264/vid_out.sv sys/sys_top.v "$d/"
     if ! python3 - "$d" "$old" "$new" "$wf" <<'PYEOF'
 import sys, os
 d, old, new, wf = sys.argv[1:5]
@@ -262,7 +265,7 @@ PYEOF
     then { echo "  $name: anchor missed (harness failure)"; echo MUTFAIL; } > "$RES/$name"; rm -rf "$d"; return; fi
     local ok=0
     if [ "$tool" = wiring ]; then
-      VID_OUT_SV="$d/vid_out.sv" python3 tools/check_emu_wiring.py "$d/emu.sv" > "$d/wlog" 2>&1 && ok=1
+      VID_OUT_SV="$d/vid_out.sv" python3 tools/check_emu_wiring.py "$d/emu.sv" "$d/sys_top.v" > "$d/wlog" 2>&1 && ok=1
       if [ $ok = 0 ] && [ -n "$want" ] && ! grep -qF -- "- $want:" "$d/wlog"; then
         { echo "  $name: failed but NOT by its own check ($want):"; grep -m2 -- '^  - ' "$d/wlog"; echo MUTFAIL; } > "$RES/$name"
         rm -rf "$d"; return
@@ -408,6 +411,9 @@ PYEOF
   wmut W111 "(fit_169 || (auto_wide && !raster_fitted))" "(auto_wide && !raster_fitted)" wiring ar_wide
   wmut W112 "wire fit_fill   = fit_169 && hdmi_sd16 && (status[2:1] == 2'd0);" "wire fit_fill   = 1'b0;" wiring fit_fill
   wmut W113 "(HDMI_HEIGHT == 12'd480 || HDMI_HEIGHT == 12'd576)" "(HDMI_HEIGHT == 12'd480)" wiring fit_fill
+  wmut W114 "fit_mode_want = status[2] ? 2'd2 : 2'd0;" "fit_mode_want = interlaced_eff ? (status[2] ? 2'd2 : 2'd0) : status[2] ? 2'd2 : 2'd3;" wiring fit_mode_want
+  WFILE=sys/sys_top.v wmut W115 "	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_mode_h)," "	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_height)," wiring sys_top.HDMI_HEIGHT
+  WFILE=sys/sys_top.v wmut W116 "	hdmi_mode_w <= WIDTH << HDMI_PR;" "	hdmi_mode_w <= (HSET && (HSET < WIDTH))  ? HSET << HDMI_PR : WIDTH << HDMI_PR;" wiring sys_top.HDMI_WIDTH
   wmut W101 "	.fit_hpf           (v_fit_hpf)," "	.fit_hpf           (3'd0)," wiring disp_reader.fit_hpf
   wmut L1 "wire stream_live = sh_valid;" "wire stream_live;" lint
   for f in "$RES"/*; do grep -v '^MUTFAIL$' "$f"; grep -q '^MUTFAIL$' "$f" && fail=1; done

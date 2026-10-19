@@ -1193,18 +1193,19 @@ disp_ctl disp_ctl_inst (
 );
 
 // ---- the fit (P6 step 3): where and how big the shown picture is -----------------------------
-// Display Shape supplies the shared 4:3 / 16:9 canvas. Interlaced output uses letterbox or
-// anamorphic fit to match that shape; progressive output fills the selected canvas. The player
+// Display Shape supplies the shared 4:3 / 16:9 canvas, and every fitted raster matches it: 4:3 is
+// Letterbox, 16:9 the anamorphic 16:9 fit, interlaced and progressive alike. HDMI is told the same
+// shape (VIDEO_ARX / ARY below), so the picture keeps its proportions on either output. Fill (mode
+// 3, A') is not selected: it letterboxed for the HDMI display's shape while HDMI was told 4:3, so
+// 480p at 4:3 showed a scope film about 1.5x too narrow (found on the DE10 2026-10-19). The player
 // publishes its calibrated geometry separately. Fit state is latched once per refresh, in its
 // blank before the next one's rows are commanded (progressive line 500, the field's line
 // 250 at 480i), so a menu change never splits a picture; disp_fit then republishes within
 // ~150 clocks.
-// A' (docs/hdmi_raster.md §3a): Auto in Progressive is Fill -- filled, but a picture wider than
-// the HDMI display (HDMI_WIDTH x HDMI_HEIGHT, latched below) is letterboxed INSIDE the raster
-// and HDMI is given the display's shape, so the whole raster (a program's overlay included)
-// covers the screen and a scope film's bars are the raster's own.
-wire  [1:0] fit_mode_want = interlaced_eff ? (status[2] ? 2'd2 : 2'd0) :
-                            status[2] ? 2'd2 : 2'd3; // shared 16:9 fit, otherwise fill the 4:3 screen
+// A' (docs/hdmi_raster.md §3a) stays in disp_fit for its benches: under Fill a picture wider than
+// the HDMI display (HDMI_WIDTH x HDMI_HEIGHT, latched below) is letterboxed INSIDE the raster and
+// HDMI is given the display's shape. The native raster (raster_geom) still uses the latched shape.
+wire  [1:0] fit_mode_want = status[2] ? 2'd2 : 2'd0; // the anamorphic 16:9 fit, or 4:3 Letterbox
 wire        raster_fitted = ~geom_nat;   // every non-native profile uses the shared fitted canvas
 reg   [1:0] fit_mode_l = 2'd0;
 reg  [11:0] fit_dw_l = 12'd0, fit_dh_l = 12'd0;   // A': the HDMI display's shape, latched with the mode
