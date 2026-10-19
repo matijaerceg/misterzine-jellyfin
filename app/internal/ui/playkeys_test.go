@@ -22,7 +22,7 @@ func TestBackRestsAfterTheOverlayGoes(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}
 	now := time.Now()
-	p.framed(now, c)
+	p.framed(now)
 	p.Tick(now, c, true)
 	keyAt(p, c, input.Enter, now) // the controls come up
 	if !p.visible {
@@ -44,7 +44,7 @@ func TestBackRestsAfterTheOverlayTimesOut(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}
 	now := time.Now()
-	p.framed(now, c)
+	p.framed(now)
 	keyAt(p, c, input.Enter, now)
 	now = now.Add(OsdHide + 100*time.Millisecond)
 	p.Tick(now, c, true) // it hides itself
@@ -64,7 +64,7 @@ func TestBackRestsAfterTheSeekStripGoes(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}
 	now := time.Now()
-	p.framed(now, c)
+	p.framed(now)
 	keyAt(p, c, input.Right, now) // a tap: the strip peeks
 	now = now.Add(50 * time.Millisecond)
 	p.Key(input.Event{Key: input.Right, Release: true}, now)
@@ -97,7 +97,7 @@ func TestDownStepsOutOfTheControls(t *testing.T) {
 		p := waitPlaying(t)
 		c := &coreOSD{}
 		now := time.Now()
-		p.framed(now, c)
+		p.framed(now)
 		keyAt(p, c, tc.open, now)
 		if !p.visible {
 			t.Fatalf("%s: the controls did not open", tc.name)
@@ -134,7 +134,7 @@ func TestDownFromTheTimelineKeepsTheScrubAndBackDropsIt(t *testing.T) {
 		p.send = func(s string) { sent = append(sent, s) }
 		c := &coreOSD{}
 		now := time.Now()
-		p.framed(now, c)
+		p.framed(now)
 		keyAt(p, c, input.Up, now) // the timeline, at 600 s
 		keyAt(p, c, input.Right, now.Add(100*time.Millisecond))
 		p.Key(input.Event{Key: input.Right, Release: true}, now.Add(150*time.Millisecond)) // a tap: 610, in its grace
@@ -153,7 +153,7 @@ func TestDownMovesInAList(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}
 	now := time.Now()
-	p.framed(now, c)
+	p.framed(now)
 	keyAt(p, c, input.Enter, now)
 	p.item.Audio = []jellyfin.Stream{{ID: "1", Title: "First"}, {ID: "2", Title: "Second"}}
 	p.openList("Audio")

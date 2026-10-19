@@ -573,7 +573,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 				// wait dot may still be running
 				updateOverlay(a.osd, func() {
 					a.osd.Hide()
-					ctl.end(a.osd)
+					ctl.end()
 					a.osd.Dot(0, 0, 0, false)
 					a.osd.Bar(0, 0, 0, 0, 0, false)
 				})
@@ -597,7 +597,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 			if !up {
 				if ev.Key == input.Back && !ev.Release && !ev.Repeat {
 					if a.osd != nil {
-						updateOverlay(a.osd, func() { ctl.end(a.osd) }) // the dot goes with the press
+						updateOverlay(a.osd, func() { ctl.end() }) // the dot goes with the press
 					}
 					stopped = true
 					ctl.closePainter(a.osd)
@@ -609,7 +609,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 				if a.osd != nil {
 					updateOverlay(a.osd, func() {
 						a.osd.Hide()
-						ctl.end(a.osd)
+						ctl.end()
 					})
 				}
 				stopped = true
@@ -646,7 +646,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 						lastFrame, _ = frames.Published()
 					}
 					if a.osd != nil {
-						ctl.framed(time.Now(), a.osd)
+						ctl.framed(time.Now())
 					}
 					continue
 				}
@@ -665,7 +665,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 					if frames != nil {
 						if seq, ok := frames.Published(); ok && seq != lastFrame {
 							lastFrame = seq
-							ctl.framed(time.Now(), a.osd)
+							ctl.framed(time.Now())
 						}
 					}
 					ctl.Tick(time.Now(), a.osd, true)

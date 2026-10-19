@@ -85,13 +85,15 @@ type Playing struct {
 	restart  bool // the stream must restart for a new track: seek to here
 	// the wait dot (waitdot.go): it runs in the middle while the picture
 	// is held up, from the start until the first frame and on any stall
-	starting  bool      // no frame from the presenter yet
-	ending    bool      // stopping: no more dot
-	frameAt   time.Time // the last frame, or now while paused: stalls are timed from it
-	lastFrame time.Time // the last frame the presenter published
-	hushAt    time.Time // a seek was sent: its wait shows no dot, the strip says where it goes
-	wait      *waitDot  // the dot, while it runs
-	waitSpec  string    // PLEXCRT_WAIT_DOT, for tuning on a set
+	starting   bool        // no frame from the presenter yet
+	ending     bool        // stopping: no more dot
+	frameAt    time.Time   // the last frame, or now while paused: stalls are timed from it
+	lastFrame  time.Time   // the last frame the presenter published
+	hushAt     time.Time   // a seek was sent: its wait shows no dot, the strip says where it goes
+	wait       *waitDot    // the dots, while they run
+	waitSpec   string      // PLEXCRT_WAIT_DOT, for tuning on a set
+	waitCanvas *gfx.Canvas // the dots' panel, alone or with the start strip under them
+	waitAlpha  []byte
 }
 
 type listMode struct {
@@ -770,8 +772,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		p.statAt = now
 		p.status()
 	}
-	p.waiting(now, osd, field)
-	dotFree := p.wait == nil // the wait dot has the sprite while it runs
+	p.waiting(now)
 	if field && p.scrub && p.held != 0 {
 		p.shownAt = now // a hold keeps the overlay up
 		if !p.visible {
@@ -830,16 +831,24 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	skipBtn := p.skipShown(now)
 	if !p.visible && !skipBtn && !peek {
 		if p.dirty {
-			if p.last != "" {
+			if p.last != "" && p.last != "wait" {
 				p.closedAt = now // something just left the screen: Back rests for BackGrace
 			}
-			p.painter.hide(osd)
-			if dotFree {
-				osd.Dot(0, 0, 0, false)
-			}
+			osd.Dot(0, 0, 0, false)
 			osd.Bar(0, 0, 0, 0, 0, false)
 			p.dirty = false
-			p.last = ""
+			if p.wait == nil {
+				p.painter.hide(osd)
+				p.last = ""
+			}
+		}
+		if p.wait != nil {
+			// the dots alone, repainted as the swell moves on
+			if frame := p.wait.frameAt(now); frame != p.wait.frame || p.last != "wait" {
+				p.wait.frame, p.last = frame, "wait"
+				c, alpha, y := p.waitPanel(frame, nil, nil)
+				p.painter.show(osd, 0, y, c, alpha)
+			}
 		}
 		return
 	}
@@ -847,9 +856,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	var x, y int
 	if p.list != nil {
 		l := p.list
-		if dotFree {
-			osd.Dot(0, 0, 0, false)
-		}
+		osd.Dot(0, 0, 0, false)
 		moved := false
 		if field {
 			moved = l.slide()
@@ -878,15 +885,25 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		// on the bar while a hold scrubs
 		osd.Bar(0, 0, 0, 0, 0, false)
 		key = "peek|" + itoa(int(p.pos)) + "|" + itoa(btoi(p.peekScrub)) + "|" + itoa(int(p.scrubTo)) + p.bufferKey()
+		frame := -1
+		if p.wait != nil {
+			frame = p.wait.frameAt(now) // the dots over the start strip: repainted as they swell
+			key += "|w" + itoa(frame)
+		}
 		if key != p.last && !(vx != 0 && p.scrubTick&1 == 1) {
 			p.last = key
 			p.compose(true)
 			h := p.peekH
-			p.painter.show(osd, 0, p.osdBottom()-h, &gfx.Canvas{W: p.canvas.W, H: h, Pix: p.canvas.Pix[:p.canvas.W*h*4]}, p.alpha[:p.canvas.W*h])
+			strip, alpha := &gfx.Canvas{W: p.canvas.W, H: h, Pix: p.canvas.Pix[:p.canvas.W*h*4]}, p.alpha[:p.canvas.W*h]
+			if p.wait != nil {
+				p.wait.frame = frame
+				c, a, y := p.waitPanel(frame, strip, alpha)
+				p.painter.show(osd, 0, y, c, a)
+			} else {
+				p.painter.show(osd, 0, p.osdBottom()-h, strip, alpha)
+			}
 		}
-		if !dotFree {
-			p.dotOn = false
-		} else if p.scrub && p.dur > 0 {
+		if p.scrub && p.dur > 0 {
 			// the dot: loaded at the press (hidden, so the run starts from
 			// here), shown once the hold runs; the core places it meanwhile
 			if vx == 0 || !p.dotOn {
@@ -901,9 +918,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		return
 	}
 	if skipBtn {
-		if dotFree {
-			osd.Dot(0, 0, 0, false)
-		}
+		osd.Dot(0, 0, 0, false)
 		osd.Bar(0, 0, 0, 0, 0, false)
 		x, y = (p.canvas.W-240)/2, 240
 		key = p.skipKey()
@@ -918,7 +933,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	// screen within a line
 	if p.composed {
 		p.sprites()
-		if vx == 0 && dotFree {
+		if vx == 0 {
 			osd.Dot(p.dotX, p.dotY, uint32(gfx.White), p.dotOn)
 		}
 		osd.Bar(p.barX, p.barY, p.barW, BarW, uint32(gfx.GreyHi), p.barOn)
@@ -934,9 +949,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	if !p.composed {
 		p.composed = true
 		p.sprites()
-		if dotFree {
-			osd.Dot(p.dotX, p.dotY, uint32(gfx.White), p.dotOn)
-		}
+		osd.Dot(p.dotX, p.dotY, uint32(gfx.White), p.dotOn)
 		osd.Bar(p.barX, p.barY, p.barW, BarW, uint32(gfx.GreyHi), p.barOn)
 	}
 	p.last = key

@@ -22,6 +22,7 @@ type painter struct {
 	w, h       int
 	pend       *stage // the panel waiting to be written, or nil
 	hid        bool   // a hide waits
+	busy       bool   // a write is in progress
 	closed     bool   // cancel queued work, hide after the active write, then exit
 	done       chan struct{}
 	free       []*stage
@@ -93,7 +94,7 @@ func (p *painter) show(osd OSD, x, y int, c *gfx.Canvas, alpha []byte) {
 	p.osd, p.x, p.y, p.w, p.h = osd, x, y, c.W, c.H
 	p.hid = false
 	p.mu.Unlock()
-	p.cond.Signal()
+	p.cond.Broadcast()
 }
 
 // do queues work for the painter's goroutine, in order with its writes:
@@ -107,7 +108,7 @@ func (p *painter) do(f func()) {
 	}
 	p.jobs = append(p.jobs, f)
 	p.mu.Unlock()
-	p.cond.Signal()
+	p.cond.Broadcast()
 }
 
 // hide queues a hide, cancelling any panel waiting.
@@ -124,7 +125,7 @@ func (p *painter) hide(osd OSD) {
 	p.osd = osd
 	p.hid = true
 	p.mu.Unlock()
-	p.cond.Signal()
+	p.cond.Broadcast()
 }
 
 // close cancels queued writes, hides after any in-flight write, then exits.
@@ -142,7 +143,7 @@ func (p *painter) close(osd OSD) {
 		p.jobs = nil // queued operations belong to the screen being left
 	}
 	p.mu.Unlock()
-	p.cond.Signal()
+	p.cond.Broadcast()
 }
 
 func (p *painter) waitClosed() { <-p.done }
@@ -174,16 +175,22 @@ func (p *painter) run() {
 			p.jobs = p.jobs[1:]
 			p.mu.Unlock()
 			f()
+			p.cond.Broadcast() // a flush may wait on the job
 			continue
 		}
 		osd := p.osd
 		if p.hid {
 			p.hid = false
+			p.busy = true
 			closed := p.closed
 			p.mu.Unlock()
 			if osd != nil {
 				osd.Hide()
 			}
+			p.mu.Lock()
+			p.busy = false
+			p.mu.Unlock()
+			p.cond.Broadcast() // a flush may wait on the hide
 			if closed {
 				close(p.done)
 				return
@@ -196,12 +203,25 @@ func (p *painter) run() {
 		}
 		s := p.pend
 		p.pend = nil
+		p.busy = true
 		x, y, w, h := p.x, p.y, p.w, p.h
 		p.mu.Unlock()
 		c.W, c.H, c.Pix = w, h, s.pix[:w*h*4]
 		osd.Show(x, y, c, s.alpha[:w*h])
 		p.mu.Lock()
 		p.free = append(p.free, s)
+		p.busy = false
 		p.mu.Unlock()
+		p.cond.Broadcast()
 	}
+}
+
+// flush waits until every queued write, hide and job has been done: for
+// tests, which check the fake core right after a Tick.
+func (p *painter) flush() {
+	p.mu.Lock()
+	for !p.closed && (p.pend != nil || p.hid || len(p.jobs) > 0 || p.busy) {
+		p.cond.Wait()
+	}
+	p.mu.Unlock()
 }
