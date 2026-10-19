@@ -36,6 +36,8 @@
 #include "seek_protocol.h"
 #include "video_geometry.h"
 #include "core_owner.h"
+#include "direct_check.h"
+#include "lag_watch.h"
 
 #define Q_PACKETS 8192
 #define Q_BYTES (64u * 1024u * 1024u)
@@ -53,14 +55,17 @@
 enum seek_state { SEEK_IDLE, SEEK_IN_PROGRESS, SEEK_READY, SEEK_ERROR };
 
 enum exit_code { EX_OK = 0, EX_ARGS = 2, EX_CORE = 3, EX_OPEN = 4,
-                 EX_REFUSED = 5, EX_STREAM = 6 };
+                 EX_REFUSED = 5, EX_STREAM = 6,
+                 /* --direct only: the stream needs a server transcode (the
+                  * pre-check failed, or the core could not keep up) */
+                 EX_NEEDS_TRANSCODE = 7 };
 enum playback_state { STATE_OPENING, STATE_PLAYING, STATE_PAUSED,
                       STATE_ENDED, STATE_ERROR };
 
 struct config {
     const char *url, *rbf, *headers, *cafile, *fifo, *status;
     double base, start_in_file;
-    int audio_index, hold, volume, audio_boost, surround_source;
+    int audio_index, hold, volume, audio_boost, surround_source, direct;
     int analog_aspect, analog_aspect_set;
     int anti_twitter, anti_twitter_set;
     struct video_geometry_config geometry;
@@ -136,6 +141,9 @@ struct player {
     struct pcm_queue pcm;
     uint64_t last_status_ms;
     char error[256];
+    struct direct_check dcheck;   /* --direct: the SPS / PPS pre-check */
+    int direct_ok;                /* --direct: the pre-check passed */
+    struct lag_watch lag;         /* --direct: the keep-up watchdog */
 };
 
 static volatile sig_atomic_t caught_signal;
@@ -227,7 +235,7 @@ static void usage(void)
 {
     fprintf(stderr, "usage: jfplay [--rbf path] [--base SECONDS] [--start-in-file SECONDS] [--audio INDEX] "
             "[--headers TEXT] [--cafile path] [--fifo path] [--status path] "
-            "[--hold] [--volume 0-100] [--audio-boost 100-300] [--surround-source] "
+            "[--hold] [--direct] [--volume 0-100] [--audio-boost 100-300] [--surround-source] "
             "[--analog-aspect 0-4] [--anti-twitter 0-2] "
             "[--geometry LEFT,TOP,RIGHT,BOTTOM,WIDTH] URL\n");
 }
@@ -240,6 +248,7 @@ static int parse_args(int argc, char **argv, struct config *c)
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--hold")) c->hold = 1;
         else if (!strcmp(argv[i], "--surround-source")) c->surround_source = 1;
+        else if (!strcmp(argv[i], "--direct")) c->direct = 1;
         else if (!strcmp(argv[i], "--rbf") && ++i < argc) c->rbf = argv[i];
         else if (!strcmp(argv[i], "--headers") && ++i < argc) c->headers = argv[i];
         else if (!strcmp(argv[i], "--cafile") && ++i < argc) c->cafile = argv[i];
@@ -1282,6 +1291,14 @@ static void write_status(struct player *p, int force)
     }
     if (refused && !atomic_load(&p->exit_code))
         fail(p, EX_REFUSED, "core refused stream: %u %s", refused, h264ring_refusal_name(refused));
+    if (have && p->cfg.direct && !atomic_load(&p->exit_code)) {
+        int running = p->direct_ok && p->origin_ready && !p->paused &&
+                      p->state == STATE_PLAYING && p->seek_state != SEEK_IN_PROGRESS;
+        int lag_ms = (int16_t)H264RING_ST(&st, LAG_MS);
+        if (lag_watch_sample(&p->lag, now, running, late, lag_ms))
+            fail(p, EX_NEEDS_TRANSCODE,
+                 "direct stream needs a transcode: the core cannot keep up (%d ms behind)", -lag_ms);
+    }
     char tmp[1024], clean[256], seek_clean[256], state[16], seek_state[16];
     snprintf(tmp, sizeof tmp, "%s.tmp.%ld", p->cfg.status, (long)getpid());
     snprintf(clean, sizeof clean, "%s", p->error);
@@ -1634,6 +1651,29 @@ static int service_seek(struct player *p)
     return p->seek_reset_done < 2;
 }
 
+/* --direct: feed Annex-B SPS / PPS to the pre-check. Returns 1 when the
+ * stream passed, 0 while undecided, -1 after failing with EX_NEEDS_TRANSCODE.
+ * final: no more parameter sets will come before the first picture. */
+static int direct_precheck(struct player *p, const uint8_t *data, size_t len, int final)
+{
+    const char *why = "no SPS / PPS before the first picture";
+    AVRational fr = p->nominal_video_rate;
+    double fps = fr.num > 0 && fr.den > 0 ? av_q2d(fr) : 0.0;
+    int rc = data && len ? direct_check_au(&p->dcheck, data, len, fps, &why) : 0;
+    if (rc > 0) {
+        p->direct_ok = 1;
+        logmsg("direct stream pre-check passed (profile %u, %ux%u macroblocks, %.3f fps)",
+               p->dcheck.chk.profile_idc, p->dcheck.chk.width_mbs,
+               p->dcheck.chk.height_map_units * (p->dcheck.chk.frame_mbs_only ? 1u : 2u), fps);
+        return 1;
+    }
+    if (rc < 0 || final) {
+        fail(p, EX_NEEDS_TRANSCODE, "direct stream needs a transcode: %s", why);
+        return -1;
+    }
+    return 0;
+}
+
 static int receive_video(struct player *p)
 {
     int rc;
@@ -1645,6 +1685,11 @@ static int receive_video(struct player *p)
         if (rc < 0) { av_packet_free(&out); return rc; }
         if (!p->saw_idr && !annexb_idr(out->data, (size_t)out->size)) {
             av_packet_free(&out); continue;
+        }
+        if (!p->saw_idr && p->cfg.direct && !p->direct_ok &&
+            direct_precheck(p, out->data, (size_t)out->size, 1) < 0) {
+            /* nothing of the stream reaches the core */
+            av_packet_free(&out); return 0;
         }
         if (!p->saw_idr) {
             int64_t raw = packet_raw_pts90(p, out, p->rd.vi);
@@ -1898,6 +1943,15 @@ int main(int argc, char **argv)
         }
         av_strerror(rc, e, sizeof e);
         fail(&p, EX_OPEN, "stream open failed: %s", e); goto done;
+    }
+    if (p.cfg.direct) {
+        /* The container's parameter sets, before anything is shown (a
+         * transport stream has none here; its first IDR is checked). */
+        const AVCodecParameters *op = p.bsf->par_out;
+        const uint8_t *x = op->extradata;
+        if (x && op->extradata_size >= 4 && !x[0] && !x[1] && (x[2] == 1 || (!x[2] && x[3] == 1)) &&
+            direct_precheck(&p, x, (size_t)op->extradata_size, 0) < 0)
+            goto done;
     }
     if (apply_geometry(&p)) goto done;
     p.opened = 1; p.state = p.paused ? STATE_PAUSED : STATE_PLAYING; write_status(&p, 1);

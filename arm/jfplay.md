@@ -24,7 +24,7 @@ the current playback point (whichever bound is reached first).
 ## Invocation
 
 ```
-jfplay [--rbf path] [--base SECONDS] [--start-in-file SECONDS] [--audio INDEX] [--headers "K: v\r\n..."] [--cafile path] [--fifo /tmp/jfplay.ctl] [--status /tmp/jfplay.status] [--hold] [--volume 0-100] [--audio-boost 100-300] [--surround-source] [--analog-aspect 0-3] [--anti-twitter 0-2] [--geometry LEFT,TOP,RIGHT,BOTTOM,WIDTH] URL
+jfplay [--rbf path] [--base SECONDS] [--start-in-file SECONDS] [--audio INDEX] [--headers "K: v\r\n..."] [--cafile path] [--fifo /tmp/jfplay.ctl] [--status /tmp/jfplay.status] [--hold] [--direct] [--volume 0-100] [--audio-boost 100-300] [--surround-source] [--analog-aspect 0-3] [--anti-twitter 0-2] [--geometry LEFT,TOP,RIGHT,BOTTOM,WIDTH] URL
 ```
 
 `URL` is a direct-play file or an HLS master/media playlist.  `--headers` is
@@ -86,6 +86,20 @@ app sends this option only when the running core advertises interface 1.2 or
 later, so older cores retain preview-only calibration. Applying geometry
 requires a custom core build with interface 1.2 or later. The software path is
 implemented but has not yet been confirmed on a MiSTer display.
+
+`--direct` marks an untranscoded stream. Before anything of the stream reaches
+the core, the worker checks its SPS and PPS (from the container's extradata,
+or else the first IDR access unit) with the decoder project's
+`clients/common/h264check.c` plus `direct_check.h`: Main or High profile,
+4:2:0, 8-bit, CABAC, no MBAFF (field-coded PAFF is accepted), at most 1280
+pixels wide and 3,600 macroblocks, within the core's macroblock rate for the
+container frame rate, and no slice groups or redundant pictures. A failure,
+or no parameter sets before the first IDR, exits with code 7 and an `error`
+naming the reason. While a `--direct` stream plays, `lag_watch.h` samples
+`DISP_LATE` and `LAG_MS` once a second (outside pause, seeks and a 3 s grace
+after each); four consecutive seconds with new late pickups and a picture that
+is behind and falling further behind (or more than 2 s behind) also exit with
+code 7. The `position` written at exit is where to resume a transcode.
 
 With `--hold`, the session starts paused before any records are submitted.  The
 reader finds the first IDR (discarding earlier video), then the process fills as
@@ -212,6 +226,7 @@ and fractional seconds use three decimal places.
 | 4 | The URL could not be opened or initial stream setup failed. |
 | 5 | The core refused the stream (unsupported profile, size, or similar). |
 | 6 | A network/demux/decode failure occurred after playback opened. |
+| 7 | `--direct` only: the stream needs a server transcode (pre-check failed, or the core could not keep up). |
 
 On natural EOF the final held video access unit carries
 `H264RING_F_END_OF_STREAM` after queued audio. On stop, a session reset discards
