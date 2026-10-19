@@ -11,7 +11,7 @@ First packaged beta of the CRT-first Jellyfin application.
 - Direct streaming and Jellyfin transcoding, burned-in subtitles, pause/resume,
   seeking, buffered-range display and surround downmix boost.
 - 4:3/16:9 display shape, saved calibration and crop, vertical de-flicker,
-  analog dither, menu/paused dimming and playback-only 240p/288p.
+  menu/paused dimming and playback-only 240p/288p.
 - NTSC/PAL output with optional 50/60 refresh matching. No 48 Hz mode.
   Optional 24-to-25 film speed-up requires fixed PAL and raises audio pitch.
 

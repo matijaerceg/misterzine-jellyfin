@@ -39,7 +39,6 @@ screen for HDMI's benefit and the analog picture would be stretched.
 ## Banding on an 18-bit I/O board
 
 The classic DE10-Nano analog I/O board has a 6-bit-a-colour video DAC: smooth gradients -- a
-sky, a fade, a dark scene -- come out in visible bands. Set **Analog Dither** to **On**: the
-core adds a fine, moving pattern that the screen averages away, and the gradients come out
-smooth. Leave it Off on a board with a full 8-bit DAC (a SuperStation, a 24-bit analog board).
-HDMI is never affected.
+sky, a fade, a dark scene -- show some banding, and there is no option for it. (An analog
+dither was tried and removed: on component video it made the picture worse.) A board with a
+full 8-bit DAC (a SuperStation, a 24-bit analog board) does not band. HDMI is never affected.

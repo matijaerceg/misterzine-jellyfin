@@ -47,7 +47,6 @@ module emu (
 	output        VGA_F1,
 	output  [1:0] VGA_SL,
 	output        VGA_SCALER,
-	output        VGA_DITHER,     // H264-FORK (2026-10-06, docs/analog.md S12): the OSD's Analog Dither -> sys_top's dac_dither
 
 	// UMD-FORK (inherited): composite sync generated from the core's OWN raster, with
 	// the equalizing pulses the framework's csync module cannot produce. sys_top delays
@@ -171,7 +170,7 @@ assign LOCKED    = locked & vid_locked;
 //     30 chars and splits CONF_STR on those characters.
 //   * This string is INSIDE CONF_STR = inside the netlist. Changing it re-rolls the
 //     pinned fitter SEED, so change it once per branch and never per commit.
-`define CORE_VERSION "dev-buttons"
+`define CORE_VERSION "dev-ditherreg"
 
 // The OSD definition. Every option, button and file extension here MUST be documented
 // in the manual: tools/docs_check.py parses this block (by its terminator, never a
@@ -195,9 +194,9 @@ assign LOCKED    = locked & vid_locked;
 //
 // Legacy status positions remain allocated for the HPS settings API: [2:1] shape, [4:3]
 // deinterlace, [7] HDMI deinterlace, [9:8] legacy Analog Aspect (hidden), [16:15] Anti-Twitter mirror,
-// [17:18] program actions, [19] analog dither. The display policy adds [22:20] profile,
+// [17:18] program actions, [19] free (reserved). The display policy adds [22:20] profile,
 // [23] legacy match refresh (ignored), [24] playback 240p, [25] film speed,
-// [26] dither disable, and [28:27] refresh-match mode. CONF_STR stays at v1 so existing
+// [26] free (reserved), and [28:27] refresh-match mode. CONF_STR stays at v1 so existing
 // HPS values remain intact; the new profile defaults to 480i60.
 localparam CONF_STR = {
 	"MisterZine Jellyfin;;",
@@ -210,7 +209,6 @@ localparam CONF_STR = {
 	"H0O[4:3],Deinterlace,Weave,Bob,Blend;",
 	"h0O[7],HDMI Deinterlace,Weave,Bob;",
 	"O[29],De-flicker,On,Off;",
-	"O[26],Analog Dither,On,Off;",
 	"-;",
 	"-;",
 	"R[0],Reset;",
@@ -1716,7 +1714,6 @@ assign CE_PIXEL = vga_ce_q;       // one clk_vid clock a dot: every third at 480
 assign VGA_F1 = vga_f1_q;        // 480i: v_pos[0], 0 on the top field (what ascal's Weave needs, DVD #41); 0 in 480p
 assign VGA_SL = 2'd0;
 assign VGA_SCALER  = 1'b0;
-assign VGA_DITHER  = ~status[26];  // Default On; new bit avoids inverting saved legacy bit-19 preferences.
 assign VGA_DISABLE = 1'b0;
 assign VGA_CS    = cs_smpte;
 assign VGA_CS_EN = cs_smpte_en;

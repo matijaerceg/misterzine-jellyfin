@@ -105,7 +105,6 @@
 #           ack tied off, pic_in's emission input tied off, word 85 tied off (W107) -> check_emu_wiring
 #           (recon_out.pinfo_we, pic_in.oq_hold, pic_in.rst_n, pic_xing, ring_rd.pd_ack,
 #           pic_in.r_emit_valid, ring_words_sys.f_disp_fhold)
-#   W108 (docs/analog.md S12) the Analog Dither tied on (every board dithered) -> check_emu_wiring (VGA_DITHER)
 #   W109, W110 (interface 0.17, F5) word 30's fit_valid tied 1; fit_clamp reported with no picture shown
 #   W111 (issue #11) HDMI's Auto aspect 4:3 under Analog Aspect Fit (the anamorphic 16:9 fit) -> check_emu_wiring (ar_wide)
 #   W112, W113 (issue #11) Fit on an SD HDMI mode not filled (16:9 there: a letterboxed window); 720x576 left out -> check_emu_wiring (fit_fill)
@@ -403,7 +402,6 @@ PYEOF
   wmut W104 "\t.pd_ack         (pd_ack)," "\t.pd_ack         (1'b0)," wiring ring_rd.pd_ack
   wmut W105 "\t.r_emit_valid     (em_valid)," "\t.r_emit_valid     (1'b0)," wiring pic_in.r_emit_valid
   wmut W107 "\t.f_disp_fhold     (disp_fhold)," "\t.f_disp_fhold     (32'd0)," wiring ring_words_sys.f_disp_fhold
-  wmut W108 "assign VGA_DITHER  = status[19];" "assign VGA_DITHER  = 1'b1;" wiring VGA_DITHER
   # (0.17, F5) the fit's status before any picture: fit_valid tied 1, a fit flag ungated
   wmut W109 "wire        st_fit_valid    = sh_valid;" "wire        st_fit_valid    = 1'b1;" wiring st_fit_valid
   wmut W110 "wire        st_fit_clamp    = sh_valid & fit_clamp;" "wire        st_fit_clamp    = fit_clamp;" wiring st_fit_clamp

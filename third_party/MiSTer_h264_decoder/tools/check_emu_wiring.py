@@ -361,9 +361,9 @@ def main():
             bad(wire, 'not assigned')
         elif terms(rhs) != want:
             bad(wire, 'is `%s`, expected exactly %s' % (rhs, sorted(want)))
-    # Analog Dither defaults On using a fresh disable bit; legacy bit 19 is ignored.
-    if (assign_of(src, 'VGA_DITHER') or '').replace(' ', '') != '~status[26]':
-        bad('VGA_DITHER', "must be ~status[26] (the default-On Analog Dither option)")
+    # Analog Dither was removed 2026-10-19; its port must not come back.
+    if 'VGA_DITHER' in src:
+        bad('VGA_DITHER', 'removed 2026-10-19; must not come back')
     rhs = assign_of(src, 'reset_n')
     if rhs is None:
         bad('reset_n', 'not assigned')

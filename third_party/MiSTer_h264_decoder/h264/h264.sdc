@@ -92,10 +92,6 @@ set_max_delay -from [get_keepers {*dec_stub:*|cnt[23]*}] -to [get_keepers {*dec_
 # flops (cdc_reset's shape)
 set_false_path -to [get_pins -compatibility_mode {*ring_rd:*|rst_m1|clrn *ring_rd:*|rst_m2|clrn}]
 
-# (2026-10-06) the OSD's Analog Dither (emu's status[19], clk_sys) into sys_top's dac_dither (clk_vid): a
-# quasi-static level, synchronised by en_s1 / en_s2 -- its first stage
-set_false_path -to [get_keepers {*dac_dither:*|en_s1}]
-
 # cdc_reset: the reset asserts asynchronously on the two synchroniser flops and is
 # released through them -- their clear pins are the crossing (recovery checked from the
 # source domain was 3.7 ns wide for clk_sys -> clk_mem)

@@ -662,6 +662,11 @@ offset dropped, the flush skipped, a box weight wrong, chroma not following the 
 
 ## 12. The analog DAC's dither (2026-10-06, with the maintainer)
 
+**Removed 2026-10-19.** On the DE10's 6-bit analog board over component the dither made macroblocking
+look worse and tinted the picture, so `dac_dither`, the Analog Dither option (`status[19]`),
+`VGA_DITHER` and the bench are gone. Only the analog output register (`vga_od`) stays. The rest of
+this section is history.
+
 **Found:** on a CRT over S-Video (.236, `vga_mode=svideo`) films showed banding. Test patterns
 (`ramp_dark`: Y 16 -> 64 across the screen, x264 at qp 2, verified smooth: 49 levels, monotonic) showed
 **14 bands**: the ramp is RGB 0 -> 56, and the I/O board's VGA DAC takes the top **6 bits** of each

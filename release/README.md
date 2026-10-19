@@ -37,7 +37,7 @@ There is no 48 Hz mode.
 Use in-app video calibration to adjust the picture to your screen, and **Video
 crop** to choose how much of a film's edges to crop. **De-flicker** in the core
 OSD softens vertical detail on interlaced output while preserving horizontal
-detail. Analog dither reduces banding. **240p Playback** keeps menus interlaced
+detail. **240p Playback** keeps menus interlaced
 and switches only video to 240p, or 288p in the PAL family.
 
 **Play 24fps at 25fps** is available with fixed PAL output and refresh matching

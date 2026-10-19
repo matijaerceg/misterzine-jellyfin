@@ -1712,11 +1712,12 @@ This core's own (`H264-FORK`):
   `hd_raster.md` §2). The raster's 81 MHz `clk_vid` comes from a second PLL; the stock group
   pattern names only `sys_pll`, and a clock in no group is timed against every framework clock.
   In the group, its crossings are timed and bounded by name in `h264/h264.sdc`.
-- **`sys_top.v`: the analog DAC's dither** (2026-10-06, `analog.md` §12): `h264/dac_dither.sv`
-  between the core-raster VGA path's last word (`vga_o`) and the pins (`vga_od` into `VGA_R/G/B` and
-  the SDIO low bits), enabled by `emu`'s new output **`VGA_DITHER`** (the OSD's Analog Dither,
-  `status[19]`, Off by default: a 24-bit analog board does not band). HDMI and the scaler-to-VGA path
-  (`vgas_o`) are untouched.
+- **`sys_top.v`: the analog DAC's dither** (added 2026-10-06, `analog.md` §12; **removed 2026-10-19**:
+  it worsened macroblocking and tinted component video on the DE10's 6-bit board). It was
+  `h264/dac_dither.sv` between the core-raster VGA path's last word (`vga_o`) and the pins, enabled by
+  `emu`'s `VGA_DITHER` (OSD Analog Dither, `status[19]`). What remains from 2026-10-19 is the analog
+  output register: `vga_od` registers `vga_o` (and the syncs / DE with it), so every analog pin and
+  SOG leaves a flip-flop. HDMI and the scaler-to-VGA path (`vgas_o`) are untouched.
 - **`sys.tcl`: `pll_hdmi` pinned to `FRACTIONALPLL_X0_Y1_N0`, its output to
   `PLLOUTPUTCOUNTER_X0_Y5_N1`** (2026-10-11, `history.md` §47). Main sets each HDMI mode's pixel clock
   by rewriting the PLL's physical C counter 0 (and its VCO). A fit that put the output on another

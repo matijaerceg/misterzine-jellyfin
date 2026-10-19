@@ -1505,7 +1505,6 @@ reg  [39:0] PhaseInc;
 
 
 	wire VGA_DISABLE;
-	wire vga_dither_en;   // H264-FORK: emu's VGA_DITHER (the OSD's Analog Dither), clk_sys -> dac_dither's synchroniser
 	wire [23:0] vgas_o;
 	wire vgas_hs, vgas_vs, vgas_cs, vgas_de;
 	`ifndef MISTER_DEBUG_NOHDMI
@@ -1552,21 +1551,27 @@ reg  [39:0] PhaseInc;
 		assign {vga_o, vga_hs, vga_vs, vga_cs, vga_de } =  {vga_o_t, vga_hs_t, vga_vs_t, vga_cs_t, vga_de_t } ;
 	`endif
 
-	// H264-FORK (2026-10-06, docs/analog.md S12): an ordered dither to the I/O board's 6-bit DAC on the
-	// core-raster VGA path (RGB, YPbPr, S-Video / composite alike) -- film's gradients banded in 64
-	// steps on a CRT behind an 18-bit I/O board (a SuperStation's 24-bit DAC does not band: so an OSD
-	// option, Analog Dither, default Off). Active video only; HDMI and the scaler-to-VGA path (vgas_o)
-	// untouched.
-	wire [23:0] vga_od;
-	dac_dither vga_dither (.clk(clk_vid), .en(vga_dither_en), .hs(vga_hs), .vs(vga_vs), .de(vga_de), .din(vga_o), .dout(vga_od));
+	// H264-FORK (2026-10-19): register the analog word, and the syncs and DE with it, so every
+	// analog pin (and SOG on SD_SPI_CS) leaves a flip-flop. Unregistered combinational logic ahead of
+	// the untimed VGA pins (sys_top.sdc false-paths VGA_*) lost component sync on some fits of the
+	// DE10. One clk_vid of delay on every analog signal alike; HDMI untouched.
+	reg  [23:0] vga_od;
+	reg         vga_hs_d, vga_vs_d, vga_cs_d, vga_de_d;
+	always @(posedge clk_vid) begin
+		vga_od   <= vga_o;
+		vga_hs_d <= vga_hs;
+		vga_vs_d <= vga_vs;
+		vga_cs_d <= vga_cs;
+		vga_de_d <= vga_de;
+	end
 
 	wire vgas_en = vga_fb | vga_scaler;
 
-	wire cs1 = vgas_en ? vgas_cs : vga_cs;
-	wire de1 = vgas_en ? vgas_de : vga_de;
+	wire cs1 = vgas_en ? vgas_cs : vga_cs_d;
+	wire de1 = vgas_en ? vgas_de : vga_de_d;
 
-	assign VGA_VS = av_dis ? 1'bZ      :(((vgas_en ? (~vgas_vs ^ VS[12])                         : VGA_DISABLE ? 1'd1 : ~vga_vs) | csync_en) & subcarrier_out);
-	assign VGA_HS = av_dis ? 1'bZ      :  (vgas_en ? ((csync_en ? ~vgas_cs : ~vgas_hs) ^ HS[12]) : VGA_DISABLE ? 1'd1 : (csync_en ? ~vga_cs : ~vga_hs));
+	assign VGA_VS = av_dis ? 1'bZ      :(((vgas_en ? (~vgas_vs ^ VS[12])                         : VGA_DISABLE ? 1'd1 : ~vga_vs_d) | csync_en) & subcarrier_out);
+	assign VGA_HS = av_dis ? 1'bZ      :  (vgas_en ? ((csync_en ? ~vgas_cs : ~vgas_hs) ^ HS[12]) : VGA_DISABLE ? 1'd1 : (csync_en ? ~vga_cs_d : ~vga_hs_d));
 	assign VGA_R  = av_dis ? 6'bZZZZZZ :   vgas_en ? vgas_o[23:18]                               : VGA_DISABLE ? 6'd0 : vga_od[23:18]; // H264-FORK: vga_od
 	assign VGA_G  = av_dis ? 6'bZZZZZZ :   vgas_en ? vgas_o[15:10]                               : VGA_DISABLE ? 6'd0 : vga_od[15:10];
 	assign VGA_B  = av_dis ? 6'bZZZZZZ :   vgas_en ? vgas_o[7:2]                                 : VGA_DISABLE ? 6'd0 : vga_od[7:2]  ;
@@ -1830,7 +1835,6 @@ emu emu
 
 `ifndef MISTER_DUAL_SDRAM
 	.VGA_DISABLE(VGA_DISABLE),
-	.VGA_DITHER(vga_dither_en),   // H264-FORK (2026-10-06): the analog DAC's dither (h264/dac_dither.sv)
 `endif
 
 	.HDMI_WIDTH(direct_video ? 12'd0 : hdmi_width),

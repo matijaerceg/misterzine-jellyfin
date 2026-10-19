@@ -510,7 +510,6 @@ set_global_assignment -name SYSTEMVERILOG_FILE h264/dec/recon_mb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE h264/dec/recon_top.sv
 set_global_assignment -name SYSTEMVERILOG_FILE h264/recon_out.sv
 set_global_assignment -name SYSTEMVERILOG_FILE h264/pic_in.sv
-set_global_assignment -name SYSTEMVERILOG_FILE h264/dac_dither.sv
 set_global_assignment -name SYSTEMVERILOG_FILE h264/ddr_mux2.sv
 set_global_assignment -name SYSTEMVERILOG_FILE h264/disp_fit.sv
 set_global_assignment -name SYSTEMVERILOG_FILE h264/raster_geom.sv
