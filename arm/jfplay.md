@@ -225,7 +225,7 @@ and fractional seconds use three decimal places.
 | 3 | The H.264 core could not be launched, opened, or started. |
 | 4 | The URL could not be opened or initial stream setup failed. |
 | 5 | The core refused the stream (unsupported profile, size, or similar). |
-| 6 | A network/demux/decode failure occurred after playback opened. |
+| 6 | A network/demux/decode failure occurred after playback opened. A socket read that sees no data for 15 s (direct) or 60 s (transcode) fails and FFmpeg reconnects at the same offset, backing off for about two minutes; only then does the worker exit 6. |
 | 7 | `--direct` only: the stream needs a server transcode (pre-check failed, or the core could not keep up). |
 
 On natural EOF the final held video access unit carries

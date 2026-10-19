@@ -287,8 +287,23 @@ static int parse_args(int argc, char **argv, struct config *c)
     return c->url ? 0 : -1;
 }
 
+/* Socket read/connect timeout (tcp's "timeout", reaching tcp through http and
+ * tls). Without one a connection that goes silent, such as after a Wi-Fi drop
+ * the server gave up on, blocks the reader forever with the status still
+ * "playing". A direct stream is a static file and answers at once; a transcode
+ * can hold a segment request while the server starts encoding (over 30 s with
+ * burned-in subtitles), so it gets longer. */
+#define NET_TIMEOUT_DIRECT_US    "15000000"
+#define NET_TIMEOUT_TRANSCODE_US "60000000"
+
 static void net_options(const struct config *c, AVDictionary **d)
 {
+    av_dict_set(d, "timeout", c->direct ? NET_TIMEOUT_DIRECT_US : NET_TIMEOUT_TRANSCODE_US, 0);
+    /* After a read error or a premature end, reconnect and resume at the same
+     * offset (a response of known length), backing off for about two minutes
+     * (FFmpeg's reconnect_delay_max / reconnect_delay_total_max) before failing. */
+    av_dict_set(d, "reconnect", "1", 0);
+    av_dict_set(d, "reconnect_on_network_error", "1", 0);
     if (c->headers) av_dict_set(d, "headers", c->headers, 0);
     if (c->cafile) {
         av_dict_set(d, "tls_verify", "1", 0);
