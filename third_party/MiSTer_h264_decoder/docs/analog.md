@@ -662,8 +662,8 @@ offset dropped, the flush skipped, a box weight wrong, chroma not following the 
 
 ## 12. The analog DAC's dither (2026-10-06, with the maintainer)
 
-**Removed 2026-10-19.** On the DE10's 6-bit analog board over component the dither made macroblocking
-look worse and tinted the picture, so `dac_dither`, the Analog Dither option (`status[19]`),
+**Removed 2026-10-19.** On a high-bit-depth analog board over component the dither made macroblocking
+look worse and tinted the picture. It was never judged on a 6-bit board, where it could still help. So `dac_dither`, the Analog Dither option (`status[19]`),
 `VGA_DITHER` and the bench are gone. Only the analog output register (`vga_od`) stays. The rest of
 this section is history.
 

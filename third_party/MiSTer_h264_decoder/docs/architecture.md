@@ -1713,7 +1713,7 @@ This core's own (`H264-FORK`):
   pattern names only `sys_pll`, and a clock in no group is timed against every framework clock.
   In the group, its crossings are timed and bounded by name in `h264/h264.sdc`.
 - **`sys_top.v`: the analog DAC's dither** (added 2026-10-06, `analog.md` §12; **removed 2026-10-19**:
-  it worsened macroblocking and tinted component video on the DE10's 6-bit board). It was
+  it worsened macroblocking and tinted component video on a high-bit-depth analog board; never judged on a 6-bit board). It was
   `h264/dac_dither.sv` between the core-raster VGA path's last word (`vga_o`) and the pins, enabled by
   `emu`'s `VGA_DITHER` (OSD Analog Dither, `status[19]`). What remains from 2026-10-19 is the analog
   output register: `vga_od` registers `vga_o` (and the syncs / DE with it), so every analog pin and
