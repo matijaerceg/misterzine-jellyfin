@@ -144,6 +144,8 @@ struct player {
     struct direct_check dcheck;   /* --direct: the SPS / PPS pre-check */
     int direct_ok;                /* --direct: the pre-check passed */
     struct lag_watch lag;         /* --direct: the keep-up watchdog */
+    unsigned lag_reanchor;        /* last DISP_REANCHOR the watchdog saw */
+    int lag_reanchor_seen;
 };
 
 static volatile sig_atomic_t caught_signal;
@@ -1292,12 +1294,22 @@ static void write_status(struct player *p, int force)
     if (refused && !atomic_load(&p->exit_code))
         fail(p, EX_REFUSED, "core refused stream: %u %s", refused, h264ring_refusal_name(refused));
     if (have && p->cfg.direct && !atomic_load(&p->exit_code)) {
+        /* A source stall that starved the ring leaves the display clock
+         * re-anchored, and the pictures then arrive late with a large lag
+         * though the core decodes fine. DISP_REANCHOR is already in the
+         * status word, so a window that saw it move does not count and
+         * restarts the grace, as a pause or seek does. */
+        unsigned reanch = (unsigned)H264RING_ST(&st, DISP_REANCHOR);
+        int reanchored = p->lag_reanchor_seen && reanch != p->lag_reanchor;
+        p->lag_reanchor = reanch; p->lag_reanchor_seen = 1;
         int running = p->direct_ok && p->origin_ready && !p->paused &&
-                      p->state == STATE_PLAYING && p->seek_state != SEEK_IN_PROGRESS;
-        int lag_ms = (int16_t)H264RING_ST(&st, LAG_MS);
-        if (lag_watch_sample(&p->lag, now, running, late, lag_ms))
+                      p->state == STATE_PLAYING && p->seek_state != SEEK_IN_PROGRESS &&
+                      !reanchored;
+        unsigned raw_lag = (unsigned)H264RING_ST(&st, LAG_MS) & 0xFFFFu;
+        if (lag_watch_sample(&p->lag, now, running, late, raw_lag))
             fail(p, EX_NEEDS_TRANSCODE,
-                 "direct stream needs a transcode: the core cannot keep up (%d ms behind)", -lag_ms);
+                 "direct stream needs a transcode: the core cannot keep up (%d ms behind)",
+                 -(int)(int16_t)raw_lag);
     }
     char tmp[1024], clean[256], seek_clean[256], state[16], seek_state[16];
     snprintf(tmp, sizeof tmp, "%s.tmp.%ld", p->cfg.status, (long)getpid());

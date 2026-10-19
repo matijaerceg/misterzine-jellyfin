@@ -141,7 +141,7 @@ static void test_lag(void)
     /* in sync, then a drifting 60.000 stream: late pickups, lag ~1 ms/s */
     for (int i = 0; i < 40; i++, t += 250) {
         if (i > 20) { late++; lag = -(i - 20) / 4 - 200; }
-        fired |= lag_watch_sample(&w, t, 1, late, lag);
+        fired |= lag_watch_sample(&w, t, 1, late, (unsigned)lag & 0xFFFFu);
     }
     if (fired) { fprintf(stderr, "FAIL lag: drift triggered\n"); failures++; }
     /* a decoder at 0.85x: 150 ms more behind each second */
@@ -150,7 +150,7 @@ static void test_lag(void)
     uint64_t start = t, when = 0;
     for (int i = 0; i < 80 && !when; i++, t += 250) {
         late += 3; lag -= 37;
-        if (lag_watch_sample(&w, t, 1, late, lag)) when = t - start;
+        if (lag_watch_sample(&w, t, 1, late, (unsigned)lag & 0xFFFFu)) when = t - start;
     }
     if (!when || when < LAG_GRACE_MS + 3 * LAG_WINDOW_MS || when > LAG_GRACE_MS + 6 * LAG_WINDOW_MS) {
         fprintf(stderr, "FAIL lag: falling behind fired after %llu ms\n", (unsigned long long)when);
@@ -161,7 +161,7 @@ static void test_lag(void)
     late = 0; lag = -3000; fired = 0;
     for (int i = 0; i < 60; i++, t += 250) {
         late += 3;
-        fired |= lag_watch_sample(&w, t, (i % 16) != 0, late, lag);
+        fired |= lag_watch_sample(&w, t, (i % 16) != 0, late, (unsigned)lag & 0xFFFFu);
     }
     if (fired) { fprintf(stderr, "FAIL lag: fired across pauses\n"); failures++; }
     /* the 16-bit late counter wraps */
@@ -169,9 +169,38 @@ static void test_lag(void)
     late = 0xFFF0; lag = -2500; when = 0;
     for (int i = 0; i < 60 && !when; i++, t += 250) {
         late = (late + 2) & 0xFFFFu;
-        if (lag_watch_sample(&w, t, 1, late, lag)) when = 1;
+        if (lag_watch_sample(&w, t, 1, late, (unsigned)lag & 0xFFFFu)) when = 1;
     }
     if (!when) { fprintf(stderr, "FAIL lag: hard lag with wrapping counter\n"); failures++; }
+    /* a no-value sample neither triggers nor moves the baseline or the clock */
+    memset(&w, 0, sizeof w);
+    late = 0; fired = 0;
+    lag_watch_sample(&w, t, 1, late, 0);
+    t += LAG_GRACE_MS;
+    fired |= lag_watch_sample(&w, t, 1, late, (unsigned)-50 & 0xFFFFu);
+    t += LAG_WINDOW_MS;
+    {
+        uint64_t next = w.next_ms;
+        int base = w.behind0;
+        unsigned l0 = w.late0;
+        fired |= lag_watch_sample(&w, t, 1, late + 5, LAG_NONE);
+        if (w.next_ms != next || w.behind0 != base || w.late0 != l0 || w.bad) {
+            fprintf(stderr, "FAIL lag: sentinel moved the baseline\n"); failures++;
+        }
+    }
+    for (int i = 0; i < 12; i++, t += LAG_WINDOW_MS) {
+        late += 2;
+        fired |= lag_watch_sample(&w, t, 1, late, (unsigned)-200 & 0xFFFFu);
+    }
+    if (fired) { fprintf(stderr, "FAIL lag: sentinel counted as growth\n"); failures++; }
+    /* a stall: not running for a stretch, then a large lag, restarts the grace */
+    memset(&w, 0, sizeof w);
+    late = 0; fired = 0;
+    for (int i = 0; i < 12; i++, t += 250) {
+        late += 3;
+        fired |= lag_watch_sample(&w, t, i >= 4 && i != 5, late, (unsigned)-2500 & 0xFFFFu);
+    }
+    if (fired) { fprintf(stderr, "FAIL lag: fired after a stall\n"); failures++; }
 }
 
 int main(void)

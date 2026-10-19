@@ -13,8 +13,8 @@
  * windows trigger. Late pickups alone do not: a 60.000 frames/s stream on
  * the 59.94 raster counts them steadily while its lag grows ~1 ms a second.
  * Sampling pauses (and the grace restarts) while paused, seeking or before
- * the first picture. The thresholds are first estimates, to be tuned on
- * hardware. */
+ * the first picture, and a LAG_MS of 0xFFFF (no pickup yet) is not a sample.
+ * The thresholds are first estimates, to be tuned on hardware. */
 #include <stdint.h>
 
 #define LAG_WINDOW_MS   1000u
@@ -23,6 +23,7 @@
 #define LAG_GROWTH_MS   20
 #define LAG_HARD_MS     2000
 #define LAG_BAD_WINDOWS 4u
+#define LAG_NONE        0xFFFFu  /* the core's LAG_MS before its first pickup */
 
 struct lag_watch {
     int active;
@@ -31,12 +32,13 @@ struct lag_watch {
     int behind0;
 };
 
-/* One sample; returns 1 when a transcode is needed. */
+/* One sample (raw_lag is the core's 16-bit LAG_MS word); returns 1 when a transcode is needed. */
 static inline int lag_watch_sample(struct lag_watch *w, uint64_t now_ms, int running,
-                                   unsigned late, int lag_ms)
+                                   unsigned late, unsigned raw_lag)
 {
-    int behind = -lag_ms;
     if (!running) { w->active = 0; return 0; }
+    if (raw_lag == LAG_NONE) return 0;  /* no pickup yet: not a sample */
+    int behind = -(int)(int16_t)raw_lag;
     if (!w->active) {
         w->active = 1; w->bad = 0;
         w->next_ms = now_ms + LAG_GRACE_MS;

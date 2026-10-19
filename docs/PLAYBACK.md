@@ -16,17 +16,21 @@ limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280x720, at
 most 30 frames per second above 854 pixels wide (60 at or below), and an
 average bitrate of at most 6 Mbit/s above 854 pixels wide (8 Mbit/s at or
 below). A file that fits is streamed directly whatever the bitrate setting.
-Otherwise the app requests a transcode with the configured bitrate limit, as
-before; the bitrate setting only applies to transcodes.
+Otherwise the app makes a second PlaybackInfo request for a transcode with the
+configured bitrate limit (two requests for a transcoded item, one for a direct
+one), as before; the bitrate setting only applies to transcodes.
 
 Jellyfin cannot report every property the core depends on (CABAC versus
-CAVLC entropy coding, MBAFF versus field-coded interlace), so `jfplay` checks
+CAVLC entropy coding, MBAFF versus field-coded interlace). MBAFF is refused and
+field-coded interlace is accepted, but Jellyfin's own `IsInterlaced` flag cannot
+tell the two apart, so the app only logs it and does not decide on it. `jfplay` checks
 a direct stream's parameter sets before the first picture is shown. If the
 check fails, the core refuses the stream, or the core keeps falling behind for
 several seconds, the app restarts the item once as a transcode at the current
 position. The switch is recorded in the playback log and is not shown as an
 error; the direct play session is reported stopped and the transcode is
-reported as a new session.
+reported as a new session. The playback position is carried over to the
+transcode.
 
 It uses the first media source returned:
 

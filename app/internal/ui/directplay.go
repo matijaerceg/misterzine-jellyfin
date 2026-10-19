@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"strings"
@@ -228,7 +229,8 @@ func (s *Session) fallbackLocked(err error) bool {
 		}
 	}
 	_ = os.Remove(s.p.Status)
-	if err := s.startContext(int(ps.Position), false, s.sessionContext()); err != nil {
+	// startContext takes whole seconds: round to nearest rather than truncate
+	if err := s.startContext(int(math.Round(ps.Position)), false, s.sessionContext()); err != nil {
 		s.finishLocked(s.suppressStopCancellation(err))
 	}
 	return true
