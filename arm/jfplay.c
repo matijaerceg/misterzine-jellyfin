@@ -48,6 +48,7 @@
 #define PCM_DECODE_RESERVE 8192
 #define PTS_MARGIN 90000
 #define PTS_CONTIG_TOLERANCE 90
+#define AUDIO_RESYNC_TOLERANCE 9000 /* 0.1 s: a decoded frame's timestamp this near the sample clock follows it */
 
 enum seek_state { SEEK_IDLE, SEEK_IN_PROGRESS, SEEK_READY, SEEK_ERROR };
 
@@ -783,6 +784,16 @@ static int receive_audio(struct player *p)
         if (source_pts < 0) source_pts = AV_NOPTS_VALUE;
         pts = source_pts == AV_NOPTS_VALUE ? p->audio_next90 :
               film_speed_pts90(p->film_speed, source_pts);
+        /* Decoded audio is sample-continuous; the container's timestamps
+         * are not always (Matroska laces several AAC frames under one
+         * timestamp, and rounds to 1 ms). A frame near where the samples
+         * put it keeps the sample clock, so the records stay contiguous:
+         * a timestamp step would split a record, pad it with silence and
+         * land the next one late at the core -- a click, many a second.
+         * A real jump (a seek, a gap) still resyncs the clock. */
+        if (pts != AV_NOPTS_VALUE && p->audio_next90 != AV_NOPTS_VALUE &&
+            llabs(pts - p->audio_next90) <= AUDIO_RESYNC_TOLERANCE)
+            pts = p->audio_next90;
         out_cap = (int)av_rescale_rnd(swr_get_delay(p->swr, f->sample_rate) + f->nb_samples,
                                       film_speed_audio_rate(p->film_speed, 48000),
                                       f->sample_rate, AV_ROUND_UP);
