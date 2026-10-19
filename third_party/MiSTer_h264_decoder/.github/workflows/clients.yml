@@ -1,0 +1,105 @@
+name: clients
+
+# Builds the HPS programs the release ships beside the core -- the Moonlight client, the
+# Jellyfin client, the video player and the camera viewer -- for the
+# MiSTer's ARM, each in its pinned image (hps/docker, clients/moonlight/docker,
+# clients/common/docker, clients/uvc/docker: every image is built from this repository, so a
+# hosted runner can make them; nothing is pulled from a private registry).
+#
+# Two jobs to do:
+#   - a CI check on every PR and push to main that touches hps/ or clients/: the ARM
+#     builds (-Werror, static) fail next to the change that broke them;
+#   - called by package.yml with the release manifest's commit, so the clients in the
+#     install zip are built from exactly the tree the .rbf was synthesised from. The
+#     artifact `clients-dist` is clients-dist.tar, clients/*/build/dist from the repository
+#     root (tools/package_release.sh reads them there).
+#
+# The host tests (clients/*/tests/run_test.sh --red, hps's) are not run here: they need the
+# reference sets and are the local gate before a merge.
+#
+# One image for every client (CLIENTS_DOCKER_IMAGE): the build scripts name the common image
+# by a local tag (deps2 / deps3) that records when it was last rebuilt on a workstation; here
+# it is built once, from the Dockerfile at this commit.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'The commit to build (package.yml passes the manifest SHA)'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'The commit to build (default: the dispatch ref)'
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - 'hps/**'
+      - 'clients/**'
+      - '.github/workflows/clients.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'hps/**'
+      - 'clients/**'
+      - '.github/workflows/clients.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clients-${{ inputs.ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build the HPS clients (ARM)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      USE_DOCKER: '1'
+      CLIENTS_DOCKER_IMAGE: mister-h264-clients:ci
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: The client library and its tools
+        run: hps/build_arm.sh
+
+      - name: The Moonlight client
+        run: clients/moonlight/build.sh
+
+      - name: The Jellyfin client
+        run: clients/jellyfin/build.sh
+
+      - name: The video player
+        run: clients/player/build.sh
+
+      - name: The camera viewer
+        run: clients/uvc/build.sh
+
+      - name: What was built
+        run: |
+          set -euo pipefail
+          for f in clients/moonlight/build/dist/moonlight/moonlight clients/jellyfin/build/dist/jellyfin/jellyfin \
+                   clients/player/build/dist/h264player/h264player clients/uvc/build/dist/h264cam/h264cam; do
+            [ -x "$f" ] || { echo "::error::$f was not built"; exit 1; }
+            file "$f"
+          done
+          { echo "### Clients built at \`$(git rev-parse --short=12 HEAD)\`"; echo
+            find clients/*/build/dist -type f -printf '- `%p` (%s bytes)\n'; } >> "$GITHUB_STEP_SUMMARY"
+
+      # A tarball, not the trees: an artifact does not keep file modes, and
+      # tools/package_release.sh refuses a client binary that is not executable.
+      - name: Pack the dist trees
+        run: tar -cf clients-dist.tar clients/moonlight/build/dist clients/jellyfin/build/dist clients/player/build/dist clients/uvc/build/dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: clients-dist
+          path: clients-dist.tar
+          if-no-files-found: error
+          retention-days: 7

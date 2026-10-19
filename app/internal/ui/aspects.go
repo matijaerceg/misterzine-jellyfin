@@ -1,0 +1,198 @@
+package ui
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"plexcrt/internal/jellyfin"
+)
+
+// Aspects remembers the picture shape of shows, taken from each show's
+// first episode, so the 4:3 filter can judge a show the way it judges a
+// movie. The first time the filter needs them, every TV library is swept
+// in one request each; the few shows that leaves out are probed one by one.
+// Answers are kept on disk in the cache folder. Until a show is known it
+// stays visible.
+type Aspects struct {
+	mu    sync.Mutex
+	known map[string]float64 // show rating key -> aspect (0: seen, unknown)
+	path  string
+	swept chan struct{} // closed when the library sweep has finished; nil before it starts
+}
+
+const (
+	aspectProbes = 8                       // shows probed at once
+	aspectBudget = 6 * time.Second         // per batch; the rest stay visible until next time
+	aspectWait   = 1500 * time.Millisecond // how long a listing waits for the sweep before showing
+)
+
+func (a *Aspects) load(dir string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.path = filepath.Join(dir, "aspects.json")
+	a.known = map[string]float64{}
+	a.swept = nil
+	if data, err := os.ReadFile(a.path); err == nil {
+		_ = json.Unmarshal(data, &a.known)
+	}
+}
+
+func (a *Aspects) save() {
+	a.mu.Lock()
+	data, err := json.Marshal(a.known)
+	path := a.path
+	a.mu.Unlock()
+	if err != nil || path == "" {
+		return
+	}
+	tmp := path + ".tmp"
+	if os.WriteFile(tmp, data, 0o600) == nil {
+		_ = os.Rename(tmp, path)
+	}
+}
+
+func (a *Aspects) set(key string, v float64) {
+	a.mu.Lock()
+	a.known[key] = v
+	a.mu.Unlock()
+}
+
+// aspectShowKey gives shows and their season entries the same measurement.
+func aspectShowKey(it *jellyfin.Item) string {
+	switch it.Type {
+	case "show":
+		return it.ID
+	case "season":
+		if it.SeriesID != "" {
+			return it.SeriesID
+		}
+		return it.ParentID
+	}
+	return ""
+}
+
+// apply fills in known show and season aspects without any request.
+func (a *Aspects) apply(items []*jellyfin.Item) (unknown []*jellyfin.Item) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for _, it := range items {
+		key := aspectShowKey(it)
+		if key == "" || it.Aspect != 0 {
+			continue
+		}
+		if v, ok := a.known[key]; ok {
+			it.Aspect = v
+		} else {
+			unknown = append(unknown, it)
+		}
+	}
+	return unknown
+}
+
+// sweep starts the one-off library sweep if it has not started, and
+// returns the channel closed when it is done; then is called on completion.
+func (a *Aspects) sweep(client *jellyfin.Client, then func()) <-chan struct{} {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.swept != nil {
+		return a.swept
+	}
+	done := make(chan struct{})
+	a.swept = done
+	go func() {
+		defer close(done)
+		defer then()
+		secs, err := client.Sections(bg())
+		if err != nil {
+			return
+		}
+		for _, s := range secs {
+			if s.Type != "show" {
+				continue
+			}
+			found, err := client.FirstEpisodeAspects(bg(), s.Key)
+			if err != nil {
+				continue
+			}
+			a.mu.Lock()
+			for key, v := range found {
+				a.known[key] = v
+			}
+			a.mu.Unlock()
+		}
+		a.save()
+	}()
+	return done
+}
+
+// measureShows fills in the aspect of every show in items: from the
+// library sweep first, then by probing what it missed (a few at a time,
+// within a time budget). Safe from any goroutine; meant for the workers
+// that fetch listings.
+func (a *App) measureShows(items []*jellyfin.Item) {
+	if a.Client == nil || a.Cfg == nil || !a.Cfg.FourThree {
+		return
+	}
+	client := a.Client
+	deadline := time.Now().Add(aspectBudget)
+	if unknown := a.aspects.apply(items); len(unknown) == 0 {
+		return
+	}
+	// a cold cache: give the sweep a moment, then show what is known and
+	// let the sweep's completion refilter the home rows
+	select {
+	case <-a.aspects.sweep(client, func() { a.Later(a.refilterHome) }):
+	case <-time.After(aspectWait):
+		a.aspects.apply(items)
+		return
+	}
+	unknown := a.aspects.apply(items)
+	if len(unknown) == 0 {
+		return
+	}
+	sem := make(chan struct{}, aspectProbes)
+	var wg sync.WaitGroup
+	for _, it := range unknown {
+		if time.Now().After(deadline) {
+			break
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(it *jellyfin.Item) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			key := aspectShowKey(it)
+			v, err := client.ShowAspect(bg(), key)
+			if err != nil {
+				return // left unknown: visible now, probed again next time
+			}
+			a.aspects.set(key, v)
+			it.Aspect = v
+		}(it)
+	}
+	wg.Wait()
+	a.aspects.save()
+}
+
+// refilterHome asks the home screen to fetch its rows again, now that the
+// sweep can judge the shows in them.
+func (a *App) refilterHome() {
+	if len(a.stack) > 0 {
+		if h, ok := a.stack[0].(*Home); ok {
+			h.refreshAt = time.Time{}
+		}
+	}
+	a.pagers = map[string]*Pager{} // library views opened next start from known shapes
+}
+
+// measureHubs runs measureShows over every row of a home fetch.
+func (a *App) measureHubs(hubs []*jellyfin.Hub) {
+	var items []*jellyfin.Item
+	for _, hub := range hubs {
+		items = append(items, hub.Items...)
+	}
+	a.measureShows(items)
+}

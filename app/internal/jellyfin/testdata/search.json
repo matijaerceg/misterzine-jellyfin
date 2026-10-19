@@ -1,0 +1,153 @@
+{
+ "Items": [
+  {
+   "Name": "The Baader Meinhof Complex",
+   "Id": "010c03f5ddce0c3bc16306dcffb5b378",
+   "HasSubtitles": true,
+   "Container": "mkv",
+   "PremiereDate": "2008-09-25T07:00:00.0000000Z",
+   "CriticRating": 85,
+   "OfficialRating": "R",
+   "ChannelId": null,
+   "CommunityRating": 6.975,
+   "RunTimeTicks": 89740420000,
+   "ProductionYear": 2008,
+   "IsFolder": false,
+   "Type": "Movie",
+   "UserData": {
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "010c03f5-ddce-0c3b-c163-06dcffb5b378",
+    "ItemId": "010c03f5ddce0c3bc16306dcffb5b378"
+   },
+   "VideoType": "VideoFile",
+   "ImageTags": {
+    "Logo": "b733d087d5ecf0d1b488bc6a535fcb34",
+    "Thumb": "b5f893ed8c7c00051daf2dcced4704a8",
+    "Primary": "d20f26b9954ba4e40216b9b7ce2fb16e"
+   },
+   "BackdropImageTags": [
+    "4137a837ea752c16ed2aa77dfe3113be"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "4137a837ea752c16ed2aa77dfe3113be": "WlKnSC~VRjof%2t6~ooea|ofoeWCWBM|j[oefQRk?GxtWVayofj["
+    },
+    "Logo": {
+     "b733d087d5ecf0d1b488bc6a535fcb34": "HTQmCrWBRjt7M{%MRjofWB~qRjxuayWBayayRjt7"
+    },
+    "Thumb": {
+     "b5f893ed8c7c00051daf2dcced4704a8": "WWHKd_ae-n#QM{$$^OMyxt$%oM%10La#Rkxuozs,s:%fRkR*NGM{"
+    },
+    "Primary": {
+     "d20f26b9954ba4e40216b9b7ce2fb16e": "dCEB=}-TIV-pO?Sznh-oIpEfI:x[~7%0t7xH~Tnl-nxW"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Video",
+   "OriginalLanguage": "de"
+  },
+  {
+   "Name": "The Eight Mountains",
+   "Id": "017e8fa080830ffe45628a1d4d5196ac",
+   "HasSubtitles": true,
+   "Container": "mkv",
+   "PremiereDate": "2022-12-21T08:00:00.0000000Z",
+   "CriticRating": 91,
+   "OfficialRating": "NR",
+   "ChannelId": null,
+   "CommunityRating": 7.6,
+   "RunTimeTicks": 88457279999,
+   "ProductionYear": 2022,
+   "IsFolder": false,
+   "Type": "Movie",
+   "UserData": {
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "017e8fa0-8083-0ffe-4562-8a1d4d5196ac",
+    "ItemId": "017e8fa080830ffe45628a1d4d5196ac"
+   },
+   "VideoType": "VideoFile",
+   "ImageTags": {
+    "Primary": "d2a1f81862616eff0a1b3440206620bd",
+    "Logo": "68321c967aef94d33df005eded8bd4ca",
+    "Thumb": "f2823debc90c06f74da87779933b646d"
+   },
+   "BackdropImageTags": [
+    "1ec1f7388312caf2b3be15c2bd69177d"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "1ec1f7388312caf2b3be15c2bd69177d": "WlHxKN-nM{OZ9vIq~qWERPxubFof?bjbaxxtt6bb_2ofR*ofa#Wr"
+    },
+    "Primary": {
+     "d2a1f81862616eff0a1b3440206620bd": "dkKLBbozoz-;_NkWaykC0LWWf5Rjo}j@jZt6tRt6oeay"
+    },
+    "Logo": {
+     "68321c967aef94d33df005eded8bd4ca": "PUKd}KWBRjxuIUWBofxuIUWBM{j[RjayM{t7~qRjWBfQWBayWBxu"
+    },
+    "Thumb": {
+     "f2823debc90c06f74da87779933b646d": "WUCGY=NG9GxaM{oe~qRQD*tQRkfk?voJIUWXWBWX?bWBIVoeaeof"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Video",
+   "OriginalLanguage": "it"
+  },
+  {
+   "Name": "The Holiday",
+   "Id": "004fc55645c8518d31813334b2eb8f05",
+   "HasSubtitles": true,
+   "Container": "mkv",
+   "PremiereDate": "2006-12-05T08:00:00.0000000Z",
+   "CriticRating": 51,
+   "OfficialRating": "PG-13",
+   "ChannelId": null,
+   "CommunityRating": 7.102,
+   "RunTimeTicks": 81461760000,
+   "ProductionYear": 2006,
+   "IsFolder": false,
+   "Type": "Movie",
+   "UserData": {
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "004fc556-45c8-518d-3181-3334b2eb8f05",
+    "ItemId": "004fc55645c8518d31813334b2eb8f05"
+   },
+   "VideoType": "VideoFile",
+   "ImageTags": {
+    "Logo": "ffe9179977825a17dd0207773e9f2447",
+    "Primary": "910bac7c3ef7e5fffaccee02284d7d12",
+    "Thumb": "a609cd839be79b07ad2eacd55d36a5d2"
+   },
+   "BackdropImageTags": [
+    "05dc469c5dc528b9e7d17facca36e1d9"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "05dc469c5dc528b9e7d17facca36e1d9": "W.Oz0*~qR*jc?bx]?bM{tRoMozozxuRjt7WBWBoe-;xuoeV[jZoe"
+    },
+    "Logo": {
+     "ffe9179977825a17dd0207773e9f2447": "PHBJ%CfQNujtS2soWpsVo1sVNuSLS2o1soa|1vo1a|NuWpWpsoWp"
+    },
+    "Primary": {
+     "910bac7c3ef7e5fffaccee02284d7d12": "dhIXN%kCR*xu-;RkWB%24TM|Rjf6I9RkWCWB%ht7t7oe"
+    },
+    "Thumb": {
+     "a609cd839be79b07ad2eacd55d36a5d2": "W-Of.G4TM{-;WVoe?HoLj[ofj]t7o}j]oLtRs:j[-;WBafozkCjZ"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Video",
+   "OriginalLanguage": "en"
+  }
+ ],
+ "TotalRecordCount": 12,
+ "StartIndex": 0
+}

@@ -1,0 +1,37 @@
+name: The core will not load or shows nothing
+description: Black screen, no test pattern, the core does not appear
+labels: ["bug", "area:loading"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Core version
+      description: The About line of the core's OSD menu.
+      placeholder: H264 v0.1.0 261001
+    validations:
+      required: true
+  - type: dropdown
+    id: screen
+    attributes:
+      label: What appears on screen?
+      options:
+        - Nothing — black screen, no test pattern
+        - The test pattern, but it does not move
+        - The test pattern stays although a program is sending a stream
+        - Something else (describe below)
+    validations:
+      required: true
+  - type: dropdown
+    id: output
+    attributes:
+      label: Which output?
+      options:
+        - HDMI
+        - Analog
+        - Both
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Anything else

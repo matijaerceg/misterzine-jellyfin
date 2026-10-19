@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.rbf binary
+*.png binary
+*.jpg binary
+*.ttf binary
+*.zip binary
+arm/jfplay binary

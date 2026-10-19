@@ -1,0 +1,497 @@
+package ring
+
+import (
+	"time"
+	"unsafe"
+
+	"plexcrt/internal/gfx"
+)
+
+// Overlay is what the playback screens draw over the video: a rectangle of
+// pixels with alpha, the dot (a disc, the scrub and wait marker) and the
+// bar (a filled rectangle). The PlexCRT core had a plane and two sprites
+// in hardware; the H.264 core has the one overlay page, so every change
+// here composes them into the page not on screen -- the lines they cover,
+// transparent elsewhere, declared as the band so the core fetches nothing
+// else -- and flips to it. It shares the Ring's two pages: a frame from
+// End replaces it, and a Show replaces the frame.
+type Overlay struct {
+	r                  *Ring
+	logicalW, logicalH int
+
+	opaque     bool // compose over an opaque black screen while a new stream starts
+	on         bool
+	x, y, w, h int
+	src        []byte // the rectangle's pixels, alpha merged in (BGRA)
+	srcStride  int
+	own        []byte // src's storage for Show
+	region     []byte // Upload's content, for ShowAt
+	regionVer  uint64 // increments when Upload changes the backing region
+	shownVer   uint64 // region version in the last composed page
+	regionOff  int
+	regionSrc  bool
+	mapX       []int // reusable nearest-neighbor source column map
+
+	dotOn        bool
+	dotX, dotY   int
+	dotRGB       uint32
+	dotAnchorX   int // last requested place; dotX is rebased as the run moves
+	dotAnchored  bool
+	drawnDotX    int
+	drawnDotSet  bool
+	runV, runMin int
+	runMax       int
+	runField     uint32 // the heartbeat when the run (re)started at dotX
+	running      chan struct{}
+	barOn        bool
+	barX, barY   int
+	barW, barH   int
+	barRGB       uint32
+	row          []uint32
+	batchDepth   int
+	batchDirty   bool
+}
+
+const dotRadius = 7
+
+// RegionSize is how many bytes Upload can hold (as the old plane's region).
+const RegionSize = 0x160000
+
+// Overlay creates hidden playback controls, preserving any presented menu or loading frame.
+func (r *Ring) Overlay() *Overlay {
+	o := &Overlay{r: r, logicalW: W, logicalH: H, row: make([]uint32, r.ow)}
+	r.mu.Lock()
+	r.overlay = o
+	if !r.frame {
+		o.compose()
+	}
+	r.mu.Unlock()
+	return o
+}
+
+// SetCanvasSize sets the logical design space used by playback panels and
+// their sprites. The core still receives pixels in the native raster.
+func (o *Overlay) SetCanvasSize(w, h int) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	if w > 0 && h > 0 {
+		o.logicalW, o.logicalH = w, h
+	}
+}
+
+func (o *Overlay) transform() (sx, sy float64, x0, y0 int) {
+	// The logical canvas describes the displayed shape; map its axes
+	// independently to the physical output raster. A 960x480 wide design
+	// therefore fills both anamorphic 720x480 and square-pixel 1280x720.
+	st, _ := o.r.Status()
+	x0, y0, w, h := nativeViewport(st, o.logicalW, o.r.ow, o.r.oh)
+	sx = float64(w) / float64(max(1, o.logicalW))
+	sy = float64(h) / float64(max(1, o.logicalH))
+	return sx, sy, x0, y0
+}
+
+func (o *Overlay) point(x, y int) (int, int) {
+	sx, sy, x0, y0 := o.transform()
+	return int(float64(x)*sx+0.5) + x0, int(float64(y)*sy+0.5) + y0
+}
+
+// BeginUpdate groups several overlay changes into one framebuffer publish.
+// Calls may overlap with the dot runner or painter; Ring.mu serializes each
+// change and the outermost EndUpdate publishes the latest combined state.
+func (o *Overlay) BeginUpdate() {
+	o.r.mu.Lock()
+	o.batchDepth++
+	o.r.mu.Unlock()
+}
+
+// EndUpdate publishes changes accumulated since BeginUpdate. Nested updates
+// publish only when the outermost update ends.
+func (o *Overlay) EndUpdate() {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	if o.batchDepth == 0 {
+		return
+	}
+	o.batchDepth--
+	if o.batchDepth == 0 && o.batchDirty {
+		o.batchDirty = false
+		o.compose()
+	}
+}
+
+// update composes immediately unless an app-owned update group is open.
+func (o *Overlay) update() {
+	if o.batchDepth != 0 {
+		o.batchDirty = true
+		return
+	}
+	o.compose()
+}
+
+// Hide takes the rectangle off (the dot and the bar stay as they are).
+func (o *Overlay) Hide() {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	if !o.on && o.r.overlayCurrent() {
+		return
+	}
+	o.on = false
+	o.update()
+}
+
+// SetOpaque makes the overlay cover the full screen with an opaque black
+// background. It is used while a new stream is starting, when the core may
+// still be holding the previous stream's last picture. The panel, dot and
+// bar are composed over black until opaque mode is cleared.
+func (o *Overlay) SetOpaque(on bool) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	if o.opaque == on && o.r.overlayCurrent() {
+		return
+	}
+	o.opaque = on
+	o.update()
+}
+
+// Show publishes a BGRx canvas at x,y with an alpha plane of the same size
+// (0..255 a pixel; nil for opaque).
+func (o *Overlay) Show(x, y int, c *gfx.Canvas, alpha []byte) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	sx, sy, x0, y0 := o.transform()
+	w, h := int(float64(c.W)*sx+0.5)&^1, int(float64(c.H)*sy+0.5)&^1
+	x, y = int(float64(x)*sx+0.5)+x0, int(float64(y)*sy+0.5)+y0
+	x, y = x&^1, y&^1
+	if w == 0 || h == 0 || x < 0 || y < 0 || x+w > o.r.ow || y+h > o.r.oh {
+		return
+	}
+	if len(o.own) < w*h*4 {
+		o.own = make([]byte, w*h*4)
+	}
+	if w == c.W && h == c.H {
+		for yy := 0; yy < h; yy++ {
+			copy(o.own[yy*w*4:(yy+1)*w*4], c.Pix[yy*c.W*4:(yy+1)*c.W*4])
+		}
+		if alpha != nil {
+			for i, a := range alpha[:c.W*c.H] {
+				o.own[i*4+3] = a
+			}
+		} else {
+			for i := 3; i < len(o.own); i += 4 {
+				o.own[i] = 255
+			}
+		}
+		o.on, o.x, o.y, o.w, o.h = true, x, y, w, h
+		o.src, o.srcStride = o.own, w*4
+		o.regionSrc = false
+		o.update()
+		return
+	}
+	if cap(o.mapX) < w {
+		o.mapX = make([]int, w)
+	} else {
+		o.mapX = o.mapX[:w]
+	}
+	for xx := range o.mapX {
+		o.mapX[xx] = min(c.W-1, xx*c.W/w)
+	}
+	for yy := 0; yy < h; yy++ {
+		row := o.own[yy*w*4 : (yy+1)*w*4]
+		sourceY := min(c.H-1, yy*c.H/h)
+		for xx := 0; xx < w; xx++ {
+			sourceX := o.mapX[xx]
+			src := (sourceY*c.W + sourceX) * 4
+			dst := xx * 4
+			copy(row[dst:dst+4], c.Pix[src:src+4])
+			a := byte(255)
+			if alpha != nil {
+				a = alpha[sourceY*c.W+sourceX]
+			}
+			row[dst+3] = a
+		}
+	}
+	o.on, o.x, o.y, o.w, o.h = true, x, y, w, h
+	o.src, o.srcStride = o.own, w*4
+	o.regionSrc = false
+	o.update()
+}
+
+// Upload stores a BGRx canvas at byte offset off of the region, with one
+// alpha for every pixel, row after row (c.W*4 bytes a row), for ShowAt.
+func (o *Overlay) Upload(off int, c *gfx.Canvas, alpha byte) {
+	n := c.W * c.H * 4
+	if off < 0 || off+n > RegionSize {
+		return
+	}
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	if o.region == nil {
+		o.region = make([]byte, RegionSize)
+	}
+	dst := o.region[off : off+n]
+	copy(dst, c.Pix[:n])
+	for i := 3; i < n; i += 4 {
+		dst[i] = alpha
+	}
+	o.regionVer++
+}
+
+// ShowAt shows a w x h rectangle at x,y whose pixels start at byte offset
+// off of the uploaded region (w*4 bytes a row): scrolling uploaded content
+// by its offset.
+func (o *Overlay) ShowAt(x, y, w, h, off int) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	sx, sy, x0, y0 := o.transform()
+	lw, lh := w, h
+	x, y = int(float64(x)*sx+0.5)+x0, int(float64(y)*sy+0.5)+y0
+	w, h = int(float64(w)*sx+0.5)&^1, int(float64(h)*sy+0.5)&^1
+	x, y, off = x&^1, y&^1, off&^7
+	if w <= 0 || h <= 0 || x < 0 || y < 0 || x+w > o.r.ow || y+h > o.r.oh || off < 0 || off+lw*lh*4 > RegionSize {
+		return
+	}
+	if o.region == nil {
+		o.region = make([]byte, RegionSize)
+	}
+	if o.on && o.regionSrc && o.x == x && o.y == y && o.w == w && o.h == h &&
+		o.regionOff == off && o.shownVer == o.regionVer && o.r.overlayCurrent() {
+		return
+	}
+	if len(o.own) < w*h*4 {
+		o.own = make([]byte, w*h*4)
+	}
+	if cap(o.mapX) < w {
+		o.mapX = make([]int, w)
+	} else {
+		o.mapX = o.mapX[:w]
+	}
+	for xx := range o.mapX {
+		o.mapX[xx] = min(lw-1, xx*lw/w)
+	}
+	for yy := 0; yy < h; yy++ {
+		sourceY := min(lh-1, yy*lh/h)
+		for xx := 0; xx < w; xx++ {
+			src := off + (sourceY*lw+o.mapX[xx])*4
+			dst := (yy*w + xx) * 4
+			copy(o.own[dst:dst+4], o.region[src:src+4])
+		}
+	}
+	o.on, o.x, o.y, o.w, o.h = true, x, y, w, h
+	o.src, o.srcStride = o.own, w*4
+	o.regionSrc, o.regionOff = true, off
+	o.update()
+}
+
+// Dot places the dot (a disc of radius 7 rows centred on x,y, frame
+// pixels) or hides it.
+func (o *Overlay) Dot(x, y int, rgb uint32, on bool) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	x, y = o.point(x, y)
+	rgb &= 0xFFFFFF
+	same := o.dotAnchored && o.dotAnchorX == x && o.dotY == y && o.dotRGB == rgb && o.dotOn == on
+	dotPositionCurrent := !o.dotOn || o.runV != 0 || o.drawnDotSet && o.drawnDotX == o.dotXLocked()
+	if same && dotPositionCurrent && o.r.overlayCurrent() {
+		return
+	}
+	if !o.dotAnchored || o.dotAnchorX != x {
+		o.dotX = x
+		o.runField = o.r.Field()
+	}
+	o.dotAnchorX, o.dotAnchored = x, true
+	o.dotY, o.dotRGB, o.dotOn = y, rgb, on
+	o.update()
+}
+
+// DotRun moves the dot vx pixels every field (0 stops), within xmin..xmax,
+// as the old core did: a goroutine redraws it each heartbeat. Read where it
+// is with DotX.
+func (o *Overlay) DotRun(vx, xmin, xmax int) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	sx, _, x0, _ := o.transform()
+	o.dotX = o.dotXLocked()
+	vx, xmin, xmax = int(float64(vx)*sx+0.5), int(float64(xmin)*sx+0.5)+x0, int(float64(xmax)*sx+0.5)+x0
+	o.runField = o.r.Field()
+	o.runV, o.runMin, o.runMax = vx, max(0, xmin), max(0, xmax)
+	if vx != 0 && o.running == nil {
+		o.running = make(chan struct{})
+		go o.run(o.running)
+	} else if vx == 0 && o.running != nil {
+		close(o.running)
+		o.running = nil
+	}
+}
+
+func (o *Overlay) run(stop chan struct{}) {
+	last := o.r.Field()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-time.After(4 * time.Millisecond):
+		}
+		if f := o.r.Field(); f != last {
+			last = f
+			o.r.mu.Lock()
+			if o.dotOn {
+				o.update()
+			}
+			o.r.mu.Unlock()
+		}
+	}
+}
+
+// DotX is where the dot is now.
+func (o *Overlay) DotX() int {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	x, _ := o.inversePoint(o.dotXLocked(), 0)
+	return x
+}
+
+func (o *Overlay) inversePoint(x, y int) (int, int) {
+	sx, sy, x0, y0 := o.transform()
+	return int(float64(x-x0)/sx + 0.5), int(float64(y-y0)/sy + 0.5)
+}
+
+func (o *Overlay) dotXLocked() int {
+	if o.runV == 0 {
+		return o.dotX
+	}
+	x := o.dotX + o.runV*int(int32(o.r.Field()-o.runField))
+	return max(o.runMin, min(o.runMax, x))
+}
+
+// Bar places the bar, a filled rectangle, or hides it.
+func (o *Overlay) Bar(x, y, w, h int, rgb uint32, on bool) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	sx, sy, x0, y0 := o.transform()
+	x, y = int(float64(x)*sx+0.5)+x0, int(float64(y)*sy+0.5)+y0
+	w, h = int(float64(w)*sx+0.5), int(float64(h)*sy+0.5)
+	rgb &= 0xFFFFFF
+	if o.barX == x && o.barY == y && o.barW == w && o.barH == h && o.barRGB == rgb && o.barOn == on &&
+		o.r.overlayCurrent() {
+		return
+	}
+	o.barX, o.barY, o.barW, o.barH, o.barRGB, o.barOn = x, y, w, h, rgb, on
+	o.update()
+}
+
+// compose draws the rectangle, the bar and the dot into the page not on
+// screen and flips to it; with none of them visible it hides the overlay.
+// Called with r.mu held.
+func (o *Overlay) compose() {
+	r := o.r
+	if !r.writesAllowed() {
+		return
+	}
+	first, last := r.oh, -1
+	span := func(y0, y1 int) {
+		y0, y1 = max(0, y0), min(r.oh-1, y1)
+		if y0 <= y1 {
+			first, last = min(first, y0), max(last, y1)
+		}
+	}
+	if o.opaque || r.dim != 0 {
+		span(0, r.oh-1)
+	}
+	if o.on {
+		span(o.y, o.y+o.h-1)
+	}
+	if o.barOn && o.barW > 0 && o.barH > 0 {
+		span(o.barY, o.barY+o.barH-1)
+	}
+	dx := o.dotXLocked()
+	if o.dotOn {
+		sx, sy, _, _ := o.transform()
+		radius := int(float64(dotRadius)*min(sx, sy) + 0.5)
+		span(o.dotY-radius, o.dotY+radius)
+	}
+	if first > last || r.npage == 0 {
+		if !r.overlayDescriptorCurrent(desc{}) {
+			r.write(desc{})
+		}
+		r.frame = false
+		return
+	}
+	p := r.flipTarget()
+	if !r.writesAllowed() {
+		return
+	}
+	page := r.pages[p]
+	for y := first; y <= last; y++ {
+		row := o.row
+		if o.opaque {
+			for x := range row {
+				row[x] = 0xFF000000
+			}
+		} else {
+			clear(row)
+		}
+		if o.on && y >= o.y && y < o.y+o.h {
+			s := o.src[(y-o.y)*o.srcStride:]
+			px := unsafe.Slice((*uint32)(unsafe.Pointer(&s[0])), o.w)
+			if o.opaque {
+				for x, src := range px {
+					a := (src >> 24) & 0xFF
+					r := ((src >> 16) & 0xFF) * a
+					g := ((src >> 8) & 0xFF) * a
+					b := (src & 0xFF) * a
+					row[o.x+x] = 0xFF000000 | ((r+127)/255)<<16 | ((g+127)/255)<<8 | (b+127)/255
+				}
+			} else {
+				copy(row[o.x:o.x+o.w], px)
+			}
+		}
+		if o.barOn && y >= o.barY && y < o.barY+o.barH {
+			for x := max(0, o.barX); x < min(r.ow, o.barX+o.barW); x++ {
+				row[x] = 0xFF000000 | o.barRGB
+			}
+		}
+		if o.dotOn {
+			sx, sy, _, _ := o.transform()
+			radius := int(float64(dotRadius)*min(sx, sy) + 0.5)
+			if dy := y - o.dotY; dy >= -radius && dy <= radius {
+				half := 0
+				for half*half+dy*dy <= radius*radius {
+					half++
+				}
+				for x := max(0, dx-half+1); x < min(r.ow, dx+half); x++ {
+					row[x] = 0xFF000000 | o.dotRGB
+				}
+			}
+		}
+		if r.dim != 0 {
+			// A black veil attenuates the video beneath transparent pixels.
+			// Convert the combined result back to straight alpha, so panels
+			// and sprites dim by the same amount as the paused picture.
+			level := uint32(Full) - r.dim
+			for x, pixel := range row {
+				a := pixel >> 24
+				alpha := 255 - (255-a)*level/Full
+				if a == 0 {
+					row[x] = alpha << 24
+					continue
+				}
+				if alpha == 0 {
+					row[x] = 0
+					continue
+				}
+				denom := uint32(Full) * alpha
+				red := ((pixel >> 16) & 255) * a * level / denom
+				green := ((pixel >> 8) & 255) * a * level / denom
+				blue := (pixel & 255) * a * level / denom
+				row[x] = alpha<<24 | red<<16 | green<<8 | blue
+			}
+		}
+		copy(page[y*(r.ostride/4):y*(r.ostride/4)+r.ow], row)
+	}
+	r.describe(p, first, last)
+	o.drawnDotX, o.drawnDotSet = dx, true
+	if o.regionSrc {
+		o.shownVer = o.regionVer
+	}
+	r.frame = false
+}

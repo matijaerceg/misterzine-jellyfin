@@ -1,0 +1,182 @@
+package ui
+
+import (
+	"plexcrt/internal/jellyfin"
+	"strings"
+	"time"
+)
+
+const viewRefreshInterval = 30 * time.Second
+
+type viewResult struct {
+	items []*jellyfin.Item
+	err   error
+}
+
+// All state and result application belong to the UI thread. Workers only
+// fetch into a buffered channel, so leaving a screen never blocks a worker.
+type viewRefresh struct {
+	next    time.Time
+	pending chan viewResult
+}
+
+func (r *viewRefresh) reset() {
+	r.pending = nil
+	r.next = time.Now().Add(viewRefreshInterval)
+}
+
+// soon has the next poll fetch at once.
+func (r *viewRefresh) soon() {
+	r.pending = nil
+	r.next = time.Now()
+}
+
+func (r *viewRefresh) poll(a *App, now time.Time, fetch func() ([]*jellyfin.Item, error), apply func([]*jellyfin.Item)) {
+	if r.pending != nil {
+		select {
+		case result := <-r.pending:
+			r.pending = nil
+			r.next = now.Add(viewRefreshInterval)
+			if result.err == nil {
+				apply(result.items)
+				a.dirty = true
+			} else if a.Log != nil {
+				a.Log.Printf("view refresh: %v", result.err)
+			}
+		default:
+		}
+		return
+	}
+	if r.next.IsZero() {
+		r.next = now.Add(viewRefreshInterval)
+		return
+	}
+	if now.Before(r.next) {
+		return
+	}
+	result := make(chan viewResult, 1)
+	r.pending = result
+	go func() {
+		items, err := fetch()
+		result <- viewResult{items, err}
+		select {
+		case a.Wake <- struct{}{}:
+		default:
+		}
+	}()
+}
+
+// Refresh only watch state in existing lists. Membership, ordering, artwork,
+// and already-fetched stream details stay intact.
+func updateWatchState(current, fresh []*jellyfin.Item) {
+	byKey := make(map[string]*jellyfin.Item, len(fresh))
+	for _, it := range fresh {
+		if it.ID != "" {
+			byKey[it.ID] = it
+		}
+	}
+	for _, it := range current {
+		if f := byKey[it.ID]; f != nil {
+			it.ViewOffset, it.ViewCount, it.Viewed = f.ViewOffset, f.ViewCount, f.Viewed
+		}
+	}
+}
+
+func actionKind(actions []string, at int) string {
+	if at < 0 {
+		return "synopsis"
+	}
+	if at >= len(actions) {
+		return ""
+	}
+	a := actions[at]
+	for _, kind := range []string{"Resume", "Mark", "Audio", "Subtitles", "Remove", GoToShow, ShuffleShow} {
+		if strings.HasPrefix(a, kind) {
+			return kind
+		}
+	}
+	return "Play"
+}
+
+func restoreAction(actions []string, kind string) int {
+	if kind == "synopsis" {
+		return -1
+	}
+	for i := range actions {
+		if actionKind(actions, i) == kind {
+			return i
+		}
+	}
+	return 0
+}
+
+func (p *Preplay) pollRefresh(now time.Time) {
+	if p.cw.poll(p.app, now) {
+		kind := actionKind(p.actions, p.cur)
+		p.rebuild()
+		p.cur = restoreAction(p.actions, kind)
+		p.app.dirty = true
+	}
+	client, key := p.app.Client, p.item.ID
+	p.periodic.poll(p.app, now, func() ([]*jellyfin.Item, error) {
+		it, err := client.Item(bg(), key)
+		if err != nil {
+			return nil, err
+		}
+		return []*jellyfin.Item{it}, nil
+	}, func(items []*jellyfin.Item) {
+		if len(items) == 0 {
+			return
+		}
+		kind := actionKind(p.actions, p.cur)
+		*p.item = *items[0]
+		p.rebuild()
+		p.cur = restoreAction(p.actions, kind)
+	})
+}
+
+func (s *Season) pollRefresh(now time.Time) {
+	// an answer that lands while the episodes load is kept for their rebuild
+	if s.cw.poll(s.app, now) && !s.loading && len(s.eps) > 0 {
+		kind := actionKind(s.actions, s.act)
+		s.rebuild()
+		s.act = restoreAction(s.actions, kind)
+		s.keepActVisible(now)
+		s.app.dirty = true
+	}
+	if s.loading || s.err != nil || len(s.eps) == 0 {
+		return
+	}
+	client, key := s.app.Client, s.season().Key
+	s.periodic.poll(s.app, now, func() ([]*jellyfin.Item, error) {
+		return client.Items(bg(), key, nil, 500)
+	}, func(items []*jellyfin.Item) {
+		kind := actionKind(s.actions, s.act)
+		updateWatchState(s.eps, items)
+		s.rebuild()
+		s.act = restoreAction(s.actions, kind)
+		s.keepActVisible(now)
+	})
+}
+
+func (v *Show) pollRefresh(now time.Time) {
+	// Avoid touching the layouts while a transition worker is using them.
+	if v.transition != nil || v.fade.Running() {
+		return
+	}
+	if v.episodes {
+		v.season.pollRefresh(now)
+		return
+	}
+	client, key := v.app.Client, v.item.Key
+	v.periodic.poll(v.app, now, func() ([]*jellyfin.Item, error) {
+		return client.Items(bg(), key, nil, 500)
+	}, func(items []*jellyfin.Item) {
+		updateWatchState(v.picker.hubs[0].Items, items)
+		v.picker.pageKey = ""
+		if v.season != nil {
+			v.season.pageKey = ""
+			v.season.entryKey = ""
+		}
+	})
+}

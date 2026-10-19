@@ -1,0 +1,31 @@
+name: Analog / CRT output
+description: No picture, rolling, wrong geometry or sync on an analog display
+labels: ["bug", "area:analog"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Core version
+      placeholder: H264 v0.1.0 261001
+    validations:
+      required: true
+  - type: textarea
+    id: ini
+    attributes:
+      label: The video lines of your MiSTer.ini
+      description: vga_scaler, composite_sync, ypbpr, vga_sog and any [H264] section.
+    validations:
+      required: true
+  - type: input
+    id: display
+    attributes:
+      label: Display and connection
+      description: e.g. Sony PVM over RGB SCART, consumer TV over composite via an I/O board
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+    validations:
+      required: true

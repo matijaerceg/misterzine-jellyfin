@@ -1,0 +1,60 @@
+{
+ "Items": [
+  {
+   "Name": "Season 1",
+   "Id": "75f8f90d32f580e3f70e6c30b9838780",
+   "PremiereDate": "2024-03-21T07:00:00.0000000Z",
+   "ChannelId": null,
+   "ProductionYear": 2024,
+   "IndexNumber": 1,
+   "IsFolder": true,
+   "Type": "Season",
+   "ParentLogoItemId": "e8597adb9c3c4567dc82aac5981b22ac",
+   "ParentBackdropItemId": "e8597adb9c3c4567dc82aac5981b22ac",
+   "ParentBackdropImageTags": [
+    "8b156c4c38ef326b1ad2feaf99b27ace"
+   ],
+   "UserData": {
+    "PlayedPercentage": 0,
+    "UnplayedItemCount": 8,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "411959001",
+    "ItemId": "75f8f90d32f580e3f70e6c30b9838780"
+   },
+   "RecursiveItemCount": 8,
+   "ChildCount": 8,
+   "SeriesName": "3 Body Problem",
+   "SeriesId": "e8597adb9c3c4567dc82aac5981b22ac",
+   "SeriesPrimaryImageTag": "c98cfdc0a2362738e4cce2a624c99e03",
+   "ImageTags": {
+    "Primary": "14f60c229e5b5f089c144f2a0f54b42a"
+   },
+   "BackdropImageTags": [],
+   "ParentLogoImageTag": "58f265d1051d84024dc6beb10fdad671",
+   "ImageBlurHashes": {
+    "Primary": {
+     "14f60c229e5b5f089c144f2a0f54b42a": "d98|q{%34:SO$,xcEMEM00RlS}R+%MRixY%1Ins:^lxa",
+     "c98cfdc0a2362738e4cce2a624c99e03": "dYHT{dD*bv-U1OoJj[R+0gx[V[M|}rxFWBoJODWBo0of"
+    },
+    "Logo": {
+     "58f265d1051d84024dc6beb10fdad671": "PPFhelx]PAV@W;VYRPWAHXg3J,ofIoixRPM{-VR*R*jZRki_f6WB"
+    },
+    "Thumb": {
+     "c204440a5f869eb7b8bdc2580a671b59": "W57T;0xY5;%MIAk;~Xi{IWN{9axaE1t6s9IpNtwJ9Go}S|Vs^jI:"
+    },
+    "Backdrop": {
+     "8b156c4c38ef326b1ad2feaf99b27ace": "W57KbtxWE*%f9Zx[~WRQ9vNy4:o3IUxaj=NGR%r=4:x[$$RP^%Rj"
+    }
+   },
+   "ParentThumbItemId": "e8597adb9c3c4567dc82aac5981b22ac",
+   "ParentThumbImageTag": "c204440a5f869eb7b8bdc2580a671b59",
+   "LocationType": "FileSystem",
+   "MediaType": "Unknown"
+  }
+ ],
+ "TotalRecordCount": 1,
+ "StartIndex": 0
+}

@@ -1,0 +1,10 @@
+{
+ "Authenticated": false,
+ "Secret": "SECRET",
+ "Code": "123456",
+ "DeviceId": "misterzine-capture-0001",
+ "DeviceName": "capture",
+ "AppName": "MisterZine",
+ "AppVersion": "0.1",
+ "DateAdded": "2026-10-16T05:47:04.0558799Z"
+}

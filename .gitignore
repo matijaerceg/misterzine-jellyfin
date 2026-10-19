@@ -1,0 +1,16 @@
+third_party/release/*.zip
+build/
+__pycache__/
+*.pyc
+SERVER.md
+# forked app: build outputs and local state
+app/dist/
+release/dist/
+*.log
+.claude/
+plexcrt.json*
+.plextoken*
+.env
+.env.*
+!.env.example
+arm/jfplay

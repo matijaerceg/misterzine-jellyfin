@@ -1,0 +1,353 @@
+# Reference
+
+Detailed behavior and display settings. For everyday help, see the
+[help page](../release/README.md).
+
+## Using Plex
+
+### Household profiles
+
+Accounts without Plex Home open their libraries without a user-selection screen.
+A Plex Home with one unprotected profile also continues automatically. Homes
+with multiple profiles show **Who's watching?**; selecting a protected profile
+requires its Plex PIN, including the primary account. Use Up/Down to choose a
+digit and OK to enter it, or type the digits on a keyboard. Back erases a digit
+or returns to the profile list when the entry is empty. PINs are not saved.
+
+**Options > Switch user** changes the active household profile without linking
+the device again. Libraries, playback and watch progress use that profile's
+Plex access. Switching clears local recent searches and hidden-library choices
+when the profile changes.
+
+**Options > Sign in automatically** remembers the last selected profile on this
+installation, skipping the picker and its PIN on startup. It is off by default;
+only a signed-in full account can change it. Managed profiles see its current
+On/Off value greyed out; selecting the row explains how to change it.
+A managed profile can be remembered
+after a full account enables the setting. Explicitly switching to a protected
+profile still requires its PIN. Household options are hidden for ordinary
+accounts without Plex Home.
+
+Checking profiles and switching users requires a connection to Plex. A failed
+lookup or rejected PIN leaves the libraries locked rather than opening the
+primary account. Automatic sign-in uses the saved server connection at startup.
+
+### Controls
+
+- D-pad moves the selection; OK opens it; Back goes back or opens the drawer.
+- In the library wall, L/R jumps by sort letter or page. Back selects the view
+  tabs, then returns to the previous screen. A library with collections has a
+  **Collections** tab, the last one; it appears once the server has listed at
+  least one. OK on a collection shows its items, in the collection's order and
+  through the 4:3 filter like any view; one Back returns to it on the
+  Collections tab.
+- Every library has a **Folders** tab, after Continue (the library's
+  Continue Watching) and before Collections: the library's folders on disk
+  as the server lists them. OK on a folder shows its subfolders and files
+  under the folder's name; a file opens as from any other view; Back comes
+  out one folder at a time. It is meant for libraries of unmatched files
+  (Plex's "Other Videos", such as music videos kept in artist folders),
+  where the other views show one flat list.
+- With a MisterZine code that covers it and **Show beta features** on,
+  Options has **Random library order**, marked BETA, on by default. Movie
+  and TV libraries then have a
+  **Random** tab after Released: the whole library in a random order,
+  shown once all of it has been listed. The order and the selected poster
+  stay through an item's page and back and through the other tabs; a title
+  added on the server meanwhile slots in without changing the order of the
+  rest. Leaving the library (back to Home or the menu) shuffles it again and
+  forgets the place: a library left on Random opens on it again, in a new
+  order from the first poster. On the tabs, OK on Random shuffles again and
+  starts at the first poster; Down goes to the posters. With the setting off,
+  without the code or with beta features hidden there is no Random tab, and
+  the library opens on A to Z.
+- During playback, OK opens the controls. Left/right selects an action; OK
+  activates it. Up opens the scrubber. Back or Down closes the controls; Back
+  with the controls hidden stops playback. Audio/subtitle menus use the same
+  controls. In the scrubber, taps step the dot ten seconds and a hold runs it,
+  speeding up once after half a second; the seek goes on its own 400 ms after
+  the last release (OK sends it at once). Down from the scrubber returns to the
+  buttons and keeps the new position; Back returns without it.
+  With the controls hidden, left/right shows a strip with the title, the
+  progress bar and the times, and works the same way: taps and holds add
+  up into one seek. The last frame stays on screen until the new position
+  starts playing. **More** holds the crop for the playback under way (see
+  Display setup) and the saved subtitle size (see Subtitles).
+- Over an intro or credits the server has found, **Skip intro** or **Skip
+  credits** shows for 20 seconds once playback reaches them, also after a
+  resume or a seek into them, and goes two seconds before their end. OK skips
+  them; Back dismisses the button. Options can turn the buttons off.
+- Back on a season page after playback, the episode after the last one
+  finished (played to the end or stopped in its last 30 seconds) is selected;
+  the season's last stays selected. An episode stopped earlier stays selected.
+  Nothing starts playing.
+- A movie or episode in Continue Watching has **Remove from Continue Watching**
+  as the last action on its page. Plex keeps the resume point, and playing it
+  again puts it back in the row. Servers without a Continue Watching list
+  don't show the action.
+- A show's row of seasons ends with a **Shuffle** tile, and every episode's
+  actions hold **Shuffle show**. Both play every episode of the show, watched
+  or not and specials included, in a random order and each from its start.
+  While the episodes are listed the start bar runs under the action, and
+  Back gives up. A shuffle runs on into the next episode even with autoplay
+  off; Prev and Next move along the shuffled order. Afterwards the season
+  page keeps the episode it had selected.
+- An episode's page opened without the show's row of seasons (a show with one
+  season, Continue Watching, search, Home) has **Go to show** in its actions,
+  which shows that row. On a page opened from the row, Back does the same.
+- The menu lists Home, Search, the movie and TV libraries, Options, Exit to
+  MiSTer menu and Patreon. A long list of libraries scrolls, and the menu opens
+  on the library visited last. Patreon says what a MisterZine code unlocks for
+  good and holds **Beta access**; once a code has been entered, or on an
+  unlocked beta, it thanks you instead. Its supporters
+  row lists the Patreon supporters, current then past. The list is the one the
+  MisterZine app shows: it is fetched from `misterzine.fyi` with each release
+  check and kept in the cache folder for when the MiSTer is offline.
+- Options contains video mode, video geometry and crop, theme music, navigation
+  taps, autoplay, the skip buttons, bitrate, downmix boost, subtitle size, the 4:3 filter,
+  server selection and sign-out. A scrollbar on the right shows where the list
+  is. Up and Down wrap between the first and last rows, skipping group gaps.
+  OK, left or right turns a setting on or off; a setting with more choices
+  (bitrate, downmix boost, subtitle size, crop) changes with left and right only, shown by the
+  arrows either side of its value when it is selected. The 4:3 filter
+  applies to the
+  home rows, search and every library view. Movies and episodes are judged by
+  their own picture; a show by its first episode. Each TV library is read once
+  for that, the first time the filter needs it, and the answers are kept in the
+  cache folder. An update waiting under Options is marked with a purple UPDATE
+  mark at the top of Home and a purple dot in the menu.
+- After three minutes without a press in the menus or on a paused video, the
+  screen dims to a quarter of its brightness. The next press only brings it
+  back; it does not also act. The sign-in code never dims.
+- To leave the app, choose Exit to MiSTer menu in the menu (before sign-in, at
+  the foot of Options). Returning to the MiSTer Menu core from MiSTer's OSD
+  works too.
+
+### Connecting after power-on
+
+Opened right after the MiSTer is switched on, Plex can start before the
+network is up. On a MiSTer without a clock chip it can also start before the
+clock has been set from the internet, and secure connections to the server
+fail until then. For its first minute Plex keeps trying every two seconds and
+shows **Connecting** with what it is waiting for. After that it shows the error
+and tries again every 30 seconds; OK tries at once.
+
+### Server connection
+
+On sign-in and when choosing a server, Plex tries every connection plex.tv
+lists for the server at once and keeps the best that answers: the home
+network first, then the internet, then Plex's relay. At each it uses a secure
+(HTTPS) connection when one works, and otherwise a plain HTTP connection where
+the server allows it. The relay is secure only. The server's **Secure
+connections** setting (Settings > Network) decides: **Required** refuses plain
+connections, **Preferred** accepts them.
+
+### Release notes on start
+
+A release can carry a short note. It appears once, over Home, the first time
+Home has connected after the app starts, and stays until OK is held for one
+second (a bar under the hint fills while it is held). Once dismissed, that
+note is remembered in the settings file and does not show again.
+
+### Subtitles
+
+> **Legacy Plex reference:** The controls and behavior below describe an older
+> Plex version of MisterZine. Jellyfin now burns selected subtitles into the
+> video, but subtitle size is not applied. The saved subtitle-size preference
+> is retained. See [current playback behavior](PLAYBACK.md).
+
+**Options > Subtitle size** chooses Normal (100%), Large (150%) or Extra large
+(200%). Normal keeps Plex's original size. This setting is available to everyone
+and is saved for future playback. During playback, **More > Subtitle size** changes
+the same setting. With a subtitle track selected, changing size briefly restarts
+the stream at the current position; choosing the current size leaves it playing.
+With subtitles off, the choice is saved for when they are enabled.
+
+Plex draws subtitles into the video before sending it to MiSTer. The size setting
+asks Plex to scale them at that stage; the result depends on the server and subtitle
+format. Styled ASS/SSA and image-based PGS/VobSub tracks may behave differently
+from plain text subtitles. It cannot resize lettering already embedded in the
+original video. Crop can cut the ends of long subtitle lines.
+
+### Sound and playback quality
+
+> **Legacy Plex reference:** The downmix boost behavior below describes an older
+> Plex version. Jellyfin now applies surround downmix boost in its playback
+> worker, with peak limiting, and supports live changes from playback More.
+> The bitrate and server behavior below remain Plex-specific.
+> See [current playback behavior](PLAYBACK.md).
+
+Theme music and navigation taps can be disabled in Options. **Video bitrate**
+defaults to Max: at 480 lines a Plex server sends at most about 2 Mbps of
+video, whatever higher ceiling is requested. The lower steps (1.2 Mbps, 1 Mbps,
+and 0.4 Mbps at a lower resolution) are for slow connections to the server;
+the labels are the video rates measured with Plex Media Server 1.43. Settings
+of 4.5 or 6 Mbps saved by older versions read as Max, which is the stream they
+already received.
+
+Frames are decoded with H.264's loop filter on, which keeps block edges from
+building up between keyframes in dark scenes. The video presenter fits frames
+to the 4:3 screen; **Video crop** can cut away picture edges. 50 and 60 fps
+video is requested from the server at half its frame rate (25 or 29.97 fps),
+which the board can keep up with.
+
+Surround soundtracks are folded to stereo by the Plex server. A plain fold
+comes out noticeably quieter than a stereo track, so **Surround downmix boost**
+in Options raises the level when the server downmixes: Off, Small or Large
+(the default). Stereo tracks are passed through unchanged. The setting applies
+from the next playback.
+
+### Update, rollback and remove
+
+Open **Options > Updates** to see whether a newer version is available, and its
+download size. The screen checks when it opens. Checks also run in the background
+at startup and every six hours while browsing; failed background checks stay quiet
+and are tried again after five minutes. An update found by an earlier check is
+still offered while the network is down.
+
+Updates offers only versions newer than the one running. It never reinstalls the
+current version or goes back to an older one; **MisterZine-Plex-Rollback** does
+that. Public builds notify about newer public releases. Beta notifications are off
+by default but can be switched on in Updates; a newer beta is listed either way.
+Beta builds notify about newer betas and public releases that catch up. Nothing
+installs or switches channels automatically.
+
+Choose **Update now**. If a beta needs a code you have not saved, choose **Enter
+code and update**, or **Install for browsing**. Your current version will keep
+working. Codes and older receipts survive updates and rollback. Downloading
+continues if you leave the screen or Plex closes; activation waits for **Restart
+now**. **Later** leaves the current version active. If an update fails, the reason
+is shown under **Try again**. If startup fails, the previous selection is restored.
+
+An ordinary Downloader run can refresh `misterzine-plex-downloads/package.zip`;
+it cannot activate that package. Rebooting the MiSTer does not install a downloaded
+update either; only **Restart now** does. The selected channel is registered in
+`downloader_misterzine_plex.ini`. Installation data stays in
+`/media/fat/misterzine-plex`.
+
+Each installed release keeps its own folder. Once an update has started, Plex keeps
+the new release and the previous one and removes older release folders.
+
+**MisterZine-Plex-Rollback** selects the previous installed release without opening
+Plex. Return to MiSTer Menu before using it. **MisterZine-Plex-Uninstall** works
+offline and removes Plex binaries, entries, staging files and its database
+registration. The default keeps sign-in, preferences, artwork and acquired codes.
+Removing all Plex data requires typing **REMOVE**. Downloader and unrelated files
+are preserved. A manually extracted `misterzine-plex-beta` ZIP folder can be
+removed separately after installation.
+
+If Zaparoo is installed, Plex also appears under **Other** in Zaparoo. The installer
+keeps its own entry, `zaparoo/launchers/misterzine-plex.toml`, pointed at the
+selected release and removes it on uninstall. Nothing needs adding to Zaparoo's
+`config.toml`.
+
+Each release also checks its own entries at boot and once an update to it has
+finished: the main-menu entry, the Scripts entries and the Zaparoo entry. An in-app
+update is installed by the previous release's code, so this is what brings them up
+to date, and it adds the Zaparoo entry at the next boot when Zaparoo is installed
+after Plex. Nothing is written when they are already right, and a Zaparoo reload
+that did not happen is retried at the next check. The boot hook in
+`linux/user-startup.sh` is changed only by the installer and uninstaller. The last
+check and Zaparoo reload are recorded in `maintenance.json` and appear in
+diagnostics reports, with the Zaparoo version and whether its `config.toml`
+overrides the entry.
+
+### Showcase captures
+
+Options ends with the app version and build information. Select Version and
+press OK three times in quick succession (less than two seconds between presses)
+to toggle Showcase Mode. A brief message confirms whether it is on or off.
+Showcase Mode uses generic library names and hides library totals and numeric
+library position counts. Titles, artwork, episode details and watched/progress
+indicators remain visible. The account name is also omitted from Sign out.
+The mode lasts until the app exits; repeat the shortcut to turn it off sooner.
+After switching, Back returns to Home so cached menu images cannot expose old
+labels. This is capture styling, not full account anonymization; server selection
+and sign-in screens can still contain identifying information.
+
+## Display setup
+
+
+CRT output is intended primarily for NTSC 15 kHz CRT output at 480i. Component
+and Y/C profiles enforce 480i. This is profile detection, not cable or display
+detection: RGB-only CRT profiles need **Safe 480i** in the core OSD.
+
+The core OSD has **Video output: App settings / Safe 480i**. Normally leave it
+on App settings. HDMI 480p is selected in the app's Options and requires a fresh
+two-second OK hold to keep the change. It reverts if you do not confirm.
+
+**Options > Video calibration** shows adjustable screen edges and a square.
+On an H.264 core that advertises playback geometry interface 1.2 or later,
+the saved edges and width correction also adjust video playback; menus are
+unaffected. The application labels the screen **Video calibration (preview
+only)** on older cores, where the saved values do not affect playback. Using
+the playback adjustment requires a custom core build with interface 1.2 or
+later. Fit/crop telemetry has been verified on Mister Pi with DeFlicker off and on;
+visual confirmation on a CRT remains pending.
+Geometry applies to fitted 720x480 or 720x576 output, not Native HDMI output.
+
+**Options > Video crop** sets how much of a picture that does not match the
+screen is cut away. **Off** shows all of it, with black bars. **14:9** cuts the
+sides of anything wider than 14:9, the compromise broadcasters used for
+widescreen on 4:3 sets: thin bars remain and little is lost. **Fill** cuts
+whatever overhangs the screen (or the area set under Video geometry), so there
+are no bars: a 16:9 picture loses a quarter of its width, which also removes
+the side bars of 4:3 shows stored in 16:9 files. A picture narrower than the
+screen loses its top and bottom instead. Pictures within 1% of the target
+shape are left whole. The crop is enlarged from the frame Plex sends, so it
+is slightly softer, and a crop can cut the ends of long subtitle lines, which
+Plex draws across the full width. Each playback starts with this setting;
+**More > Crop** in the playback controls changes it for that playback,
+including the episodes that follow it, and the change shows at once.
+
+For HDMI scaling, aspect and variable refresh rate settings, see [HDMI setup](HDMI.md).
+The geometry code scales its saved 480-line edges for a 576-line raster, but
+PAL playback has not yet been confirmed on hardware. RGB-only CRTs are not
+detected automatically.
+
+## MisterZine Plex Core - Patreon beta access
+
+Official beta builds let anyone link Plex, browse libraries, search, change
+settings and use watched-state controls. Starting or resuming a movie or episode
+requires the member code for that release. Browsing theme music remains available.
+Public and normal development builds play without a code. The FPGA core and
+separate playback tools do not check Patreon access.
+
+### Unlocking a beta
+
+Find the exact version shown in the app's drawer or Options, then find its
+members-only Patreon release post. The post supplies a six-digit code.
+
+Press Play or Resume to open the early-access code screen, or select **Beta access** on
+the menu's Patreon page. Left/right selects a digit; up/down changes it. Hold up/down to repeat.
+Digit changes take effect immediately, with a short rolling animation. A keyboard can type the
+six digits directly, including leading zeros. Press OK to unlock or Back to cancel.
+Keyboard Backspace edits and Escape cancels. The Patreon address is displayed
+on the code screen, the Patreon page and in Options. An incorrect code stays visible for
+correction. Successful entry continues the selected playback automatically;
+unlocking from the Patreon page simply returns to it.
+
+Access is saved with the installation, separately from the Plex account. Restarts,
+sign-out, reinstallations that preserve settings and updates using the same access
+batch keep working. A release using a new batch requires its new code. Previously
+unlocked releases still work after rollback. Keep the installation's settings and
+`beta-unlocks` directory when moving or backing up your installation.
+
+The BETA badge stays visible after unlocking. Video playback has no beta watermark.
+
+To clear saved access, select **Patreon → Beta access → Forget beta access** in the menu and
+confirm. This removes all saved beta unlocks and legacy keys on the installation,
+including access to older releases. Plex sign-in and settings are kept. Beta
+playback requires unlocking again; legacy builds need their key restored.
+
+### Older file-key builds
+
+If your older release post supplies a patron key ZIP, extract it onto the SD
+card root, preserving `misterzine-plex/beta-keys/<batch>.key`, then press Play.
+Keep older keys for rollback. Numeric-code builds do not convert or delete them.
+
+### Does access expire?
+
+There is no automatic membership check, expiry or device binding. Cancellation
+does not disable an acquired build. A later release may require a new code.
+Existing component licenses and modification rights remain unchanged.

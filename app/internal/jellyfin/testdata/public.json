@@ -1,0 +1,9 @@
+{
+ "LocalAddress": "http://jellyfin.test:8096",
+ "ServerName": "test-server",
+ "Version": "12.2.0",
+ "ProductName": "Jellyfin Server",
+ "OperatingSystem": "",
+ "Id": "ab2fcab83d844492a4ecc65a0fca36cd",
+ "StartupWizardCompleted": true
+}

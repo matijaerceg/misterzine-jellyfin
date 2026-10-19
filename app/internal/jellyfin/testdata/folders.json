@@ -1,0 +1,127 @@
+{
+ "Items": [
+  {
+   "Name": "... nur noch Gewölk ...",
+   "Id": "358f1b71dbd1eb6238744f21a9a01f14",
+   "HasSubtitles": true,
+   "Container": "mkv",
+   "PremiereDate": "1977-11-01T08:00:00.0000000Z",
+   "ChannelId": null,
+   "RunTimeTicks": 9538240000,
+   "ProductionYear": 1977,
+   "IsFolder": false,
+   "Type": "Movie",
+   "UserData": {
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "358f1b71-dbd1-eb62-3874-4f21a9a01f14",
+    "ItemId": "358f1b71dbd1eb6238744f21a9a01f14"
+   },
+   "VideoType": "VideoFile",
+   "ImageTags": {
+    "Primary": "3c6a155bc52371b75541b4c3a9186bd1"
+   },
+   "BackdropImageTags": [],
+   "ImageBlurHashes": {
+    "Primary": {
+     "3c6a155bc52371b75541b4c3a9186bd1": "V02Fc4of4nayxuxufQWBj[j[4nWB?bofM{RjfQxuayay"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Video",
+   "OriginalLanguage": "en"
+  },
+  {
+   "Name": "\"BLOW THE NIGHT!\" Let's Spend the Night Together",
+   "Id": "b15b99d4109b6e9ebb8736a0391d361d",
+   "HasSubtitles": true,
+   "Container": "mkv",
+   "PremiereDate": "1983-03-19T08:00:00.0000000Z",
+   "ChannelId": null,
+   "CommunityRating": 7.4,
+   "RunTimeTicks": 65575930000,
+   "ProductionYear": 1983,
+   "IsFolder": false,
+   "Type": "Movie",
+   "UserData": {
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "b15b99d4-109b-6e9e-bb87-36a0391d361d",
+    "ItemId": "b15b99d4109b6e9ebb8736a0391d361d"
+   },
+   "VideoType": "VideoFile",
+   "ImageTags": {
+    "Primary": "bd4cf5f80515021e010afee7c2cadfb7"
+   },
+   "BackdropImageTags": [
+    "191970e42fd1f16b05f343ff347223d7"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "191970e42fd1f16b05f343ff347223d7": "WS8}x+V?NMg4r=of?wogRjWXofoJ-;f,n}ayW=oe%#bHogoga}W="
+    },
+    "Primary": {
+     "bd4cf5f80515021e010afee7c2cadfb7": "dNFgOb1v;%9txFWBxGn%D*R*xaozxaR*RjNGNwX8aexG"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Video",
+   "OriginalLanguage": "ja"
+  },
+  {
+   "Name": "\"MANOS\" The Hands of Fate",
+   "Id": "89b648a7eeb2c1468d2411403a8905bf",
+   "HasSubtitles": true,
+   "Container": "mkv",
+   "PremiereDate": "1966-11-15T08:00:00.0000000Z",
+   "CriticRating": 0,
+   "OfficialRating": "Not Rated",
+   "ChannelId": null,
+   "CommunityRating": 2.2,
+   "RunTimeTicks": 44226330000,
+   "ProductionYear": 1966,
+   "IsFolder": false,
+   "Type": "Movie",
+   "UserData": {
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "89b648a7-eeb2-c146-8d24-11403a8905bf",
+    "ItemId": "89b648a7eeb2c1468d2411403a8905bf"
+   },
+   "VideoType": "VideoFile",
+   "ImageTags": {
+    "Thumb": "5383beb8709b31aa20b51ffc6c376e86",
+    "Logo": "f929ef62e45fbe7742c5e53707e5356f",
+    "Primary": "44231431d646689bc278dcf327cef6da"
+   },
+   "BackdropImageTags": [
+    "813c897afb9ad6ddda15c52e3ad33a00"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "813c897afb9ad6ddda15c52e3ad33a00": "W66GPZOD1b$6XSJlBUn%rrSf-BsUkCsnWANukCsos:SMsAsUJ,a|"
+    },
+    "Thumb": {
+     "5383beb8709b31aa20b51ffc6c376e86": "WMCz^oXmFHwJEgwJ=|o}wcr?NaWW2@$j#lJ7$ioyNw#mI:Ez$jxa"
+    },
+    "Logo": {
+     "f929ef62e45fbe7742c5e53707e5356f": "NhHLl1ayD%WBM{of-;IUofxuj[Rj00IUxuWBt7WB"
+    },
+    "Primary": {
+     "44231431d646689bc278dcf327cef6da": "dgLzgJ%fKj-;Q+Rk9]ae~qoNR.t6%gxtxaj@x^axnht7"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Video",
+   "OriginalLanguage": "en"
+  }
+ ],
+ "TotalRecordCount": 6347,
+ "StartIndex": 0
+}

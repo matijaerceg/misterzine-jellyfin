@@ -1,0 +1,192 @@
+{
+ "Items": [
+  {
+   "Name": "3 Body Problem",
+   "Id": "e8597adb9c3c4567dc82aac5981b22ac",
+   "SortName": "0000000003 body problem",
+   "PremiereDate": "2024-03-21T07:00:00.0000000Z",
+   "OfficialRating": "TV-MA",
+   "ChannelId": null,
+   "Overview": "Across continents and decades, five brilliant friends make earth-shattering discoveries as the laws of science unravel and an existential threat emerges.",
+   "Taglines": [],
+   "Genres": [
+    "Sci-Fi & Fantasy",
+    "Mystery",
+    "Drama"
+   ],
+   "CommunityRating": 7.492,
+   "RunTimeTicks": 0,
+   "ProductionYear": 2024,
+   "IsFolder": true,
+   "ParentId": "e39a1fa5022aa25575a26eb89562d76b",
+   "Type": "Series",
+   "UserData": {
+    "PlayedPercentage": 0,
+    "UnplayedItemCount": 8,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "e8597adb-9c3c-4567-dc82-aac5981b22ac",
+    "ItemId": "e8597adb9c3c4567dc82aac5981b22ac"
+   },
+   "RecursiveItemCount": 8,
+   "ChildCount": 1,
+   "Status": "Continuing",
+   "AirDays": [],
+   "PrimaryImageAspectRatio": 0.6666666666666666,
+   "ImageTags": {
+    "Primary": "c98cfdc0a2362738e4cce2a624c99e03",
+    "Logo": "58f265d1051d84024dc6beb10fdad671",
+    "Thumb": "c204440a5f869eb7b8bdc2580a671b59"
+   },
+   "BackdropImageTags": [
+    "8b156c4c38ef326b1ad2feaf99b27ace"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "8b156c4c38ef326b1ad2feaf99b27ace": "W57KbtxWE*%f9Zx[~WRQ9vNy4:o3IUxaj=NGR%r=4:x[$$RP^%Rj"
+    },
+    "Primary": {
+     "c98cfdc0a2362738e4cce2a624c99e03": "dYHT{dD*bv-U1OoJj[R+0gx[V[M|}rxFWBoJODWBo0of"
+    },
+    "Logo": {
+     "58f265d1051d84024dc6beb10fdad671": "PPFhelx]PAV@W;VYRPWAHXg3J,ofIoixRPM{-VR*R*jZRki_f6WB"
+    },
+    "Thumb": {
+     "c204440a5f869eb7b8bdc2580a671b59": "W57T;0xY5;%MIAk;~Xi{IWN{9axaE1t6s9IpNtwJ9Go}S|Vs^jI:"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Unknown",
+   "EndDate": "2024-03-21T07:00:00.0000000Z",
+   "OriginalLanguage": "en"
+  },
+  {
+   "Name": "3Below: Tales of Arcadia",
+   "Id": "93f13c43ce991faf11d67e83a0895ca9",
+   "SortName": "0000000003below: tales of arcadia",
+   "PremiereDate": "2018-12-21T08:00:00.0000000Z",
+   "OfficialRating": "TV-Y7",
+   "ChannelId": null,
+   "Overview": "After crash-landing on Earth, two royal teen aliens on the run struggle to blend in with humans as they evade intergalactic bounty hunters.",
+   "Taglines": [],
+   "Genres": [
+    "Animation",
+    "Family",
+    "Comedy",
+    "Sci-Fi & Fantasy"
+   ],
+   "CommunityRating": 7.5,
+   "RunTimeTicks": 14400000000,
+   "ProductionYear": 2018,
+   "IsFolder": true,
+   "ParentId": "e39a1fa5022aa25575a26eb89562d76b",
+   "Type": "Series",
+   "UserData": {
+    "PlayedPercentage": 0,
+    "UnplayedItemCount": 13,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "93f13c43-ce99-1faf-11d6-7e83a0895ca9",
+    "ItemId": "93f13c43ce991faf11d67e83a0895ca9"
+   },
+   "RecursiveItemCount": 13,
+   "ChildCount": 1,
+   "Status": "Ended",
+   "AirDays": [],
+   "PrimaryImageAspectRatio": 0.6666666666666666,
+   "ImageTags": {
+    "Primary": "96c81e9be8e0c1499699e6a1dfdb5f21",
+    "Logo": "209fc9e48d14dc4df8c4c287e74cd129",
+    "Thumb": "a0841fa74c12d0be19f50bab2f49c0d3"
+   },
+   "BackdropImageTags": [
+    "2389ff2144e445dbec75b47d2b7813a1"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "2389ff2144e445dbec75b47d2b7813a1": "WYI4^fW.}m-nVYoh~pRoacwHEjbc=^ozV@wuI[j=={oJROn+RQRj"
+    },
+    "Primary": {
+     "96c81e9be8e0c1499699e6a1dfdb5f21": "dO8Fyhf;rwx_L$f9VrZ~sinhknobxmnzkQofH;n~V_aO"
+    },
+    "Logo": {
+     "209fc9e48d14dc4df8c4c287e74cd129": "PWP6~x%MWBt7D%t7D%j[~qof%MWBt7ofxuRj9FayfQayofRjt7M{"
+    },
+    "Thumb": {
+     "a0841fa74c12d0be19f50bab2f49c0d3": "WjIhHQ]~n%V|EmO@~A-QxbM}RRkqr?R6nOoJjEoz-UrrnijFS$bv"
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Unknown",
+   "EndDate": "2019-07-12T07:00:00.0000000Z",
+   "OriginalLanguage": "en"
+  },
+  {
+   "Name": "007: Road to a Million",
+   "Id": "872de5cadeb898b46d1438d151f7e49d",
+   "SortName": "0000000007: road to million",
+   "PremiereDate": "2023-11-10T08:00:00.0000000Z",
+   "OfficialRating": "12",
+   "ChannelId": null,
+   "Overview": "Nine pairs of everyday people are unleashed on an epic global adventure through a series of Bond inspired challenges, for a shot at winning a life-changing £1,000,000 prize. The Controller, Brian Cox, is the mastermind behind the game, watching the pairs as they hunt for 10 questions he’s hidden around the world.",
+   "Taglines": [],
+   "Genres": [
+    "Reality",
+    "Action & Adventure"
+   ],
+   "CommunityRating": 7.1,
+   "RunTimeTicks": 0,
+   "ProductionYear": 2023,
+   "IsFolder": true,
+   "ParentId": "e39a1fa5022aa25575a26eb89562d76b",
+   "Type": "Series",
+   "UserData": {
+    "PlayedPercentage": 0,
+    "UnplayedItemCount": 16,
+    "PlaybackPositionTicks": 0,
+    "PlayCount": 0,
+    "IsFavorite": false,
+    "Played": false,
+    "Key": "872de5ca-deb8-98b4-6d14-38d151f7e49d",
+    "ItemId": "872de5cadeb898b46d1438d151f7e49d"
+   },
+   "RecursiveItemCount": 16,
+   "ChildCount": 2,
+   "Status": "Continuing",
+   "AirDays": [],
+   "PrimaryImageAspectRatio": 0.6666666666666666,
+   "ImageTags": {
+    "Primary": "237bb5873ce8b3497f034b454099cff3",
+    "Logo": "70f950c32bb6ecd76f52ee4c089213d5",
+    "Thumb": "2a3d7fe69305ae54f4c5a41fe480834d"
+   },
+   "BackdropImageTags": [
+    "d801ed577a42cf6e80bf9f6570670822"
+   ],
+   "ImageBlurHashes": {
+    "Backdrop": {
+     "d801ed577a42cf6e80bf9f6570670822": "WF85K2oz4TRk-pt7tloeaeWBWBofD%az%MoJR+WqkDWCayoyt7WB"
+    },
+    "Primary": {
+     "237bb5873ce8b3497f034b454099cff3": "dEAU2A%M4:xv.TkCRjWC9FNGV?RPMxkCa0RO9at7-:f6"
+    },
+    "Logo": {
+     "70f950c32bb6ecd76f52ee4c089213d5": "P7TSUA%MfQ%MfQ%MfQ%M~qj[fQj[fQj[fQj[fQfQfQfQfQfQfQfQ"
+    },
+    "Thumb": {
+     "2a3d7fe69305ae54f4c5a41fe480834d": "WjPs#CRjt7%MWB-;_3xuofj[ofj[_3t7M{t7ofWB~qM{RjxuWBj["
+    }
+   },
+   "LocationType": "FileSystem",
+   "MediaType": "Unknown",
+   "EndDate": "2025-08-22T07:00:00.0000000Z",
+   "OriginalLanguage": "en"
+  }
+ ],
+ "TotalRecordCount": 784,
+ "StartIndex": 0
+}

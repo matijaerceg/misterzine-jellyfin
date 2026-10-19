@@ -1,0 +1,33 @@
+name: Integrating an HPS program
+description: Your program cannot talk to the core, or the core does not do what the interface says
+labels: ["bug", "area:integration"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is for developers whose program feeds the core. Include the core
+        version AND the interface version your program was built against.
+  - type: input
+    id: version
+    attributes:
+      label: Core version
+      placeholder: H264 v0.1.0 261001
+    validations:
+      required: true
+  - type: input
+    id: api
+    attributes:
+      label: Interface / client library version your program uses
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The smallest sequence of records or calls that shows it. A short stream file helps; never attach copyrighted media.

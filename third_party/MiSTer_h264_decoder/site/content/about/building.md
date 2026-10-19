@@ -1,0 +1,61 @@
+# Building from source
+
+Everything builds on a Linux PC. Docker is the simplest route: every toolchain below has a
+pinned image in the repository, built on first use when `USE_DOCKER=1` is set.
+
+## The core
+
+Requires **Quartus 17.0.2 exactly**. The pinned Docker image `raetro/quartus:mister` is
+that version:
+
+```bash
+USE_DOCKER=1 ./build_release.sh --compile   # -> releases/H264_<slug>_<date>_<time>.rbf
+```
+
+`build_release.sh` also runs the build gates (implicit nets, undriven signals, the
+decoder-clock timing gate at both corners, the netlist canary) and packs a **compressed**
+`.rbf`, which MiSTer's loader requires. Copy it to `_Other/` on the SD card.
+
+Simulation benches run under Icarus Verilog and Verilator: `bench/h264/run_*.sh` (add `--red`
+to prove each bench can fail; `bench/h264/README.md` lists them).
+
+## The programs
+
+The four programs and the client library are ARM programs, cross-compiled in their own
+Docker images. Each client's build writes the SD card's layout to its `build/dist/`: copy
+its contents to the card's root.
+
+```bash
+USE_DOCKER=1 hps/build_arm.sh               # the library, h264play, h264stat, cavlc2cabac -> hps/build/arm/
+USE_DOCKER=1 clients/moonlight/build.sh     # Scripts/moonlight.sh, moonlight/
+USE_DOCKER=1 clients/jellyfin/build.sh      # Scripts/jellyfin.sh, jellyfin/
+USE_DOCKER=1 clients/player/build.sh        # Scripts/h264player.sh, h264player/
+USE_DOCKER=1 clients/uvc/build.sh           # Scripts/h264cam.sh, h264cam/
+```
+
+The images build on one another (the compiler, then Moonlight's libraries, then FFmpeg for
+the Jellyfin client, the video player and the camera viewer): the first build takes a while.
+
+Each one has a test that runs on the PC against a simulated core (add `--red` to prove it
+can fail). They need gcc, python3, ffmpeg, and the development packages of FFmpeg, libcurl,
+libopus and libusb; run Moonlight's after its build, which fetches the upstream source it
+compiles against:
+
+```bash
+make -C hps test
+clients/moonlight/tests/run_test.sh
+clients/jellyfin/tests/run_test.sh
+clients/player/tests/run_test.sh
+clients/uvc/tests/run_test.sh
+```
+
+## The release zip
+
+`tools/package_release.sh` puts the core and the four programs into one zip, the layout
+[Install the core](../getting-started/install.md) describes. Build the programs first, from the
+same commit.
+
+## The manual
+
+The manual is built with MkDocs (`site/requirements.txt`):
+`python3 tools/docs_check.py && mkdocs build --strict`.
