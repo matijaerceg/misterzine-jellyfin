@@ -35,7 +35,10 @@ runs its native x86 unit test (log: `build/hps-host-test.log`), and produces:
 `build_ffmpeg.sh` downloads and caches OpenSSL 3.0.15 and FFmpeg 7.1.1 beneath
 `build/sources`, cross-builds static OpenSSL, and installs headers and static
 libraries under `build/arm/ffmpeg-prefix`. It also copies the static `ffmpeg`
-and `ffprobe` executables to `build/arm/`.
+and `ffprobe` executables to `build/arm/`. Both archives must match the SHA-256
+pinned in the script, whether downloaded or already cached. If a download site
+is down, place the archives from a release's `dependency-sources.zip`
+(`vendor-sources/`) in `build/sources` first.
 
 On a typical multi-core PC, HPS takes under a minute. The first FFmpeg/OpenSSL
 build usually takes 5–20 minutes; later runs reuse downloaded archives and the

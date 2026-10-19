@@ -14,24 +14,33 @@ FFMPEG_TARBALL="ffmpeg-${FFMPEG_VERSION}.tar.xz"
 OPENSSL_TARBALL="openssl-${OPENSSL_VERSION}.tar.gz"
 FFMPEG_URL="https://ffmpeg.org/releases/${FFMPEG_TARBALL}"
 OPENSSL_URL="https://www.openssl.org/source/${OPENSSL_TARBALL}"
+# FFmpeg's matches its release signature; OpenSSL's is the published one.
+FFMPEG_SHA256=733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1
+OPENSSL_SHA256=23c666d0edf20f14249b3d8f0368acaee9ab585b09e1de82107c66e1f3ec9533
 
-for tool in make perl wget tar pkg-config arm-linux-gnueabihf-gcc; do
+for tool in make perl wget tar pkg-config sha256sum arm-linux-gnueabihf-gcc; do
   command -v "$tool" >/dev/null || { echo "missing prerequisite: $tool" >&2; exit 1; }
 done
 
 mkdir -p "$SRC" "$OUT" "$PREFIX"
 cd "$SRC"
 
+# A tarball already in build/sources is used as is, so a release's archived
+# copy can stand in when the site is down. Either way it must match the hash.
 download() {
-  local url=$1 file=$2
+  local url=$1 file=$2 sha=$3
   if [[ ! -f "$file" ]]; then
     wget --progress=dot:giga -O "$file.part" "$url"
     mv "$file.part" "$file"
   fi
+  if ! echo "$sha  $file" | sha256sum -c --quiet -; then
+    echo "$file does not match its pinned SHA-256; delete it and retry" >&2
+    exit 1
+  fi
 }
 
-download "$OPENSSL_URL" "$OPENSSL_TARBALL"
-download "$FFMPEG_URL" "$FFMPEG_TARBALL"
+download "$OPENSSL_URL" "$OPENSSL_TARBALL" "$OPENSSL_SHA256"
+download "$FFMPEG_URL" "$FFMPEG_TARBALL" "$FFMPEG_SHA256"
 
 if [[ ! -f "$PREFIX/lib/libssl.a" || ! -f "$PREFIX/lib/libcrypto.a" ]]; then
   rm -rf "openssl-${OPENSSL_VERSION}"
