@@ -15,7 +15,8 @@ your server address, username and password. Your server needs transcoding
 support for unsupported video formats and burned-in subtitles.
 
 Browse freely; official beta builds ask for the shared MisterZine supporter code
-when you start playback. See [beta access](BETA_ACCESS.md).
+when you start playback. See [beta access](BETA_ACCESS.md) and the
+[terms of use](TERMS.md).
 
 The screen stays black until the app draws its first menu. No background
 animation or separate loading screen runs.

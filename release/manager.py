@@ -613,7 +613,7 @@ def install(card, package, archive=None):
     for name in HELPERS[1:]:
         if (package / name).is_file():
             atomic(root / name, (package / name).read_bytes())
-    for name in ('README.md', 'THIRD_PARTY_NOTICES.md', 'BETA_ACCESS.md'):
+    for name in ('README.md', 'TERMS.md', 'THIRD_PARTY_NOTICES.md', 'BETA_ACCESS.md'):
         if (package / name).is_file():
             atomic(root / name, (package / name).read_bytes())
     for name in ('Apache-2.0.txt', 'Go.txt', 'GPL-2.0.txt', 'GPL-3.0.txt', 'LGPL-2.1.txt'):

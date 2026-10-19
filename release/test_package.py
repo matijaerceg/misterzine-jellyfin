@@ -46,7 +46,7 @@ class PackageTests(unittest.TestCase):
             z.writestr('H264/rtl/fixture.sv', 'source')
         release = self.root / 'release'
         release.mkdir()
-        for name in ('manager.py', 'update_service.py', 'catalogue.py', 'menu_launcher.py', 'README.md', 'THIRD_PARTY_NOTICES.md', 'BETA_ACCESS.md'):
+        for name in ('manager.py', 'update_service.py', 'catalogue.py', 'menu_launcher.py', 'README.md', 'TERMS.md', 'THIRD_PARTY_NOTICES.md', 'BETA_ACCESS.md'):
             (release / name).write_text('# fixture')
         (release / 'licenses').mkdir()
         (release / 'licenses/NOTICE.txt').write_text('notice')
@@ -65,6 +65,7 @@ class PackageTests(unittest.TestCase):
             payload = {name.removeprefix('misterzine-jellyfin-beta/payload/')
                        for name in files if name.startswith('misterzine-jellyfin-beta/payload/')}
             self.assertEqual(payload, {'plexcrt', 'jfplay', 'ffmpeg', 'H264.rbf'})
+            self.assertIn('misterzine-jellyfin-beta/TERMS.md', files)
             manifest = json.loads(archive.read('misterzine-jellyfin-beta/manifest.json'))
             self.assertEqual(manifest['access'], {'batch': 'fixture-batch'})
             self.assertNotIn('code_sha256', manifest)

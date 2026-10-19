@@ -90,11 +90,13 @@ class InstallerTests(unittest.TestCase):
     def test_install_keeps_beta_help_and_core_build_provenance_with_release(self):
         self.package_version('beta-1')
         (self.package / 'BETA_ACCESS.md').write_text('access help')
+        (self.package / 'TERMS.md').write_text('terms')
         (self.package / 'provenance').mkdir()
         (self.package / 'provenance/quartus-rbf-manifest.json').write_text('{"fixture":true}')
         manager.install(self.card, self.package)
         installed = self.root / 'releases/beta-1'
         self.assertEqual((installed / 'BETA_ACCESS.md').read_text(), 'access help')
+        self.assertEqual((self.root / 'TERMS.md').read_text(), 'terms')
         self.assertEqual((installed / 'provenance/quartus-rbf-manifest.json').read_text(), '{"fixture":true}')
 
     def test_interrupted_activation_keeps_previous_release(self):

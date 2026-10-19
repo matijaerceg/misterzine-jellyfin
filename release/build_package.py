@@ -109,7 +109,7 @@ def build(out, ident, version, worker=None, ffmpeg=None, rbf=None, rbf_manifest=
         prov = package / 'provenance'
         prov.mkdir()
         shutil.copyfile(rbf_manifest, prov / 'quartus-rbf-manifest.json')
-        for name in ('manager.py', 'update_service.py', 'catalogue.py', 'menu_launcher.py', 'README.md', 'THIRD_PARTY_NOTICES.md', 'BETA_ACCESS.md'):
+        for name in ('manager.py', 'update_service.py', 'catalogue.py', 'menu_launcher.py', 'README.md', 'TERMS.md', 'THIRD_PARTY_NOTICES.md', 'BETA_ACCESS.md'):
             shutil.copyfile(ROOT / 'release' / name, package / name)
         shutil.copytree(ROOT / 'release/licenses', package / 'licenses')
         with zipfile.ZipFile(source_archive) as archive:

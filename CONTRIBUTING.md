@@ -9,7 +9,8 @@ connection type, direct-stream or transcode mode, and reproduction steps.
 Review diagnostics before sharing them; do not attach account files or card images.
 
 Keep changes focused and retain the applicable
-[component licenses](release/THIRD_PARTY_NOTICES.md). No additional license grant
+[component licenses](release/THIRD_PARTY_NOTICES.md) and
+[application terms](release/TERMS.md). No additional license grant
 is implied by source availability.
 
 On Linux with Go 1.27 and Python 3:

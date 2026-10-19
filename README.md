@@ -52,7 +52,8 @@ this fork's current behavior.
 ## Development and licenses
 
 [Contributing](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) ·
-[Player contract](arm/jfplay.md) · [Component licenses](release/THIRD_PARTY_NOTICES.md)
+[Player contract](arm/jfplay.md) · [Terms](release/TERMS.md) ·
+[Component licenses](release/THIRD_PARTY_NOTICES.md)
 
 Component licenses apply separately; source availability does not grant additional
 rights. Retained license texts and upstream notices remain with their components.
