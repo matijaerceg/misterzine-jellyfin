@@ -9,7 +9,7 @@ Requires **Quartus 17.0.2 exactly**. The pinned Docker image `raetro/quartus:mis
 that version:
 
 ```bash
-USE_DOCKER=1 ./build_release.sh --compile   # -> releases/H264_<slug>_<date>_<time>.rbf
+USE_DOCKER=1 ./build_release.sh --compile   # -> releases/H264_<version>_<date>_<time>.rbf
 ```
 
 `build_release.sh` also runs the build gates (implicit nets, undriven signals, the
@@ -49,11 +49,11 @@ clients/player/tests/run_test.sh
 clients/uvc/tests/run_test.sh
 ```
 
-## The release zip
+## Releases
 
-`tools/package_release.sh` puts the core and the four programs into one zip, the layout
-[Install the core](../getting-started/install.md) describes. Build the programs first, from the
-same commit.
+This core is MisterZine Jellyfin's fork. It is released only inside MisterZine Jellyfin
+packages, built by that project's `release/build_package.py` from a `--release` build; see its
+`release/DISTRIBUTION.md`.
 
 ## The manual
 

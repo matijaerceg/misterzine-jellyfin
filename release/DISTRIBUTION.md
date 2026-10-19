@@ -23,7 +23,17 @@ Build the Go ARMv7 application and `jfplay` using the documented toolchains.
 Supply the FFmpeg executable used by the current toolchain and the qualified
 H.264 RBF with its original generated manifest. An upstream checked-in RBF is
 not a substitute for the qualified custom image. Keep the original manifest
-unchanged even if the core's internal version is a development label.
+unchanged.
+
+The core in `third_party/MiSTer_h264_decoder` is this project's own fork and
+follows only this project's rules. Upstream changes are never merged
+automatically; a wanted fix is cherry-picked and reviewed like any other change.
+Before the build that will ship, set `CORE_VERSION` in its `h264/emu.sv` to
+`jf-` plus the app version it first ships in, and commit it. Then build with
+`build_release.sh --compile --release` from that clean commit. The packager
+refuses a core that is marginal, failed timing, was built from a dirty tree, or
+carries a version without the `jf-` prefix. An app-only release reuses the last
+packaged core and its manifest.
 
 The runtime payload is `plexcrt`, `jfplay`, `ffmpeg`, and the H.264 RBF.
 Fonts and UI assets are embedded in the application. HPS tools and static

@@ -23,10 +23,10 @@ class PackageTests(unittest.TestCase):
         self.core.write_bytes(b'qualified rbf fixture')
         self.rbf_manifest = self.root / 'private/quartus-rbf-manifest.json'
         self.rbf_manifest.write_text(json.dumps({
-            'schema': 1, 'core_version': 'qualified-test', 'build_date': '261018',
+            'schema': 1, 'core_version': 'jf-1.0.0-beta.1', 'build_date': '261018',
             'rbf': {'name': self.core.name, 'bytes': self.core.stat().st_size,
                     'sha256': build_package.sha(self.core), 'marginal': False},
-            'git': {'branch': 'fixture', 'sha': 'abc123', 'dirty': True},
+            'git': {'branch': 'fixture', 'sha': 'abc123', 'dirty': False},
             'fit': {'seed': 7}, 'timing': {'pass': True, 'clk_dec_100c_mhz': 103.67},
             'toolchain': {'quartus': '17.0.2'}}))
         self.worker = self.root / 'jfplay'
@@ -102,6 +102,18 @@ class PackageTests(unittest.TestCase):
             build_package.build(self.root / 'out', 'fixture', '1.0.0-beta.1',
                                 self.worker, self.ffmpeg, self.core,
                                 self.rbf_manifest, self.source)
+
+    def test_rejects_dirty_or_test_labelled_core(self):
+        good = json.loads(self.rbf_manifest.read_text())
+        for field, value in (('git', {'branch': 'fixture', 'sha': 'abc123', 'dirty': True}),
+                             ('git', {'branch': 'fixture', 'sha': 'abc123'}),
+                             ('core_version', 'dev-test')):
+            self.rbf_manifest.write_text(json.dumps(dict(good, **{field: value})))
+            with self.subTest(field=field, value=value), \
+                    patch.object(build_package, 'ROOT', self.root), self.assertRaises(ValueError):
+                build_package.build(self.root / 'out', 'fixture', '1.0.0-beta.1',
+                                    self.worker, self.ffmpeg, self.core,
+                                    self.rbf_manifest, self.source)
 
 
 if __name__ == '__main__':

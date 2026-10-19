@@ -73,6 +73,10 @@ def build(out, ident, version, worker=None, ffmpeg=None, rbf=None, rbf_manifest=
         raise ValueError('RBF does not match a non-marginal qualified build manifest')
     if provenance.get('timing', {}).get('pass') is not True:
         raise ValueError('RBF build manifest does not record a timing pass')
+    if provenance.get('git', {}).get('dirty') is not False:
+        raise ValueError('RBF was not built from a clean, committed tree')
+    if not str(provenance.get('core_version', '')).startswith('jf-'):
+        raise ValueError('RBF core version must be a jf- release version, not a test label')
     metadata = read_build_metadata(ROOT / 'app/dist/plexcrt.build.json', ident, version, sha(inputs['plexcrt']))
     core_provenance = {'rbf': rbf.name, 'sha256': sha(rbf),
                        'quartus_manifest_sha256': sha(rbf_manifest),

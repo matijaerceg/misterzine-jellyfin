@@ -7,25 +7,16 @@
 # output is ~2.9 MB. This script always passes `-o bitstream_compression=on`.
 #
 # Usage:
-#   ./build_release.sh                 # convert existing .sof -> releases/<name>_<date>.rbf
-#   ./build_release.sh --compile       # run the full Quartus compile first, then convert
-#   ./build_release.sh --name H264_foo  # override the release base name
-#   ./build_release.sh --release      # PUBLIC RELEASE build. Two things:
-#                                     #  (1) HARD timing gate — refuse to pack if clk_dec
-#                                     #      Fmax is below tools/fmax_check.sh's threshold
-#                                     #      at either slow corner (the chroma-fringe
-#                                     #      lottery; currently 101.4 MHz). Default
-#                                     #      (testing) builds only WARN and tag the pack
-#                                     #      MARGINAL — fringe is acceptable while testing
-#                                     #      features unrelated to video quality.
-#                                     #  (2) MiSTer release NAMING — packs as
-#                                     #      releases/H264_YYYYMMDD.rbf (the convention every
-#                                     #      other core and the MiSTer update scripts use),
-#                                     #      ignoring --name. Feature builds keep the
-#                                     #      <name>_<date>_<time> form so they stay
-#                                     #      distinguishable on an SD card; a release is
-#                                     #      the one artifact a user installs and cites in
-#                                     #      a bug report, so it gets the plain name.
+#   ./build_release.sh                  # pack the existing .sof
+#   ./build_release.sh --compile        # run the full Quartus compile first, then pack
+#   ./build_release.sh --name H264_foo  # override the base name (default H264)
+#   ./build_release.sh --release        # a build for MisterZine Jellyfin users: every
+#                                       # gate below is FATAL, so a marginal or broken
+#                                       # fit cannot be packed. Without it the gates
+#                                       # only warn and a marginal fit is tagged
+#                                       # _MARGINAL, for test builds.
+# Packs releases/<name>_<CORE_VERSION>_<date>_<time>.rbf plus a .json provenance
+# manifest that release/build_package.py requires.
 #
 # Requires quartus_sh / quartus_cpf on PATH (Quartus 17.0.2). Or run the whole thing
 # in the pinned Quartus container with USE_DOCKER=1 (see tools/docker_reexec.sh):
@@ -49,91 +40,41 @@ while [[ $# -gt 0 ]]; do
         --compile) DO_COMPILE=1; shift ;;
         --release) RELEASE_GATE=1; shift ;;
         --name)    NAME="$2"; NAME_SET=1; shift 2 ;;
-        -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
 
-# The OSD version string, read from the single source of truth. It is part of
-# CONF_STR = part of the synthesis netlist, so it changes at most ONCE PER BRANCH
-# (see CLAUDE.md "Versioning"). Recorded in the provenance manifest below, and
-# gated for shape further down.
+# The OSD version string: the one `define CORE_VERSION in h264/emu.sv. MisterZine
+# Jellyfin sets it to whatever names the build (a release core carries jf-<app version>
+# of the release it first ships in). It is inside CONF_STR, so the only rules are the
+# ones stock MiSTer Main imposes, checked here before a compile costs 40 minutes.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CORE_VERSION="$(sed -n 's/.*`define CORE_VERSION "\([^"]*\)".*/\1/p' "$HERE/h264/emu.sv" | head -1)"
 if [[ -z "$CORE_VERSION" ]]; then
     echo "ERROR: no \`define CORE_VERSION found in h264/emu.sv." >&2
     exit 1
 fi
-
-# --- Version identity gate --------------------------------------------------
-# Runs BEFORE the compile so a wrong version costs a second, not 40 minutes.
-# The invariant (h264/emu.sv, CLAUDE.md "Versioning"): a bare semver lives in
-# exactly ONE commit per release; every other commit carries dev-<slug>.
-#
-# "Publishable" is --release WITHOUT --name — the same condition that selects the
-# H264_YYYYMMDD.rbf naming below. tools/seed_sweep.sh passes --release WITH --name
-# purely for the hard timing gate, so it lands in the dev arm and is unaffected;
-# that is the one non-obvious caller.
 if [[ ${#CORE_VERSION} -gt 18 ]]; then
     echo "ERROR: CORE_VERSION '$CORE_VERSION' is ${#CORE_VERSION} chars; the limit is 18." >&2
     echo "       stock menu.cpp (MENU_ABOUT2) truncates the whole 'H264 <ver> <date>'" >&2
     echo "       About line at 30 chars, and 'H264 ' + ' ' + 'yymmdd' already uses 12." >&2
     exit 1
 fi
-case "$CORE_VERSION" in
-    *,*|*\;*|*\"*)
-        echo "ERROR: CORE_VERSION '$CORE_VERSION' contains , ; or \" — all three break CONF_STR." >&2
-        echo "       ';' ends the entry and user_io.cpp's V arm splits on commas, so the" >&2
-        echo "       version would be silently TRUNCATED rather than rejected." >&2
-        exit 1 ;;
-esac
-
-if [[ "$RELEASE_GATE" -eq 1 && "$NAME_SET" -eq 0 ]]; then
-    if [[ ! "$CORE_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        echo "ERROR: a publishable --release build needs the release semver in h264/emu.sv," >&2
-        echo "       e.g. \`define CORE_VERSION \"v0.4.0\"  — found \"$CORE_VERSION\"." >&2
-        echo "       Set it on the release commit, together with the mkdocs.yml and manual" >&2
-        echo "       updates, so one commit and one compile carry the whole release." >&2
-        exit 1
-    fi
-else
-    if [[ ! "$CORE_VERSION" =~ ^dev-[a-z0-9][a-z0-9.-]*$ ]]; then
-        echo "ERROR: dev builds must carry a feature-identifying CORE_VERSION 'dev-<slug>'," >&2
-        echo "       e.g. \`define CORE_VERSION \"dev-seekrealign\"  — found \"$CORE_VERSION\"." >&2
-        echo "       A bare semver on a dev build is exactly the bug this gate exists to" >&2
-        echo "       stop: testers quote the OSD line and report it as a released version." >&2
-        exit 1
-    fi
-    # Advisory only — a slug and a branch name legitimately differ, but a slug left
-    # over from ANOTHER branch is a real and easy mistake.
-    _br="${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')}"
-    _brslug="$(printf '%s' "${_br##*/}" | tr -cd 'a-z0-9')"
-    _vslug="$(printf '%s' "${CORE_VERSION#dev-}" | tr -cd 'a-z0-9')"
-    if [[ -n "$_brslug" && "$_brslug" != "main" && "$_brslug" != *"$_vslug"* && "$_vslug" != *"$_brslug"* ]]; then
-        echo "NOTE: CORE_VERSION '$CORE_VERSION' does not resemble branch '$_br' — left over from another branch?" >&2
-    fi
+if [[ ! "$CORE_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]]; then
+    echo "ERROR: CORE_VERSION '$CORE_VERSION' must be letters, digits and . _ + - only." >&2
+    echo "       ; ends a CONF_STR entry and Main splits the V entry on commas, so the" >&2
+    echo "       version would be silently truncated rather than rejected." >&2
+    exit 1
 fi
 
-# The .rbf, the zip and the OSD should all name the same thing, so a dev build's
-# name FOLLOWS the version slug instead of needing --name every time. An explicit
-# --name still wins.
-if [[ "$NAME_SET" -eq 0 && "$RELEASE_GATE" -eq 0 ]]; then
-    NAME="${PROJECT}_${CORE_VERSION#dev-}"
-fi
-
+# Every pack is releases/<name>_<version>_<date>_<time>.rbf, so a file on an SD card names
+# its build. The default name is the project; --name overrides it (tools/seed_sweep.sh
+# passes its own and finds the result by `ls releases/${NAME}_*.rbf`).
 SOF="output_files/${PROJECT}.sof"
 mkdir -p releases
-# Release builds take the MiSTer convention (CoreName_YYYYMMDD.rbf); feature builds keep
-# the name+timestamp form so parallel experiments stay distinguishable on the SD card.
-# An EXPLICIT --name always wins: tools/seed_sweep.sh passes --release purely for the hard
-# timing gate and still needs its own name, and without this it (a) packed sweep artifacts
-# under the release name, which reads as an official build, and (b) then failed to find
-# them via `ls releases/${NAME}_*.rbf` and reported a STALE marginal rbf as the result.
-if [[ "$RELEASE_GATE" -eq 1 && "$NAME_SET" -eq 0 ]]; then
-    OUT="releases/${PROJECT}_$(date +%Y%m%d).rbf"
-else
-    OUT="releases/${NAME}_$(date +%Y%m%d_%H%M).rbf"
-fi
+[[ "$NAME_SET" -eq 1 ]] || NAME="$PROJECT"
+OUT="releases/${NAME}_${CORE_VERSION}_$(date +%Y%m%d_%H%M).rbf"
 
 notify() { "$(dirname "$0")/tools/notify.sh" "$1" || true; }
 
@@ -205,7 +146,7 @@ else
     fi
     echo "WARNING: packing a TIMING-MARGINAL build (testing mode) — timing failures on HW are the first suspect." >&2
     FMAX_TAG="_MARGINAL"
-    OUT="releases/${NAME}${FMAX_TAG}_$(date +%Y%m%d_%H%M).rbf"
+    OUT="releases/${NAME}_${CORE_VERSION}${FMAX_TAG}_$(date +%Y%m%d_%H%M).rbf"
 fi
 
 # Undriven-signal gate (tools/lint_undriven.sh): a declared, consumed signal with no
@@ -279,8 +220,8 @@ fi
 # One JSON sidecar per .rbf, "<rbf>.json". releases/ and build_id.v are BOTH
 # git-ignored, so without this an .rbf found on a tester's SD card months from
 # now is unidentifiable — the filename is its only metadata. Three consumers:
-#   * .github/workflows/package.yml validates the uploaded release asset against
-#     it, and learns WHICH COMMIT to check out (a draft release has no git tag).
+#   * release/build_package.py refuses an RBF whose hash, name, marginal flag or
+#     timing pass does not match it, and copies it into the package as provenance.
 #   * a mystery build: which tree, which seed, what timing.
 #   * H264.qsf's hand-written seed ledger — its entries quote exactly these
 #     numbers, so this is machine-readable input for that paragraph.

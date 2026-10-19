@@ -100,8 +100,9 @@ Use a separate directory on the MiSTer's SD card. Copy `plexcrt`, `jfplay`, and
 `ffmpeg` into it and make them executable. The current application preflight
 still requires the `ffmpeg` executable alongside the app.
 
-Install a compatible H.264 core from the vendored project's documented release
-in the SD card's `_Other` folder. See its [launch instructions](../third_party/MiSTer_h264_decoder/site/content/integrating/launch.md).
+Install an H.264 core built from this repository's fork in
+`third_party/MiSTer_h264_decoder` (see [distribution](../release/DISTRIBUTION.md))
+in the SD card's `_Other` folder as `H264.rbf`. See its [launch instructions](../third_party/MiSTer_h264_decoder/site/content/integrating/launch.md).
 By default the app loads the `_Other/H264` core through an MGL. An optional
 `MISTERZINE_H264_RBF` override is an MGL core name such as `_Other/H264`, relative
 to the SD root and without the `.rbf` extension.

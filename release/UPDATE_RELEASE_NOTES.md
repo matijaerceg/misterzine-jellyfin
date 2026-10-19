@@ -23,7 +23,7 @@ First packaged beta of the CRT-first Jellyfin application.
 
 Playback updates Jellyfin watched state and resume positions. Network seeking,
 server compatibility and different hardware setups remain beta test areas.
-The included FPGA image reports `dev-jfbeta1`; its original qualification manifest
+The included FPGA image reports `jf-0.1.0-beta.1`; its original qualification manifest
 is included so the image remains traceable.
 
 Installers and update notices become available when this release and its
