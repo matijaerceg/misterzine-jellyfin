@@ -1048,13 +1048,15 @@ def main():
     # Display Shape is shared: VIDEO_AR follows the explicit wide bit for the complete canvas.
     if not re.search(r'wire\s+ar_wide\s*=\s*status\[2\]\s*;', src):
         bad('ar_wide', 'must follow the shared Display Shape bit 2')
-    if not re.search(r'wire\s+native_picture_sized\s*=\s*geom_nat\s*&&\s*!geom_disp\s*;', src):
-        bad('native_picture_sized', 'must identify Native HDMI picture-sized fallback')
+    # Native (HDMI): the raster's own shape (ar_x / ar_y: the display's when display-shaped, the
+    # picture's when picture-sized), never Display Shape's -- a 16:9-shaped raster told 4:3 is squeezed.
+    if not re.search(r'wire\s+native_raster\s*=\s*geom_nat\s*;', src):
+        bad('native_raster', 'must be geom_nat: every Native HDMI raster, display-shaped or picture-sized')
     for port, ratio, exact in (('VIDEO_ARX', "ar_wide?13'd16:13'd4", 'ar_x'),
                                ('VIDEO_ARY', "ar_wide?13'd9:13'd3", 'ar_y')):
         expr = (assign_of(src, port) or '').replace(' ', '')
-        if 'native_picture_sized?' not in expr or ("{1'b0,%s}" % exact) not in expr or ratio not in expr:
-            bad(port, 'must preserve exact source aspect only for Native HDMI picture-sized fallback')
+        if 'native_raster?' not in expr or ("{1'b0,%s}" % exact) not in expr or ratio not in expr:
+            bad(port, "must give a Native HDMI raster its own shape (ar_x / ar_y), Display Shape otherwise")
 
     # A' (docs/hdmi_raster.md §3a): the fit takes the HDMI display's shape latched at the
     # pickup with the mode (never live: a mode change would split a picture), and under `lb`

@@ -39,7 +39,9 @@ uses its existing Off and 50/60 status bit. Ordinary playback remains
 available with older cores.
 
 The display options live in the core OSD, not the Jellyfin app. Output Mode
-selects 480i60, 480p60, 576i50, 576p50, or Native HDMI. Refresh Rate Match
+selects 480i60, 480p60, 576i50, 576p50, or Native HDMI. Display Shape (4:3 or
+16:9) shapes every fitted raster and the aspect HDMI is told; in Native HDMI a
+playing video takes the HDMI mode's own shape. Refresh Rate Match
 offers Off and 50/60. Matching can switch the refresh family while a picture
 plays, then restore the selected Output Mode when playback ends. Native HDMI
 and the progressive Output Mode choices remain selectable. 240p Playback otherwise

@@ -35,6 +35,7 @@ families during playback, so enable it only if your display supports both.
 There is no 48 Hz mode.
 
 **Display Shape** in the core OSD selects the shared 4:3 or 16:9 output shape.
+In Native HDMI, a playing video takes the HDMI mode's own shape instead.
 Use in-app video calibration to adjust the picture to your screen, and **Video
 crop** to choose how much of a film's edges to crop. **De-flicker** in the core
 OSD softens vertical detail on interlaced output while preserving horizontal

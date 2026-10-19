@@ -111,6 +111,8 @@
 #   W114 (2026-10-19) progressive 4:3 back on Fill (480p at 4:3 too narrow on HDMI) -> check_emu_wiring (fit_mode_want)
 #   W115, W116 (2026-10-19) emu's HDMI_HEIGHT / HDMI_WIDTH back on the VSET / HSET-clipped size (Native's
 #           raster fed back through integer scaling) -> check_emu_wiring (sys_top.HDMI_HEIGHT / _WIDTH)
+#   W117 (2026-10-19) a display-shaped Native raster given Display Shape's aspect (squeezed at 4:3)
+#           -> check_emu_wiring (native_raster)
 #       -> check_emu_wiring (st_fit_valid / st_fit_clamp)
 #   W80-W90 (hd_raster, docs/hd_raster.md S3) CLK_VIDEO back on clk_sys, the dot two clocks in three, a
 #           raster module on clk_sys, two bundle fields swapped, the bundle truncated, frame0 without its
@@ -414,6 +416,7 @@ PYEOF
   wmut W114 "fit_mode_want = status[2] ? 2'd2 : 2'd0;" "fit_mode_want = interlaced_eff ? (status[2] ? 2'd2 : 2'd0) : status[2] ? 2'd2 : 2'd3;" wiring fit_mode_want
   WFILE=sys/sys_top.v wmut W115 "	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_mode_h)," "	.HDMI_HEIGHT(direct_video ? 12'd0 : hdmi_height)," wiring sys_top.HDMI_HEIGHT
   WFILE=sys/sys_top.v wmut W116 "	hdmi_mode_w <= WIDTH << HDMI_PR;" "	hdmi_mode_w <= (HSET && (HSET < WIDTH))  ? HSET << HDMI_PR : WIDTH << HDMI_PR;" wiring sys_top.HDMI_WIDTH
+  wmut W117 "wire native_raster = geom_nat;" "wire native_raster = geom_nat && !geom_disp;" wiring native_raster
   wmut W101 "	.fit_hpf           (v_fit_hpf)," "	.fit_hpf           (3'd0)," wiring disp_reader.fit_hpf
   wmut L1 "wire stream_live = sh_valid;" "wire stream_live;" lint
   for f in "$RES"/*; do grep -v '^MUTFAIL$' "$f"; grep -q '^MUTFAIL$' "$f" && fail=1; done
