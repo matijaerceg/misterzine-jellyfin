@@ -62,6 +62,12 @@ type Session struct {
 	stopRequested                          bool
 	seekID                                 uint64 // opMu owns the in-process seek sequence
 	surroundSource                         bool
+	// forceTranscode makes every later PlaybackInfo of this session ask for a
+	// transcode; fellBack records that the one automatic fallback was used.
+	forceTranscode, fellBack bool
+	// probedTranscode is the "audio|subtitle" selection for which the
+	// direct-play probe last got a transcode answer ("" for none).
+	probedTranscode string
 }
 
 func (p *Player) Started(t time.Time) bool {
@@ -242,17 +248,12 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		if p.Kbps != nil {
 			kbps = p.Kbps()
 		}
-		profile, err := DeviceProfileJSON(kbps)
+		s.mu.Lock()
+		force := s.forceTranscode
+		s.mu.Unlock()
+		info, err := s.playbackInfo(ctx, kbps, offset, audio, subtitle, force)
 		if err != nil {
 			return err
-		}
-		bitrate := playbackDeviceProfile(kbps).MaxStreamingBitrate
-		info, err := p.Client.PlaybackInfo(ctx, s.item.ID, jellyfin.PlaybackRequest{DeviceProfile: profile, MaxStreamingBitrate: bitrate, StartSeconds: float64(offset), AudioStream: audio, SubtitleStream: subtitle, MediaSourceID: s.item.SourceID, AlwaysBurnInSubtitleWhenTranscoding: subtitle != "-1"})
-		if err != nil {
-			return err
-		}
-		if len(info.MediaSources) == 0 {
-			return fmt.Errorf("Jellyfin offered no playable media source")
 		}
 		src := info.MediaSources[0]
 		s.surroundSource = mediaSourceSurround(src, s.item, audio)
@@ -292,6 +293,11 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	}
 	if paused {
 		args = append(args, "--hold")
+	}
+	if s.direct {
+		// jfplay checks the stream before the first picture and watches that
+		// the core keeps up; it exits 7 when a transcode is needed.
+		args = append(args, "--direct")
 	}
 	args = append(args, "--headers", "Authorization: "+p.Client.AuthHeader()+"\r\n", "--fifo", p.Fifo, "--status", p.Status)
 	if p.Boost != nil {
@@ -343,6 +349,9 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		current, closing := s.cmd == cmd, s.closing
 		s.mu.Unlock()
 		if current && !closing {
+			if s.fallbackLocked(err) {
+				return
+			}
 			s.finishLocked(err)
 		}
 	}()

@@ -2,15 +2,33 @@
 
 The Go app handles the Jellyfin session and the on-screen controls. It starts
 `jfplay`, a small playback worker that sends video and audio to the MiSTer
-H.264 core. Jellyfin supplies a direct stream when the item fits the device
-profile, or an HLS transcode when it does not.
+H.264 core. The file is streamed untranscoded when the core can certainly
+play it, and Jellyfin transcodes it to HLS otherwise.
 
 ## Starting playback
 
 When playback starts, the app requests Jellyfin `PlaybackInfo` with its device
-profile, the configured bitrate limit, the item's selected audio and subtitle
-tracks, the known media source, and the resume position. It uses the first
-media source returned:
+profile, the item's selected audio and subtitle tracks, the known media source,
+and the resume position. Unless a subtitle is selected, the first request lets
+the server offer the file as stored without applying the configured bitrate
+limit. The app then checks the returned video details against the core's own
+limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280x720, at
+most 30 frames per second above 854 pixels wide (60 at or below), and an
+average bitrate of at most 6 Mbit/s above 854 pixels wide (8 Mbit/s at or
+below). A file that fits is streamed directly whatever the bitrate setting.
+Otherwise the app requests a transcode with the configured bitrate limit, as
+before; the bitrate setting only applies to transcodes.
+
+Jellyfin cannot report every property the core depends on (CABAC versus
+CAVLC entropy coding, MBAFF versus field-coded interlace), so `jfplay` checks
+a direct stream's parameter sets before the first picture is shown. If the
+check fails, the core refuses the stream, or the core keeps falling behind for
+several seconds, the app restarts the item once as a transcode at the current
+position. The switch is recorded in the playback log and is not shown as an
+error; the direct play session is reported stopped and the transcode is
+reported as a new session.
+
+It uses the first media source returned:
 
 - For direct play or direct stream, `jfplay` reads the item's stream and seeks
   within it to the requested position.
@@ -91,7 +109,7 @@ It does not filter video recorded as interlaced fields.
 The device profile offers H.264 High or Main, 8-bit 4:2:0 video up to 1280x720.
 The core supports up to 60 frames per second at 854 pixels wide or less, and up
 to 30 frames per second above that width. The profile caps the configured video
-bitrate at 8 Mbit/s. Supported audio is decoded by `jfplay` and downmixed to
+bitrate at 8 Mbit/s for transcodes. Supported audio is decoded by `jfplay` and downmixed to
 stereo PCM for the core. Other video is requested as an HLS H.264/AAC
 transcode.
 

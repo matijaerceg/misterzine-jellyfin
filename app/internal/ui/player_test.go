@@ -185,7 +185,9 @@ func TestHLSFullTimelineSeekUsesInFileOffsetAndZeroBase(t *testing.T) {
 	gotRequests := append([]request(nil), requests...)
 	gotLaunches := append([][]string(nil), launches...)
 	mu.Unlock()
-	if len(gotRequests) != 2 || gotRequests[0].startTicks != 4937*jellyfin.TicksPerSecond || gotRequests[1].startTicks != 5100*jellyfin.TicksPerSecond {
+	// The start probes for direct play, gets a transcode and asks again with
+	// the user's bitrate; the seek restart skips the probe.
+	if len(gotRequests) != 3 || gotRequests[0].startTicks != 4937*jellyfin.TicksPerSecond || gotRequests[1].startTicks != 4937*jellyfin.TicksPerSecond || gotRequests[2].startTicks != 5100*jellyfin.TicksPerSecond {
 		t.Fatalf("HLS PlaybackInfo offsets = %#v", gotRequests)
 	}
 	if len(gotLaunches) != 2 {
@@ -728,10 +730,11 @@ func TestPlayerImmediateSeekWaitsForInitialStartup(t *testing.T) {
 	}
 	release()
 	deadline := time.Now().Add(3 * time.Second)
-	for (playbackInfo.Load() < 2 || launches.Load() < 2) && time.Now().Before(deadline) {
+	for (playbackInfo.Load() < 3 || launches.Load() < 2) && time.Now().Before(deadline) {
 		time.Sleep(5 * time.Millisecond)
 	}
-	if got := playbackInfo.Load(); got != 2 {
+	// probe + transcode request at start, one transcode request for the seek
+	if got := playbackInfo.Load(); got != 3 {
 		t.Fatalf("PlaybackInfo calls = %d, want initial start then seek restart", got)
 	}
 	if got := launches.Load(); got != 2 {

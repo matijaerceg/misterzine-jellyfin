@@ -21,7 +21,7 @@ GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go vet ./...
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -o ../build/arm/plexcrt ./cmd/plexcrt
 cd ..
 python3 arm/test_jfplay_contract.py
-make -C arm audio-boost-test seek-cache-test seek-protocol-test h264-idr-test
+make -C arm audio-boost-test seek-cache-test seek-protocol-test h264-idr-test direct-check-test
 make -C arm film-speed-test
 python3 tools/check_public_content.py
 ```
