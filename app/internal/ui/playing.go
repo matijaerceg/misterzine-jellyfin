@@ -246,6 +246,13 @@ func (p *Playing) osdY() int      { return max(0, p.osdBottom()-OsdControlH) }
 // osdHeight extends the translucent panel to the raster edge while the controls stay anchored to their safe-zone baseline.
 func (p *Playing) osdHeight() int { return max(1, p.canvasHeight()-p.osdY()) }
 
+// peekStripH is the peek's panel: its rows (peekH, ending at the safe-zone
+// baseline) and the panel's background on down to the raster edge, as the
+// full panel has it. The rows below peekH are the panel's fill.
+func (p *Playing) peekStripH() int {
+	return min(p.osdHeight(), p.peekH+p.canvasHeight()-p.osdBottom())
+}
+
 // status reads the launcher's position file.
 func (p *Playing) status() {
 	data, err := os.ReadFile("/tmp/jfplay.status")
@@ -893,14 +900,14 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		if key != p.last && !(vx != 0 && p.scrubTick&1 == 1) {
 			p.last = key
 			p.compose(true)
-			h := p.peekH
+			h := p.peekStripH()
 			strip, alpha := &gfx.Canvas{W: p.canvas.W, H: h, Pix: p.canvas.Pix[:p.canvas.W*h*4]}, p.alpha[:p.canvas.W*h]
 			if p.wait != nil {
 				p.wait.frame = frame
 				c, a, y := p.waitPanel(frame, strip, alpha)
 				p.painter.show(osd, 0, y, c, a)
 			} else {
-				p.painter.show(osd, 0, p.osdBottom()-h, strip, alpha)
+				p.painter.show(osd, 0, p.canvasHeight()-h, strip, alpha)
 			}
 		}
 		if p.scrub && p.dur > 0 {

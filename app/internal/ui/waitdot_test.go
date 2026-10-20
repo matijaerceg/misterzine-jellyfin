@@ -217,6 +217,29 @@ func tickFields(p *Playing, c *coreOSD, t0 time.Time, n int, each func(f int)) t
 	return t0
 }
 
+// The peek (a left or right press) and the start strip under the dots end
+// at the raster edge as the full panel does, not at its safe-zone baseline.
+func TestPeekPanelReachesTheBottom(t *testing.T) {
+	p := waitPlaying(t)
+	c := &coreOSD{}
+	tickFields(p, c, time.Now(), 4, func(int) {
+		p.peekAt, p.peekFor = time.Now(), OsdLinger
+	})
+	if !c.waitDotAt() || c.showY+c.showH != 480 {
+		t.Fatalf("start strip at %d, %d high", c.showY, c.showH)
+	}
+	now := time.Now()
+	p.framed(now)
+	p.peekAt, p.peekFor = now, OsdLinger
+	tickFields(p, c, now, 2, nil)
+	if !c.shown || c.waitDotAt() || c.showY+c.showH != 480 {
+		t.Fatalf("peek at %d, %d high (shown %v)", c.showY, c.showH, c.shown)
+	}
+	if a := c.showAlpha[(c.showH-1)*c.showW]; int(a) != OsdAlpha {
+		t.Fatalf("peek's bottom row alpha %d, want the panel's %d", a, OsdAlpha)
+	}
+}
+
 func TestStartStripKeepsTheDotUntilThePicture(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}

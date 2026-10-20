@@ -169,7 +169,7 @@ func (p *Playing) waitPanel(frame int, strip *gfx.Canvas, stripAlpha []byte) (c 
 	w := p.canvas.W
 	h := 2 * (WaitDotRMax + 1)
 	if strip != nil {
-		h = p.osdBottom() - waitTop
+		h = p.canvasHeight() - waitTop // the strip's panel reaches the raster edge
 	}
 	if p.waitCanvas == nil || p.waitCanvas.W != w || p.waitCanvas.H != h {
 		p.waitCanvas = gfx.NewCanvas(w, h)
