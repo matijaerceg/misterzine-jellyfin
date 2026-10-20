@@ -489,7 +489,7 @@ func (s *Season) refreshAfter(it, last *jellyfin.Item, finished bool) {
 				return
 			}
 			if itemErr == nil {
-				*it = *freshItem
+				app.takeFresh(it, freshItem)
 			}
 			if seasonErr == nil {
 				*season = *freshSeason

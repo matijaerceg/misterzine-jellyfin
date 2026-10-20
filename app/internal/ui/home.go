@@ -514,7 +514,7 @@ func (h *Home) Refresh(it *jellyfin.Item) {
 	if err != nil {
 		return
 	}
-	*it = *fresh
+	h.app.takeFresh(it, fresh)
 }
 
 // Draw paints the screen; returns true while something is still animating.

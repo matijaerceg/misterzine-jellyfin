@@ -129,7 +129,7 @@ func (p *Preplay) pollRefresh(now time.Time) {
 			return
 		}
 		kind := actionKind(p.actions, p.cur)
-		*p.item = *items[0]
+		p.app.takeFresh(p.item, items[0])
 		p.rebuild()
 		p.cur = restoreAction(p.actions, kind)
 	})

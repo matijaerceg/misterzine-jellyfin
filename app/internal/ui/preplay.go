@@ -135,7 +135,7 @@ func (p *Preplay) play(offset int) {
 func (p *Preplay) refresh() {
 	p.periodic.reset()
 	if fresh, err := p.app.Client.Item(bg(), p.item.ID); err == nil {
-		*p.item = *fresh
+		p.app.takeFresh(p.item, fresh)
 	}
 	p.rebuild()
 	p.cw.refetch(p.app) // a play or a mark can move it in or out

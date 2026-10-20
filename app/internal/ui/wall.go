@@ -622,7 +622,7 @@ func (w *Wall) jump(dir int) {
 // Refresh re-reads one item after playback.
 func (w *Wall) Refresh(it *jellyfin.Item) {
 	if fresh, err := w.app.Client.Item(bg(), it.ID); err == nil {
-		*it = *fresh
+		w.app.takeFresh(it, fresh)
 	}
 }
 

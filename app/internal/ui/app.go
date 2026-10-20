@@ -211,7 +211,7 @@ func (a *App) Open(it *jellyfin.Item, direct bool) {
 		}
 		if it.Logo == "" || it.Summary == "" {
 			if fresh, err := a.Client.Item(bg(), it.ID); err == nil {
-				*it = *fresh
+				a.takeFresh(it, fresh)
 			}
 		}
 		if len(seasons) == 1 {
@@ -224,7 +224,7 @@ func (a *App) Open(it *jellyfin.Item, direct bool) {
 	case "episode":
 		if it.SeriesID == "" || it.ParentID == "" {
 			if fresh, err := a.Client.Item(bg(), it.ID); err == nil {
-				*it = *fresh
+				a.takeFresh(it, fresh)
 			}
 		}
 		a.openSeason(it.SeriesID, it.ParentID, it.ID)
@@ -491,7 +491,7 @@ func (a *App) refreshPlayedItem(it *jellyfin.Item, reports <-chan struct{}) {
 		}
 		a.Later(func() {
 			if a.Client == client && a.playReports == reports && !a.playing {
-				*it = *fresh
+				a.takeFresh(it, fresh)
 			}
 		})
 	}()
@@ -1020,6 +1020,13 @@ func (a *App) applyStreams(it *jellyfin.Item) {
 	}
 	mark(it.Audio, ch.Audio)
 	mark(it.Subs, ch.Subtitle)
+}
+
+// takeFresh replaces an item with its fresh record, which marks the
+// server's default tracks, and marks the chosen ones again.
+func (a *App) takeFresh(it, fresh *jellyfin.Item) {
+	*it = *fresh
+	a.applyStreams(it)
 }
 
 // selectStream makes stream i of an item's audio or subtitle tracks the
