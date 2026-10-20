@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -174,6 +176,52 @@ func TestSeasonStaleLoadDoesNotOverwriteReturn(t *testing.T) {
 	}
 	if s.focused().ID != "second" || s.loading {
 		t.Fatal("stale request replaced the latest episode selection")
+	}
+}
+
+// Stepping to another season and back lists the first one again as new
+// items; their tracks must be asked for again, not skipped as already asked.
+func TestSeasonTracksReturnAfterSteppingBack(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/Shows/"):
+			n := r.URL.Query().Get("seasonId")
+			jfPage(w, r, `{"Id":"e`+n+`","Type":"Episode","Name":"Pilot"}`)
+		case strings.HasPrefix(r.URL.Path, "/Items/"):
+			id := strings.TrimPrefix(r.URL.Path, "/Items/")
+			fmt.Fprintf(w, `{"Id":%q,"Type":"Episode","MediaSources":[{"Id":"src","MediaStreams":[`+
+				`{"Type":"Audio","Index":1},{"Type":"Audio","Index":2},{"Type":"Subtitle","Index":3}]}]}`, id)
+		default:
+			fmt.Fprint(w, `{"Items":[]}`)
+		}
+	}))
+	defer server.Close()
+	a := &App{Client: testClient(server.URL, "", t.TempDir()), later: make(chan func(), 32),
+		Art: NewArt(nil, 0, nil), F: Fonts{Body: gfx.Load("med18")}}
+	one := &jellyfin.Item{Key: "/Shows/s/Episodes?seasonId=1"}
+	two := &jellyfin.Item{Key: "/Shows/s/Episodes?seasonId=2"}
+	s := &Season{app: a, seasons: []*jellyfin.Item{one, two}}
+	hasTracks := func() bool {
+		deadline := time.After(2 * time.Second)
+		for {
+			if it := s.focused(); it != nil && len(it.Audio) > 0 {
+				return slices.ContainsFunc(s.actions, func(a string) bool { return strings.HasPrefix(a, "Audio") })
+			}
+			select {
+			case f := <-a.later:
+				f()
+			case <-deadline:
+				return false
+			}
+		}
+	}
+	for step, si := range []int{0, 1, 0} {
+		s.si = si
+		s.load("")
+		drainSeason(t, a, a.seasonData)
+		if !hasTracks() {
+			t.Fatalf("step %d (season %d): episode has no Audio action", step, si+1)
+		}
 	}
 }
 

@@ -89,6 +89,7 @@ func (s *Season) load(at string) {
 	sea := s.season()
 	s.eps = nil
 	s.thumbs = nil
+	s.fetched = nil // a listing fetched again brings new items without tracks
 	s.err = nil
 	s.loading = true
 	s.loadID++
