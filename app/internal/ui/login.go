@@ -99,27 +99,44 @@ func (l *Login) open() bool {
 }
 
 // probe checks the typed address: it must answer as a Jellyfin server.
+// A bare name also tries Jellyfin's plain HTTP port when the first answer
+// fails; a failure names the first address tried.
 func (l *Login) probe() {
-	host, err := jellyfin.NormalizeHost(l.pad.text)
+	hosts, err := jellyfin.HostCandidates(l.pad.text)
 	if err != nil {
 		l.err = "Enter the server's address, such as jellyfin.example.com or 192.0.2.10:8096."
 		return
 	}
 	l.gen.Add(1)
 	gen := l.gen.Load()
-	l.err, l.busy, l.stat = "", true, "Connecting to "+host+"..."
-	client := jellyfin.New(host, "", l.app.Cfg.ClientID, nil)
+	l.err, l.busy, l.stat = "", true, "Connecting to "+hosts[0]+"..."
 	go func() {
-		info, err := client.PublicInfo(bg())
+		var (
+			host, first string
+			client      *jellyfin.Client
+			info        *jellyfin.PublicInfo
+			ferr        error
+		)
+		for _, h := range hosts {
+			c := jellyfin.New(h, "", l.app.Cfg.ClientID, nil)
+			i, err := c.PublicInfo(bg())
+			if err == nil {
+				host, client, info = h, c, i
+				break
+			}
+			l.app.Log.Printf("sign-in: %s: %v", h, err)
+			if ferr == nil {
+				first, ferr = h, err
+			}
+		}
 		quick := false
-		if err == nil {
+		if client != nil {
 			quick, _ = client.QuickConnectEnabled(bg())
 		}
 		l.later(gen, func() {
 			l.busy, l.stat = false, ""
-			if err != nil {
-				l.app.Log.Printf("sign-in: %s: %v", host, err)
-				l.err = l.probeFailure(host, err)
+			if client == nil {
+				l.err = l.probeFailure(first, ferr)
 				return
 			}
 			l.host, l.info, l.quick, l.client = host, info, quick, client

@@ -177,6 +177,27 @@ func TestNormalizeHost(t *testing.T) {
 	}
 }
 
+func TestHostCandidates(t *testing.T) {
+	for in, want := range map[string]string{
+		"jellyfin.example.com":            "https://jellyfin.example.com http://jellyfin.example.com:8096",
+		"192.0.2.10/jellyfin/":            "https://192.0.2.10/jellyfin http://192.0.2.10:8096/jellyfin",
+		"[2001:db8::1]":                   "https://[2001:db8::1] http://[2001:db8::1]:8096",
+		"192.0.2.10:8096":                 "http://192.0.2.10:8096",
+		"jellyfin.example.com:8920":       "https://jellyfin.example.com:8920",
+		"https://jellyfin.example.com":    "https://jellyfin.example.com",
+		"http://jellyfin.example.com":     "http://jellyfin.example.com",
+		"http://jellyfin.example.com:80/": "http://jellyfin.example.com:80",
+	} {
+		got, err := HostCandidates(in)
+		if err != nil || strings.Join(got, " ") != want {
+			t.Errorf("%q: %q %v, want %q", in, got, err, want)
+		}
+	}
+	if _, err := HostCandidates(""); err == nil {
+		t.Error("empty accepted")
+	}
+}
+
 func TestLibraries(t *testing.T) {
 	_, c := newFake(t)
 	signIn(t, c)

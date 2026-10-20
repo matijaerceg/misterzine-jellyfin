@@ -264,7 +264,8 @@ that `SupportsDirectStream`. Audio/subtitle choices are stream indexes
 * `RemoveFromContinueWatching` clears the resume point (Jellyfin has no hide
   that keeps it), and cannot remove a Next Up entry. The UI text may need to say so.
 * Sign-in screens (`login.go`, `connect.go`, `home_users.go`, `config.go`):
-  server address -> `NormalizeHost` + `PublicInfo`; user/password -> `SignIn`
+  server address -> `HostCandidates` + `PublicInfo` (a bare name tries https,
+  then http on port 8096); user/password -> `SignIn`
   or Quick Connect; persist `Credentials` through a `TokenStore` backed by
   the config; on `ErrUnauthorized` anywhere, return to sign-in. Plex Home,
   PINs, server discovery and `Reach`/`LocalNameBlocked` have no counterpart.

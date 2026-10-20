@@ -175,3 +175,25 @@ func NormalizeHost(s string) (string, error) {
 	u.RawQuery, u.Fragment, u.User = "", "", nil
 	return strings.TrimRight(u.String(), "/"), nil
 }
+
+// HostCandidates is the base URLs to probe, in order, for what the user
+// typed: NormalizeHost's, then for an address with neither scheme nor port
+// also Jellyfin's plain HTTP port, so jellyfin.example.com reaches a server
+// with no reverse proxy at http://jellyfin.example.com:8096.
+func HostCandidates(s string) ([]string, error) {
+	host, err := NormalizeHost(s)
+	if err != nil {
+		return nil, err
+	}
+	s = strings.TrimSpace(s)
+	if strings.Contains(s, "://") {
+		return []string{host}, nil
+	}
+	u, err := url.Parse("http://" + s)
+	if err != nil || u.Port() != "" || strings.HasSuffix(u.Host, ":") {
+		return []string{host}, nil
+	}
+	u.Host += ":8096"
+	u.RawQuery, u.Fragment, u.User = "", "", nil
+	return []string{host, strings.TrimRight(u.String(), "/")}, nil
+}
