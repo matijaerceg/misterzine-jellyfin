@@ -21,6 +21,17 @@ bars where the shapes differ -- 640x480, 854x480, a phone's 480x854 or a transco
 alike. On **Native (HDMI)** the core's picture is the video's own size instead, and MiSTer's
 HDMI scaler fits it to your display ([Video output](../video/output.md)).
 
+## HDMI scaling
+
+HDMI scaling is not a core option: it follows your `MiSTer.ini`, as for every core. If
+integer scaling (`vscale_mode`) is turned on for all cores, the picture may not fill the
+screen. Add a section for this core to `MiSTer.ini` to fill it:
+
+```ini
+[MisterZine Jellyfin]
+vscale_mode=0
+```
+
 ## Saved settings
 
 Settings are saved in the MiSTer configuration directory on the SD card using the
