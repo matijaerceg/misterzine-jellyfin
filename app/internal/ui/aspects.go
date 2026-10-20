@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -195,4 +196,69 @@ func (a *App) measureHubs(hubs []*jellyfin.Hub) {
 		items = append(items, hub.Items...)
 	}
 	a.measureShows(items)
+}
+
+// collectionsPager is a collections listing. Under the 4:3 filter each
+// page's collections are looked into (a few at a time, within a time
+// budget) before they show, and those holding nothing the filter keeps
+// are left out; the listing is kept for the session like any other, so
+// that is once per listing. A collection that could not be looked into
+// (an error, the budget spent) stays visible.
+func (a *App) collectionsPager(path string, q url.Values, fourThree bool) *Pager {
+	if !fourThree {
+		return a.pager(path, q, nil)
+	}
+	var mu sync.Mutex
+	empty := map[string]bool{} // collection ID -> the filter keeps none of its items
+	keep := func(it *jellyfin.Item) bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return !empty[it.ID]
+	}
+	look := func(items []*jellyfin.Item) {
+		deadline := time.Now().Add(aspectBudget)
+		sem := make(chan struct{}, aspectProbes)
+		var wg sync.WaitGroup
+		for _, it := range items {
+			if it.Type != "collection" || it.Key == "" || time.Now().After(deadline) {
+				continue
+			}
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(it *jellyfin.Item) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				if a.filtersEmpty(it, deadline) {
+					mu.Lock()
+					empty[it.ID] = true
+					mu.Unlock()
+				}
+			}(it)
+		}
+		wg.Wait()
+	}
+	return a.preparedPager(path, q, keep, look)
+}
+
+// filtersEmpty reports whether the 4:3 filter keeps none of a collection's
+// items, reading its listing until one is kept. Shows take only the shapes
+// already known, without a probe: one not yet measured keeps its collection.
+func (a *App) filtersEmpty(coll *jellyfin.Item, deadline time.Time) bool {
+	for start := 0; time.Now().Before(deadline); {
+		items, total, err := a.Client.Page(bg(), coll.Key, nil, start, pageSize)
+		if err != nil {
+			return false
+		}
+		a.aspects.apply(items)
+		for _, it := range items {
+			if a.Keep(it) {
+				return false
+			}
+		}
+		start += len(items)
+		if len(items) == 0 || start >= total {
+			return true
+		}
+	}
+	return false
 }

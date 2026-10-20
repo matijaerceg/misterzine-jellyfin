@@ -275,16 +275,21 @@ func (a *App) openSeason(showKey, seasonKey, at string) {
 // pager returns the listing for a path and query, kept for the session
 // so a library reopens where its count and pages already are.
 func (a *App) pager(path string, q url.Values, filter func(*jellyfin.Item) bool) *Pager {
+	var prepare func([]*jellyfin.Item)
+	if filter != nil {
+		prepare = a.measureShows // shows need a probe before the filter can judge them
+	}
+	return a.preparedPager(path, q, filter, prepare)
+}
+
+// preparedPager is pager with the caller's prepare for a filtered listing.
+func (a *App) preparedPager(path string, q url.Values, filter func(*jellyfin.Item) bool, prepare func([]*jellyfin.Item)) *Pager {
 	key := path + "?" + q.Encode()
 	if filter != nil {
 		key += "|filtered"
 	}
 	if p := a.pagers[key]; p != nil {
 		return p
-	}
-	var prepare func([]*jellyfin.Item)
-	if filter != nil {
-		prepare = a.measureShows // shows need a probe before the filter can judge them
 	}
 	p := newPager(a.Client, path, q, a.Wake, filter, prepare)
 	p.Failed = func(err error) { a.SessionEnded(err) }

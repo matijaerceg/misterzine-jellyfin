@@ -364,7 +364,7 @@ func (w *Wall) load() {
 	}
 	if v.collections {
 		// the listing that decided the tab; collections have no picture of
-		// their own to judge, the 4:3 filter applies to their items
+		// their own to judge, the 4:3 filter leaves out those it would empty
 		filter = nil
 		w.pager = w.collections()
 	} else if v.order != nil {
@@ -415,11 +415,14 @@ func (w *Wall) az() bool {
 
 // collections is the library's collections listing, kept for the session
 // like the views'; asking for it starts the fetch that decides the tab.
-// The wall holds on to it, so drawing does not look it up every frame.
+// Under the 4:3 filter it leaves out the collections the filter would
+// empty (collectionsPager). The wall holds on to it, so drawing does not
+// look it up every frame; turning the filter on or off makes it anew.
 func (w *Wall) collections() *Pager {
-	if w.collPager == nil {
+	fourThree := w.app.Cfg != nil && w.app.Cfg.FourThree
+	if w.collPager == nil || w.collPager.Filtered() != fourThree {
 		path, q := jellyfin.SectionListing(w.section.Key, w.section.Type, jellyfin.ViewCollections)
-		w.collPager = w.app.pager(path, q, nil)
+		w.collPager = w.app.collectionsPager(path, q, fourThree)
 	}
 	return w.collPager
 }

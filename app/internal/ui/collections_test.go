@@ -18,13 +18,15 @@ import (
 // collectionServer is a synthetic server with two box sets, which Jellyfin
 // lists server-wide (every library's Collections tab shows them). The
 // box sets' listing waits for hold to close, so a test can look before it lands,
-// and answers with an error while failing is set.
+// and answers with an error while failing is set. The first set holds a
+// 4:3 film, or only a wide one while wideFirst is set.
 type collectionServer struct {
 	*httptest.Server
-	hold    chan struct{}
-	mu      sync.Mutex
-	asks    map[string]int
-	failing bool
+	hold      chan struct{}
+	mu        sync.Mutex
+	asks      map[string]int
+	failing   bool
+	wideFirst bool
 }
 
 func newCollectionServer(t *testing.T) *collectionServer {
@@ -40,7 +42,7 @@ func newCollectionServer(t *testing.T) *collectionServer {
 			route = "parent:" + q.Get("parentId")
 		}
 		s.asks[route]++
-		failing := s.failing
+		failing, wideFirst := s.failing, s.wideFirst
 		s.mu.Unlock()
 		switch route {
 		case "collections":
@@ -53,6 +55,12 @@ func newCollectionServer(t *testing.T) *collectionServer {
 				`{"Id":"9020","Type":"BoxSet","Name":"Second Set","ImageTags":{"Primary":"c902"},"BackdropImageTags":["a902"],"ChildCount":3}`)
 		case "parent:1", "parent:2":
 			jfPage(w, r, `{"Id":"11","Type":"Movie","Name":"Alpha"}`, `{"Id":"12","Type":"Movie","Name":"Beta"}`)
+		case "parent:901":
+			if wideFirst {
+				jfPage(w, r, `{"Id":"31","Type":"Movie","Name":"Wide Two","Width":1920,"Height":800}`)
+				return
+			}
+			jfPage(w, r, `{"Id":"32","Type":"Movie","Name":"Square Two","Width":720,"Height":540}`)
 		case "parent:9020":
 			// the collection's own order; one wide film for the 4:3 filter to hide
 			jfPage(w, r, `{"Id":"23","Type":"Movie","Name":"Later Square","Width":640,"Height":480}`,
@@ -265,10 +273,7 @@ func TestWallOpensCollection(t *testing.T) {
 	now := time.Now()
 	library := NewWallView(a, filmsLibrary, len(wallViews)-1)
 	a.Push(library)
-	waitUntil(t, "the collections", func() bool { return library.total() == 2 })
-	if library.pager.Filtered() {
-		t.Fatal("the 4:3 filter walked the collections themselves")
-	}
+	waitUntil(t, "the collections", func() bool { return library.pager.Done() && library.total() == 2 }) // both hold a 4:3 film
 	a.key(input.Event{Key: input.Right}, now)
 	a.key(input.Event{Key: input.Enter}, now)
 	coll, ok := a.top().(*Wall)
@@ -312,6 +317,39 @@ func TestWallOpensCollection(t *testing.T) {
 		t.Fatalf("returned to view %d, item %d, tabs %v", library.view, library.cur, library.tabs)
 	}
 
+}
+
+// Under the 4:3 filter a collection holding nothing it keeps is left out
+// of the Collections tab; one with an item it cannot judge stays. Without
+// the filter every collection shows.
+func TestWallCollectionsFilteredEmptyHidden(t *testing.T) {
+	s := newCollectionServer(t)
+	close(s.hold)
+	s.mu.Lock()
+	s.wideFirst = true
+	s.mu.Unlock()
+	a := collectionTestApp(t, s, true)
+	films := NewWallView(a, filmsLibrary, len(wallViews)-1)
+	waitUntil(t, "the filtered collections", func() bool { return films.pager.Done() && films.total() >= 0 })
+	if films.pager != films.collections() || films.total() != 1 {
+		t.Fatalf("%d collections under the filter, want the second set only", films.total())
+	}
+	if it := films.pager.Get(0); it == nil || it.ID != "9020" {
+		t.Fatalf("kept %+v", it)
+	}
+	if s.asked("parent:901") == 0 {
+		t.Fatal("the first set's items were not looked into")
+	}
+	if n := films.tabCount(); n != len(wallViews) {
+		t.Fatalf("%d tabs with a collection left", n)
+	}
+
+	a.Cfg.FourThree = false
+	films = NewWallView(a, filmsLibrary, len(wallViews)-1)
+	waitUntil(t, "the collections", func() bool { return films.total() == 2 })
+	if films.pager.Filtered() {
+		t.Fatal("the collections were filtered with the filter off")
+	}
 }
 
 // Drawing asks on every frame whether the Collections tab shows; once the
