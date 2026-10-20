@@ -40,7 +40,8 @@ primary account. Automatic sign-in uses the saved server connection at startup.
   **Collections** tab, the last one; it appears once the server has listed at
   least one. OK on a collection shows its items, in the collection's order and
   through the 4:3 filter like any view; one Back returns to it on the
-  Collections tab.
+  Collections tab. With the filter on, a collection holding nothing it keeps
+  is left out of the tab.
 - Every library has a **Folders** tab, after Continue (the library's
   Continue Watching) and before Collections: the library's folders on disk
   as the server lists them. OK on a folder shows its subfolders and files
@@ -114,7 +115,10 @@ primary account. Automatic sign-in uses the saved server connection at startup.
   home rows, search and every library view. Movies and episodes are judged by
   their own picture; a show by its first episode. Each TV library is read once
   for that, the first time the filter needs it, and the answers are kept in the
-  cache folder. An update waiting under Options is marked with a purple UPDATE
+  cache folder. The filter relies on the aspect ratio Jellyfin records for
+  each file, and Jellyfin sometimes records it wrongly or not at all, so some
+  items may be missing from the filtered view or shown in it wrongly. An
+  update waiting under Options is marked with a purple UPDATE
   mark at the top of Home and a purple dot in the menu.
 - After three minutes without a press in the menus or on a paused video, the
   screen dims to a quarter of its brightness. The next press only brings it
