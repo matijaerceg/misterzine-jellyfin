@@ -153,15 +153,29 @@ func (o *Overlay) SetOpaque(on bool) {
 	o.update()
 }
 
+// overlaySpan maps the logical run [a, a+n) of a canvas lim long onto the
+// raster at scale s from o0: its start even, its length even -- except a run
+// that reaches the canvas's far edge, which ends at the viewport's. Rounding
+// the start and the length separately left the playback panel two lines
+// short of the bottom on a 964x542 Native raster (found on the DE10
+// 2026-10-19).
+func overlaySpan(a, n, lim int, s float64, o0 int) (int, int) {
+	p := (int(float64(a)*s+0.5) + o0) &^ 1
+	if a+n >= lim {
+		return p, int(float64(lim)*s+0.5) + o0 - p
+	}
+	return p, int(float64(n)*s+0.5) &^ 1
+}
+
 // Show publishes a BGRx canvas at x,y with an alpha plane of the same size
 // (0..255 a pixel; nil for opaque).
 func (o *Overlay) Show(x, y int, c *gfx.Canvas, alpha []byte) {
 	o.r.mu.Lock()
 	defer o.r.mu.Unlock()
 	sx, sy, x0, y0 := o.transform()
-	w, h := int(float64(c.W)*sx+0.5)&^1, int(float64(c.H)*sy+0.5)&^1
-	x, y = int(float64(x)*sx+0.5)+x0, int(float64(y)*sy+0.5)+y0
-	x, y = x&^1, y&^1
+	var w, h int
+	x, w = overlaySpan(x, c.W, o.logicalW, sx, x0)
+	y, h = overlaySpan(y, c.H, o.logicalH, sy, y0)
 	if w == 0 || h == 0 || x < 0 || y < 0 || x+w > o.r.ow || y+h > o.r.oh {
 		return
 	}

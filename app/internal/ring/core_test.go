@@ -190,6 +190,32 @@ func TestNativeRasterUsesTwoFullPagesAndWideLayoutFillsTheRaster(t *testing.T) {
 	}
 }
 
+// The playback panel ends at the canvas's bottom edge; on a raster whose
+// height is not a whole multiple of the canvas's (964x542 from a 960x480
+// design) it must still end at the raster's last line, not two lines short.
+func TestNativePanelReachesTheBottomOfAnOddScaledRaster(t *testing.T) {
+	f := newFake(t, false)
+	f.fb = make([]byte, NPage*964*542*4)
+	f.r.fb = f.fb
+	f.r.setOutput(964, 542)
+	f.r.setPages()
+	o := f.r.Overlay()
+	o.SetCanvasSize(960, 480)
+	c := gfx.NewCanvas(960, 208)
+	c.Fill(0, 0, c.W, c.H, gfx.Purple)
+	alpha := make([]byte, c.W*c.H)
+	for i := range alpha {
+		alpha[i] = 255
+	}
+	o.Show(0, 272, c, alpha)
+	if f.r.want.first != 306 || f.r.want.last != 541 || f.r.want.width != 964 {
+		t.Fatalf("panel bounds %+v", f.r.want)
+	}
+	if got := f.r.pages[0][541*964+963]; got != 0xFFAA5CC3 {
+		t.Fatalf("bottom-right pixel %08x", got)
+	}
+}
+
 func TestNativePlaybackCanvasFillsWideRasterWithProportionalTextSpace(t *testing.T) {
 	f := newFake(t, false)
 	f.fb = make([]byte, NPage*1280*720*4)
