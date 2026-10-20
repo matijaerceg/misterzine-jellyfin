@@ -561,20 +561,34 @@ def activate(card, launch=start_and_check):
             old = manager.read_state(root) if (root / 'active.json').exists() else None
             # A download left ready before a rollback, or before a script
             # installed the same release, must not select what already runs.
-            if old and old.get('current') == release['id']:
-                raise ValueError('This release is already installed. Check for updates again.')
-            # Copy runtime before activation so recovery does not depend on the new helper.
-            backups = {name: (root / name).read_bytes() for name in HELPERS if (root / name).exists()}
-            dropin = card / 'downloader_misterzine_jellyfin.ini'
-            old_registration = dropin.read_bytes() if dropin.exists() else None
-            for name, sha in manifest.get('files', {}).items():
-                if name not in manager.PAYLOAD or manager.digest(package / 'payload' / name) != sha:
-                    raise ValueError('Prepared payload changed. Check for updates again.')
+            current = bool(old and old.get('current') == release['id'])
+            if not current:
+                # Copy runtime before activation so recovery does not depend on the new helper.
+                backups = {name: (root / name).read_bytes() for name in HELPERS if (root / name).exists()}
+                dropin = card / 'downloader_misterzine_jellyfin.ini'
+                old_registration = dropin.read_bytes() if dropin.exists() else None
+                for name, sha in manifest.get('files', {}).items():
+                    if name not in manager.PAYLOAD or manager.digest(package / 'payload' / name) != sha:
+                        raise ValueError('Prepared payload changed. Check for updates again.')
         except Exception as exc:
             # Nothing has changed yet; the reason still belongs on the screen,
             # not only on the worker's stderr.
             failed(root, release, 'Could not restart MisterZine Jellyfin', exc)
             raise
+        if current:
+            # Nothing to install: restart what already runs, as an install would.
+            (root / 'updates/ready.json').unlink(missing_ok=True)
+            status(root, 'activating', release, 'Restarting MisterZine Jellyfin...')
+            try:
+                stop_manager(root)
+                if not launch(root):
+                    raise RuntimeError('MisterZine Jellyfin did not start')
+            except Exception as exc:
+                failed(root, release, 'Could not restart MisterZine Jellyfin', exc)
+                raise
+            status(root, 'complete', release, 'MisterZine Jellyfin ' + release['version']
+                   + ' is already installed and up to date')
+            return
         installed = False
         status(root, 'activating', release, 'Restarting MisterZine Jellyfin...')
         try:

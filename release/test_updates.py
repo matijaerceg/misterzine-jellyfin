@@ -200,13 +200,39 @@ class UpdateTests(unittest.TestCase):
         service.prepare(self.card, release, self.deliver(archive))
         manager.install(self.card, package)
         launched = []
-        with self.assertRaises(ValueError):
-            service.activate(self.card, lambda root: launched.append(root) or True)
-        self.assertEqual(launched, [])
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            service.activate(self.card, lambda root: launched.append(manager.read_state(root)['current']) or True)
+        # Nothing is selected again, but the app restarts as after an install.
+        self.assertEqual(launched, ['new'])
         self.assertEqual(manager.read_state(self.root), {'current': 'new', 'previous': 'old'})
+        self.assertFalse((self.root / 'updates/ready.json').exists())
         status = json.loads((self.root / 'updates/status.json').read_text())
-        self.assertEqual(status['stage'], 'failed')
-        self.assertIn('already installed', status['message'])
+        self.assertEqual(status['stage'], 'complete')
+        self.assertIn('already installed and up to date', status['message'])
+        self.assertIn('already installed and up to date', out.getvalue())
+
+    def test_installer_rerun_for_the_installed_release_succeeds(self):
+        # The install script run again for the release it already installed.
+        release, archive, package = self.release('same', 'beta')
+        manager.install(self.card, package)
+        request = self.fixture / 'request.json'
+        request.write_text(json.dumps(release))
+        self.deliver(archive)(self.card, self.root, release)
+        launched = []
+        with patch('sys.argv', ['worker', 'install', '--card', str(self.card), '--request', str(request), '--yes']), \
+             patch.object(service.platform, 'system', return_value='Linux'), \
+             patch.object(service.platform, 'machine', return_value='armv7l'), \
+             patch.object(service.activate, '__defaults__', (lambda root: launched.append(root) or True,)), \
+             contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()) as err, \
+             patch.object(Path, 'exists', autospec=True,
+                          side_effect=lambda p, real=Path.exists: str(p) == '/dev/MiSTer_cmd' or real(p)):
+            service.cli()
+        self.assertEqual(launched, [self.root])
+        self.assertEqual(err.getvalue(), '')
+        self.assertIn('already installed and up to date', out.getvalue())
+        self.assertEqual(manager.read_state(self.root)['current'], 'same')
+        status = json.loads((self.root / 'updates/status.json').read_text())
+        self.assertEqual(status['stage'], 'complete')
 
     def test_failed_launch_restores_runtime_registration_and_selection(self):
         _, _, package = self.release('old')
