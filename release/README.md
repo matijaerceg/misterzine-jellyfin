@@ -36,6 +36,15 @@ There is no 48 Hz mode.
 
 **Display Shape** in the core OSD selects the shared 4:3 or 16:9 output shape.
 In Native HDMI, a playing video takes the HDMI mode's own shape instead.
+HDMI scaling follows your MiSTer.ini. If it turns on integer scaling
+(`vscale_mode`) for every core, the picture may not fill the screen; add a
+section for this core to MiSTer.ini to fill it:
+
+```ini
+[MisterZine Jellyfin]
+vscale_mode=0
+```
+
 Use in-app video calibration to adjust the picture to your screen, and **Video
 crop** to choose how much of a film's edges to crop. **De-flicker** in the core
 OSD softens vertical detail on interlaced output while preserving horizontal
