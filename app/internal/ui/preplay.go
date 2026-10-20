@@ -152,9 +152,11 @@ func actionPitch(f *gfx.Font, top, n int) int {
 	return pitch
 }
 
-// Draw composes the page off-frame and copies it in.
+// Draw composes the page off-frame and copies it in. A Display Shape change
+// while the page is open resizes the output canvas (720 or 960 wide), so the
+// page follows it rather than being copied in at its old width.
 func (p *Preplay) Draw(out *gfx.Canvas, now time.Time) bool {
-	if p.page == nil {
+	if !canvasSizeIs(p.page, out.W, out.H) {
 		p.page = gfx.NewCanvas(out.W, out.H)
 	}
 	c := p.page
