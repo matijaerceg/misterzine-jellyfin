@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "releases": {
+    "beta": {
+      "id": "beta1-0004736",
+      "version": "0.1.0-beta.1",
+      "channel": "beta",
+      "notes": "MisterZine Jellyfin 0.1.0-beta.1\n\nFirst beta of MisterZine Jellyfin: a Jellyfin client for MiSTer that plays your\nlibrary through an FPGA H.264 decoder core, on a CRT or over HDMI.\n\nBeta builds ask for the MisterZine supporter code when you start playback.\nSigning in and browsing work without it.\n\n## Install\n\n1. Download `MisterZine-Jellyfin-Install-Beta.sh` from this release.\n2. Copy it into the `Scripts` folder on your SD card.\n3. Run it from the MiSTer Scripts menu.\n4. Launch **MisterZine Jellyfin** from the MiSTer main menu and sign in.\n\nNeeds a network connection and a Jellyfin server.\n\n## What works\n\n- Browse, search, Continue Watching, resume positions synced with Jellyfin.\n- H.264 files the decoder supports play directly; everything else is\n  transcoded by your server.\n- 480i/576i on CRTs, 480p/576p and native output on HDMI.\n- Display Shape (4:3 or 16:9) in the core's OSD sets the screen shape for the\n  menus and the fitted video modes. In Native HDMI, a playing video uses your\n  HDMI display's own shape.\n\n## HDMI scaling\n\nHDMI scaling follows your MiSTer.ini, as for every core. If integer scaling\n(`vscale_mode`) is on for all cores, the picture may not fill the screen. Add\nthis section to MiSTer.ini to fill it:\n\n```ini\n[MisterZine Jellyfin]\nvscale_mode=0\n```\n\n## Known issues\n\n- Stopping during a network stall can save a resume point a little too far\n  ahead.\n- Video above 854 pixels wide plays at up to 30 frames per second.\n- Subtitles are burned in by the server, so turning them on forces a\n  transcode.\n\nTested on a DE10-Nano with HDMI and a component CRT. Please report problems\nwith your board, output mode, connection type and the steps to reproduce them.\nNever post your supporter code.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.1/MisterZine-Jellyfin-beta1-0004736.zip",
+      "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
+      "size": 14031885,
+      "sha256": "1f0b1360e0487c7a721e8f22e2d8f42dfa7ef199eb34e2f9e572b38c922d3720",
+      "access": {
+        "batch": "misterzine-2026-10"
+      },
+      "source": {
+        "filename": "MisterZine-Jellyfin-Source-beta1-0004736.zip",
+        "size": 138663119,
+        "sha256": "224e11126d5d927e2b5a648162912a48cda2ed36aa234d4655821f9879d6ca2f",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.1/MisterZine-Jellyfin-Source-beta1-0004736.zip"
+      }
+    }
+  }
+}
