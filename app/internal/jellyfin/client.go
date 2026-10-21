@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -94,8 +95,9 @@ type Client struct {
 	Store      TokenStore
 	Logf       func(string, ...any) // optional; never handed a token or a query
 
-	http *http.Client
-	slow *http.Client // the home rows, which a large library answers slowly
+	http    *http.Client
+	slow    *http.Client // the home rows, which a large library answers slowly
+	refused atomic.Bool  // the server has answered this client 401 (Refused)
 
 	// Retries and Backoff govern idempotent requests that fail on the
 	// network or with a 5xx: Retries more attempts, waiting Backoff, then
@@ -132,6 +134,10 @@ func (c *Client) UserID() string { return c.Store.Credentials().UserID }
 
 // SignedIn reports whether there is a token to send.
 func (c *Client) SignedIn() bool { return c.Store.Credentials().Token != "" }
+
+// Refused reports whether the server has answered any of this client's
+// requests 401: its session, not some other client's, has ended.
+func (c *Client) Refused() bool { return c.refused.Load() }
 
 func (c *Client) logf(format string, args ...any) {
 	if c.Logf != nil {
@@ -245,6 +251,7 @@ func (c *Client) once(ctx context.Context, cl *http.Client, method, path string,
 		io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 		e := &HTTPError{Method: method, Path: pathOnly(path), Status: resp.StatusCode}
 		if resp.StatusCode == http.StatusUnauthorized {
+			c.refused.Store(true)
 			return nil, e, false
 		}
 		return nil, e, resp.StatusCode >= 500

@@ -63,7 +63,7 @@ func newFake(t *testing.T) (*fake, *Client) {
 		if !strings.HasPrefix(auth, `MediaBrowser Client="MisterZine", Device="MiSTer CRT", DeviceId="dev-1", Version="`) {
 			t.Errorf("Authorization header %q", auth)
 		}
-		open := map[string]bool{"/System/Info/Public": true, "/Users/AuthenticateByName": true, "/QuickConnect/Connect": true}
+		open := map[string]bool{"/System/Info/Public": true, "/Users/AuthenticateByName": true, "/QuickConnect/Connect": true, "/Users/Public": true}
 		if !open[r.URL.Path] && !strings.HasSuffix(auth, `Token="TESTTOKEN"`) {
 			w.WriteHeader(401)
 			return
@@ -77,6 +77,8 @@ func newFake(t *testing.T) (*fake, *Client) {
 			serve("auth.json")
 		case r.URL.Path == "/QuickConnect/Connect":
 			serve("qc_connect.json")
+		case r.URL.Path == "/Users/Public":
+			io.WriteString(w, publicUsers)
 		case r.URL.Path == "/UserViews":
 			serve("views.json")
 		case r.URL.Path == "/Items" && q.Get("searchTerm") != "":
@@ -158,6 +160,33 @@ func TestSignIn(t *testing.T) {
 	ok, err := c.QuickConnectCheck(ctx, "SECRET")
 	if err != nil || ok {
 		t.Fatalf("quick connect check %v %v", ok, err)
+	}
+}
+
+// publicUsers is a synthetic /Users/Public answer: a user with a password,
+// one without (her name with an accent, as the server has it), one only
+// the field's other name protects, and two broken entries.
+const publicUsers = `[
+ {"Name":"testuser","Id":"0123456789abcdef0123456789abcdef","PrimaryImageTag":"tag1","HasPassword":true,"HasConfiguredPassword":true},
+ {"Name":"Zoë","Id":"11111111111111111111111111111111","HasPassword":false,"HasConfiguredPassword":false},
+ {"Name":"guest","Id":"22222222222222222222222222222222","HasConfiguredPassword":true},
+ {"Name":" ","Id":"33333333333333333333333333333333"},
+ {"Name":"nobody"}
+]`
+
+// The users a server lists come without a token, their names as the server
+// has them (signing in needs the exact name), the broken entries dropped.
+func TestPublicUsers(t *testing.T) {
+	_, c := newFake(t)
+	users, err := c.PublicUsers(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 3 || users[0].Name != "testuser" || users[0].ImageTag != "tag1" || users[1].Name != "Zoë" {
+		t.Fatalf("users %+v", users)
+	}
+	if !users[0].Protected() || users[1].Protected() || !users[2].Protected() {
+		t.Fatalf("passwords %+v", users)
 	}
 }
 

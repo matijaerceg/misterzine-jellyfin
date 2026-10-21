@@ -113,6 +113,9 @@ func (o *Options) items() []option {
 	if items = extraOptions(o.app, items); len(items) > n {
 		items = append(items, optionGap()) // the Extras group, when there are any
 	}
+	if o.app.Client != nil && cfg.ServerURL != "" {
+		items = append(items, option{label: "Switch user", do: o.app.SwitchUser})
+	}
 	label := "Sign out"
 	if cfg.UserName != "" && !o.app.Showcase {
 		label = "Sign out (" + cfg.UserName + ")"

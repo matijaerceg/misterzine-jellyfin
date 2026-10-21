@@ -12,12 +12,14 @@ import (
 )
 
 // Login is the sign-in: the server's address, typed on the on-screen
-// keyboard and checked against the server's public info; then Quick
-// Connect (a code to approve in another signed-in Jellyfin app) or a user
-// name and password. The session is saved into the settings, which are the
-// token store, and the app connects. Network work runs in goroutines whose
-// answers come back on the UI thread (Later), tagged with gen so a step
-// left since cannot be changed by them.
+// keyboard and checked against the server's public info; then one of the
+// users the server lists (a password typed only for those that have one),
+// Quick Connect (a code to approve in another signed-in Jellyfin app) or a
+// user name and password. The session is saved into the settings, which
+// are the token store, and the app connects. Network work runs in
+// goroutines whose answers come back on the UI thread (Later), tagged with
+// gen so a step left since cannot be changed by them. Options > Switch user
+// opens it at the users of the server on record (NewSwitchUser).
 type Login struct {
 	app   *App
 	step  loginStep
@@ -28,11 +30,18 @@ type Login struct {
 	at    time.Time
 	host  string // the normalized address, once probed
 	info  *jellyfin.PublicInfo
-	quick bool // the server offers Quick Connect
-	cur   int  // the method list's cursor
-	user  string
-	code  string // the Quick Connect code shown
-	busy  bool
+	quick bool                  // the server offers Quick Connect
+	users []jellyfin.PublicUser // the users the server lists, often none
+	cur   int                   // the method list's cursor
+	user  string                // as the server has it: folded only to draw
+	// picked is a user taken from the server's list: only the password is
+	// typed, and Back from it returns to the list
+	picked bool
+	// switching is Options > Switch user: the session on record stays
+	// until another is saved, and Back from the list returns to it
+	switching bool
+	code      string // the Quick Connect code shown
+	busy      bool
 	// client is the sign-in's own client: its session goes into the
 	// settings, and the app makes its own client from them.
 	client *jellyfin.Client
@@ -42,7 +51,7 @@ type loginStep int
 
 const (
 	stepAddress  loginStep = iota // typing the server's address
-	stepMethod                    // Quick Connect, or user name and password
+	stepMethod                    // the listed users, Quick Connect, or user name and password
 	stepQuick                     // showing the code, waiting for approval
 	stepUser                      // typing the user name
 	stepPassword                  // typing the password
@@ -60,6 +69,24 @@ func NewLogin(app *App) *Login {
 	}
 	l.pad = newKeyPad(addr, "Connect >", false)
 	return l
+}
+
+// NewSwitchUser is the sign-in for Options > Switch user: the server on
+// record's users and other ways to sign in, its address not typed again.
+// Back returns to the session as it was; signing in replaces it.
+func NewSwitchUser(app *App) *Login {
+	l := &Login{app: app, at: time.Now(), step: stepMethod, host: app.Cfg.ServerURL, switching: true}
+	l.pad = newKeyPad(l.host, "Connect >", false)
+	l.connect([]string{l.host})
+	return l
+}
+
+// SwitchUser opens the user list of the server on record over Options.
+func (a *App) SwitchUser() {
+	if a.Client == nil || a.Cfg.ServerURL == "" {
+		return
+	}
+	a.Push(NewSwitchUser(a))
 }
 
 // to changes step: answers still on their way for the old one are dropped.
@@ -100,13 +127,20 @@ func (l *Login) open() bool {
 
 // probe checks the typed address: it must answer as a Jellyfin server.
 // A bare name also tries Jellyfin's plain HTTP port when the first answer
-// fails; a failure names the first address tried.
+// fails.
 func (l *Login) probe() {
 	hosts, err := jellyfin.HostCandidates(l.pad.text)
 	if err != nil {
 		l.err = "Enter the server's address, such as jellyfin.example.com or 192.0.2.10:8096."
 		return
 	}
+	l.connect(hosts)
+}
+
+// connect tries the addresses in turn until one answers as a Jellyfin
+// server, then asks it for Quick Connect and the users it lists, and moves
+// on to the ways to sign in. A failure names the first address tried.
+func (l *Login) connect(hosts []string) {
 	l.gen.Add(1)
 	gen := l.gen.Load()
 	l.err, l.busy, l.stat = "", true, "Connecting to "+hosts[0]+"..."
@@ -130,16 +164,24 @@ func (l *Login) probe() {
 			}
 		}
 		quick := false
+		var users []jellyfin.PublicUser
 		if client != nil {
 			quick, _ = client.QuickConnectEnabled(bg())
+			var err error
+			if users, err = client.PublicUsers(bg()); err != nil {
+				l.app.Log.Printf("sign-in: users: %v", err) // typing the name still works
+			}
 		}
 		l.later(gen, func() {
 			l.busy, l.stat = false, ""
 			if client == nil {
 				l.err = l.probeFailure(first, ferr)
+				if l.switching {
+					l.err += " OK: try again."
+				}
 				return
 			}
-			l.host, l.info, l.quick, l.client = host, info, quick, client
+			l.host, l.info, l.quick, l.users, l.client = host, info, quick, users, client
 			l.cur = 0
 			l.to(stepMethod)
 		})
@@ -162,13 +204,66 @@ func (l *Login) probeFailure(host string, err error) string {
 	return "No Jellyfin server at " + host + ". Check the address."
 }
 
-// methods are the method list's rows.
+// method is what a row of the method list does.
+type method int
+
+const (
+	methodUser   method = iota // sign in as a user the server lists
+	methodQuick                // Quick Connect
+	methodTyped                // type a user name, then its password
+	methodServer               // back to the address
+)
+
+type loginRow struct {
+	label string
+	do    method
+	user  jellyfin.PublicUser // methodUser's
+}
+
+// rows are the method list: the users the server lists, Quick Connect when
+// it offers it, typing a user name (Other user under a list of users), and
+// another server, except when switching user. None before the server has
+// answered.
+func (l *Login) rows() []loginRow {
+	if l.info == nil {
+		return nil
+	}
+	var out []loginRow
+	for _, u := range l.users {
+		out = append(out, loginRow{label: jellyfin.Fold(u.Name), do: methodUser, user: u})
+	}
+	if l.quick {
+		out = append(out, loginRow{label: "Quick Connect", do: methodQuick})
+	}
+	typed := "User name and password"
+	if len(l.users) > 0 {
+		typed = "Other user"
+	}
+	out = append(out, loginRow{label: typed, do: methodTyped})
+	if !l.switching {
+		out = append(out, loginRow{label: "Change server", do: methodServer})
+	}
+	return out
+}
+
+// methods are the method list's labels.
 func (l *Login) methods() []string {
 	var out []string
-	if l.quick {
-		out = append(out, "Quick Connect")
+	for _, r := range l.rows() {
+		out = append(out, r.label)
 	}
-	return append(out, "User name and password", "Change server")
+	return out
+}
+
+// pick signs in as a user from the server's list: at once when the user
+// has no password, after typing it otherwise.
+func (l *Login) pick(u jellyfin.PublicUser) {
+	l.user, l.picked = u.Name, true
+	if u.Protected() {
+		l.to(stepPassword)
+		return
+	}
+	l.signIn("")
 }
 
 // startQuick asks for a code and polls it until approved, then redeems it.
@@ -220,7 +315,7 @@ func (l *Login) current(gen int64) bool { return l.gen.Load() == gen }
 func (l *Login) signIn(password string) {
 	l.gen.Add(1)
 	gen, client, user := l.gen.Load(), l.client, l.user
-	l.err, l.busy, l.stat = "", true, "Signing in..."
+	l.err, l.busy, l.stat = "", true, "Signing in as "+jellyfin.Fold(user)+"..."
 	go func() {
 		cr, err := client.SignIn(bg(), user, password)
 		l.signedIn(gen, cr, err)
@@ -234,6 +329,12 @@ func (l *Login) signedIn(gen int64, cr jellyfin.Credentials, err error) {
 		if err != nil {
 			l.app.Log.Printf("sign-in: %v", err)
 			switch {
+			case errors.Is(err, jellyfin.ErrUnauthorized) && l.step == stepMethod:
+				// listed without a password, yet the server wants one
+				l.to(stepPassword)
+				l.err = "Enter the password for " + jellyfin.Fold(l.user) + "."
+			case errors.Is(err, jellyfin.ErrUnauthorized) && l.picked:
+				l.err = "Wrong password."
 			case errors.Is(err, jellyfin.ErrUnauthorized):
 				l.err = "Wrong user name or password."
 			case l.step == stepQuick:
@@ -323,7 +424,14 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 			l.err = ""
 		}
 	case stepMethod:
-		rows := l.methods()
+		rows := l.rows()
+		if len(rows) == 0 {
+			// switching user, and the server did not answer: OK asks again
+			if ev.Key == input.Enter && !ev.Repeat {
+				l.connect([]string{l.host})
+			}
+			return
+		}
 		switch ev.Key {
 		case input.Up:
 			l.cur = max(0, l.cur-1)
@@ -333,12 +441,17 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 			if ev.Repeat {
 				return
 			}
-			switch rows[l.cur] {
-			case "Quick Connect":
+			switch r := rows[l.cur]; r.do {
+			case methodUser:
+				l.pick(r.user)
+			case methodQuick:
 				l.startQuick()
-			case "User name and password":
+			case methodTyped:
+				if l.picked {
+					l.user, l.picked = "", false
+				}
 				l.to(stepUser)
-			case "Change server":
+			case methodServer:
 				l.to(stepAddress)
 			}
 		}
@@ -349,8 +462,9 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 	}
 }
 
-// Back steps back: the password to the user name, the methods to the
-// address, the address to Options.
+// Back steps back: the password to the user name (or to the users, for
+// one picked from them), the methods to the address, the address to
+// Options. Switching user, the methods return to the session untouched.
 func (l *Login) Back() bool {
 	switch l.step {
 	case stepAddress:
@@ -358,11 +472,20 @@ func (l *Login) Back() bool {
 		l.busy, l.stat = false, ""
 		l.app.Push(NewOptions(l.app))
 	case stepMethod:
+		if l.switching {
+			l.gen.Add(1) // nothing on its way may sign in now
+			l.app.Pop()
+			return true
+		}
 		l.to(stepAddress)
 	case stepQuick, stepUser:
 		l.to(stepMethod)
 	case stepPassword:
-		l.to(stepUser)
+		if l.picked {
+			l.to(stepMethod)
+		} else {
+			l.to(stepUser)
+		}
 	}
 	return true
 }
@@ -385,7 +508,7 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 		y += f.Big.Height() + 8
 		label := "User name"
 		if l.step == stepPassword {
-			label = "Password for " + l.user
+			label = "Password for " + jellyfin.Fold(l.user)
 		}
 		l.app.text(c, SafeX, y, f.Body, gfx.GreyHi, f.Body.Fit(label, SafeW))
 		l.pad.Draw(l.app, c, y+f.Body.Height()+10, now)
@@ -394,13 +517,18 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 		y += f.Big.Height() + 8
 		l.app.text(c, SafeX, y, f.Body, gfx.GreyLo, f.Body.Fit(l.host, SafeW))
 		y += f.Body.Height() + 24
-		for i, row := range l.methods() {
+		// a long list of users scrolls, clear of the status lines
+		rows := l.rows()
+		shown := max(1, (SafeBottom-2*f.Body.Height()-10-y)/ListRowH)
+		first := centredFirst(l.cur, shown, len(rows))
+		menuScrollbar(c, y, (shown-1)*ListRowH+f.Body.Height(), first, shown, len(rows))
+		for i := first; i < min(len(rows), first+shown); i++ {
 			col := gfx.GreyHi
 			if i == l.cur {
 				col = gfx.White
 				focusBar(c, SafeX, y, f.Body.Height())
 			}
-			l.app.text(c, SafeX, y, f.Body, col, row)
+			l.app.text(c, SafeX, y, f.Body, col, f.Body.Fit(rows[i].label, SafeW-24))
 			y += ListRowH
 		}
 	case stepQuick:
@@ -423,6 +551,12 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 	}
 	back := map[loginStep]string{stepAddress: "Back: Options", stepMethod: "Back: change server",
 		stepQuick: "Back: other ways to sign in", stepUser: "Back: other ways to sign in", stepPassword: "Back: user name"}[l.step]
+	switch {
+	case l.step == stepMethod && l.switching:
+		back = "Back: Options" // signed in as before
+	case l.step == stepPassword && l.picked:
+		back = "Back: other ways to sign in"
+	}
 	hintX := SafeX
 	if l.step == stepAddress || l.step == stepUser || l.step == stepPassword {
 		hintX = SafeX + 300 // right of the keyboard

@@ -908,6 +908,10 @@ func NewClient(cfg *Config, cacheDir string) *jellyfin.Client {
 func (a *App) Connect() {
 	cfg := a.Cfg
 	c := NewClient(cfg, a.cacheDir)
+	if old := a.Client; old != nil && old.Store.Credentials().Token != cfg.ServerToken {
+		// a switch of user: the session it replaces ends, as on a sign-out
+		go old.SignOut(bg())
+	}
 	a.Client = c
 	a.Art.SetClient(c)
 	a.secs = nil
@@ -961,6 +965,12 @@ func (a *App) SessionEnded(err error) bool {
 	a.Later(func() {
 		if a.Client == nil {
 			return // already signed out
+		}
+		if !a.Client.Refused() || len(a.Connected) > 0 {
+			// a session replaced (Switch user), or saved to replace it:
+			// the refusal was of the old one, answering screens on their
+			// way out
+			return
 		}
 		a.Log.Printf("session refused by the server: signing in again")
 		if err := a.Cfg.SignOut(); err != nil {

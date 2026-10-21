@@ -14,19 +14,30 @@ import (
 	"time"
 
 	"plexcrt/internal/input"
+	"plexcrt/internal/jellyfin"
 )
 
 // signInServer is a Jellyfin server for the sign-in screens, answering
 // with the jellyfin package's captured fixtures. Quick Connect requests
-// are approved or expired by the test; the password is "secret".
+// are approved or expired by the test; testuser's password is "secret".
+// It lists the users in users on its sign-in screen; guest has no password.
 type signInServer struct {
 	*httptest.Server
 	mu       sync.Mutex
 	approved bool
 	expired  bool
-	quick    bool // Quick Connect is switched on
-	views    int  // status for /UserViews (0: 200)
+	quick    bool   // Quick Connect is switched on
+	views    int    // status for /UserViews (0: 200)
+	users    string // the /Users/Public answer
+	guestPw  string // guest's password, though listed without one
+	logouts  []string
 }
+
+// listedUsers are testuser, with a password, and guest, without one.
+const listedUsers = `[{"Name":"testuser","Id":"0123456789abcdef0123456789abcdef","HasPassword":true,"HasConfiguredPassword":true},
+ {"Name":"guest","Id":"22222222222222222222222222222222","HasPassword":false,"HasConfiguredPassword":false}]`
+
+const guestAuth = `{"User":{"Name":"guest","Id":"22222222222222222222222222222222"},"AccessToken":"GUESTTOKEN"}`
 
 func fixtureFile(t *testing.T, name string) []byte {
 	t.Helper()
@@ -38,7 +49,7 @@ func fixtureFile(t *testing.T, name string) []byte {
 }
 
 func newSignInServer(t *testing.T) *signInServer {
-	s := &signInServer{quick: true}
+	s := &signInServer{quick: true, users: "[]"}
 	public, auth, qc := fixtureFile(t, "public.json"), fixtureFile(t, "auth.json"), fixtureFile(t, "qc_connect.json")
 	s.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
@@ -72,11 +83,21 @@ func newSignInServer(t *testing.T) *signInServer {
 		case "/Users/AuthenticateByName":
 			var body struct{ Username, Pw string }
 			json.NewDecoder(r.Body).Decode(&body)
-			if body.Username != "testuser" || body.Pw != "secret" {
+			switch {
+			case body.Username == "testuser" && body.Pw == "secret":
+				w.Write(auth)
+			case body.Username == "guest" && body.Pw == s.guestPw:
+				io.WriteString(w, guestAuth)
+			default:
 				w.WriteHeader(http.StatusUnauthorized)
-				return
 			}
-			w.Write(auth)
+		case "/Users/Public":
+			io.WriteString(w, s.users)
+		case "/Sessions/Logout":
+			auth := r.Header.Get("Authorization")
+			_, token, _ := strings.Cut(auth, `Token="`)
+			s.logouts = append(s.logouts, strings.TrimSuffix(token, `"`))
+			w.WriteHeader(http.StatusNoContent)
 		case "/UserViews":
 			if s.views != 0 {
 				w.WriteHeader(s.views)
@@ -293,6 +314,205 @@ func TestSignInUserAndPassword(t *testing.T) {
 	l.typed()
 	pump(t, a, "the sign-in", func() bool { return !l.busy })
 	expectSignedIn(t, a, s)
+}
+
+// choose puts the method list's cursor on the row labelled label and
+// presses OK.
+func choose(t *testing.T, l *Login, label string) {
+	t.Helper()
+	for i, m := range l.methods() {
+		if m == label {
+			l.cur = i
+			l.Key(input.Event{Key: input.Enter}, time.Now())
+			return
+		}
+	}
+	t.Fatalf("no %q among %q", label, l.methods())
+}
+
+// A server that lists no users (servers often hide them) offers the ways
+// to sign in it always did.
+func TestSignInNoListedUsers(t *testing.T) {
+	s := newSignInServer(t)
+	a := signInApp(t)
+	l := openLogin(a)
+	probed(t, a, l, s.URL)
+	if got := strings.Join(l.methods(), ", "); got != "Quick Connect, User name and password, Change server" {
+		t.Fatalf("methods %q", got)
+	}
+}
+
+// The users a server lists come first. One with a password asks for the
+// password only, and Back returns to the list; Other user types a name as
+// before.
+func TestSignInListedUserWithPassword(t *testing.T) {
+	s := newSignInServer(t)
+	s.set(func() { s.users = listedUsers })
+	a := signInApp(t)
+	l := openLogin(a)
+	probed(t, a, l, s.URL)
+	if got := strings.Join(l.methods(), ", "); got != "testuser, guest, Quick Connect, Other user, Change server" {
+		t.Fatalf("methods %q", got)
+	}
+	choose(t, l, "testuser")
+	if l.step != stepPassword || !l.pad.secret || l.pad.text != "" || l.user != "testuser" {
+		t.Fatalf("a user with a password went to step %d, user %q", l.step, l.user)
+	}
+	if l.Back(); l.step != stepMethod || l.methods()[l.cur] != "testuser" {
+		t.Fatalf("Back from the password: step %d, cursor on %q", l.step, l.methods()[l.cur])
+	}
+	choose(t, l, "Other user")
+	if l.step != stepUser || l.pad.text != "" {
+		t.Fatalf("Other user went to step %d with %q typed", l.step, l.pad.text)
+	}
+	l.Back()
+	choose(t, l, "testuser")
+	l.pad.text = "wrong"
+	l.typed()
+	pump(t, a, "the refusal", func() bool { return !l.busy })
+	if l.err != "Wrong password." || l.step != stepPassword || a.Cfg.SignedIn() {
+		t.Fatalf("wrong password: step %d, %q", l.step, l.err)
+	}
+	l.pad.text = "secret"
+	l.typed()
+	pump(t, a, "the sign-in", func() bool { return !l.busy })
+	expectSignedIn(t, a, s)
+}
+
+// A listed user without a password signs in at OK. One the server lists
+// without a password yet refuses without one is asked for it.
+func TestSignInListedUserWithoutPassword(t *testing.T) {
+	s := newSignInServer(t)
+	s.set(func() { s.users = listedUsers })
+	a := signInApp(t)
+	l := openLogin(a)
+	probed(t, a, l, s.URL)
+	choose(t, l, "guest")
+	pump(t, a, "the sign-in", func() bool { return !l.busy })
+	if len(a.Connected) != 1 || a.Cfg.ServerToken != "GUESTTOKEN" || a.Cfg.UserName != "guest" {
+		t.Fatalf("guest: %q, session %+v", l.err, a.Cfg.Credentials())
+	}
+	if saved := LoadConfig(a.Cfg.path); saved.ServerToken != "GUESTTOKEN" {
+		t.Fatal("the session was not saved")
+	}
+
+	s.set(func() { s.guestPw = "pw" })
+	a = signInApp(t)
+	l = openLogin(a)
+	probed(t, a, l, s.URL)
+	choose(t, l, "guest")
+	pump(t, a, "the refusal", func() bool { return !l.busy })
+	if l.step != stepPassword || l.err != "Enter the password for guest." || a.Cfg.SignedIn() {
+		t.Fatalf("refused without a password: step %d, %q", l.step, l.err)
+	}
+	l.pad.text = "pw"
+	l.typed()
+	pump(t, a, "the sign-in", func() bool { return !l.busy })
+	if a.Cfg.ServerToken != "GUESTTOKEN" {
+		t.Fatalf("guest with a password: %q", l.err)
+	}
+}
+
+// signedInApp is an app signed in to s as testuser, with Options open over
+// a screen standing for Home.
+func signedInApp(t *testing.T, s *signInServer) *App {
+	t.Helper()
+	a := signInApp(t)
+	a.Cfg.ServerURL, a.Cfg.ServerName = s.URL, "test-server"
+	a.Cfg.SetCredentials(jellyfin.Credentials{UserID: "0123456789abcdef0123456789abcdef", UserName: "testuser",
+		Token: "TESTTOKEN", ServerID: "ab2fcab83d844492a4ecc65a0fca36cd"})
+	a.Cfg.HiddenLibraries = []string{"2"}
+	if err := a.Cfg.Save(); err != nil {
+		t.Fatal(err)
+	}
+	a.Client = NewClient(a.Cfg, t.TempDir())
+	a.pagers = map[string]*Pager{}
+	a.stack = []Screen{&splashTestScreen{}, NewOptions(a)}
+	return a
+}
+
+// Options > Switch user lists the server's users without asking for its
+// address again. Back returns to Options with the session as it was, a
+// sign-in still on its way included.
+func TestSwitchUserBack(t *testing.T) {
+	s := newSignInServer(t)
+	s.set(func() { s.users = listedUsers })
+	a := signedInApp(t, s)
+	o := a.top().(*Options)
+	i := optionRow(o, "Switch user")
+	if i < 0 || optionRow(o, "Sign out (testuser)") != i+1 {
+		t.Fatalf("Switch user at row %d, not above Sign out", i)
+	}
+	o.items()[i].do()
+	l, ok := a.top().(*Login)
+	if !ok || !l.switching {
+		t.Fatal("Switch user did not open the user list")
+	}
+	pump(t, a, "the users", func() bool { return !l.busy })
+	if got := strings.Join(l.methods(), ", "); l.step != stepMethod || got != "testuser, guest, Quick Connect, Other user" {
+		t.Fatalf("switching: step %d, methods %q, %q", l.step, got, l.err)
+	}
+	client := a.Client
+	if !l.Back() || a.top() != o || a.Client != client || len(a.Connected) != 0 {
+		t.Fatal("Back did not return to Options with the session")
+	}
+
+	a.SwitchUser()
+	l = a.top().(*Login)
+	pump(t, a, "the users", func() bool { return !l.busy })
+	choose(t, l, "guest")
+	l.Back() // before the server answers
+	time.Sleep(50 * time.Millisecond)
+	pump(t, a, "the queue", func() bool { return len(a.later) == 0 })
+	saved := LoadConfig(a.Cfg.path)
+	if a.top() != o || len(a.Connected) != 0 || a.Cfg.ServerToken != "TESTTOKEN" || saved.ServerToken != "TESTTOKEN" ||
+		!a.Cfg.LibraryHidden("2") {
+		t.Fatalf("a switch given up on changed the session: %+v", a.Cfg.Credentials())
+	}
+}
+
+// Switching to another user replaces the saved session, so the next start
+// signs in as the new user; what belonged to the old user goes, its session
+// ends on the server, and its refusal by then does not sign the new one out.
+func TestSwitchUserReplacesSession(t *testing.T) {
+	s := newSignInServer(t)
+	s.set(func() { s.users = listedUsers })
+	a := signedInApp(t, s)
+	a.SwitchUser()
+	l := a.top().(*Login)
+	pump(t, a, "the users", func() bool { return !l.busy })
+	choose(t, l, "guest")
+	pump(t, a, "the switch", func() bool { return len(a.Connected) > 0 || l.err != "" })
+	if a.Cfg.ServerToken != "GUESTTOKEN" || a.Cfg.UserName != "guest" || a.Cfg.ServerURL != s.URL || a.Cfg.LibraryHidden("2") {
+		t.Fatalf("after the switch: %q, session %+v, hidden %q", l.err, a.Cfg.Credentials(), a.Cfg.HiddenLibraries)
+	}
+	saved := LoadConfig(a.Cfg.path)
+	if saved.ServerToken != "GUESTTOKEN" || saved.UserID != "22222222222222222222222222222222" || saved.ServerURL != s.URL {
+		t.Fatal("the new session was not saved for the next start")
+	}
+	old := a.Client
+	<-a.Connected
+	a.Connect()
+	if a.Client == old || a.Client.Store.Credentials().Token != "GUESTTOKEN" {
+		t.Fatal("the app did not change to the new session")
+	}
+	pump(t, a, "the old session's end", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return len(s.logouts) > 0
+	})
+	if s.logouts[0] != "TESTTOKEN" {
+		t.Fatalf("signed out %q", s.logouts)
+	}
+	s.set(func() { s.views = http.StatusUnauthorized })
+	_, err := old.Sections(bg())
+	if !a.SessionEnded(err) {
+		t.Fatalf("the old session's refusal: %v", err)
+	}
+	pump(t, a, "the queue", func() bool { return len(a.later) == 0 })
+	if a.Client == nil || a.Cfg.ServerToken != "GUESTTOKEN" {
+		t.Fatal("the old session's refusal signed the new one out")
+	}
 }
 
 // A token the server no longer takes (401) anywhere sends the app back to

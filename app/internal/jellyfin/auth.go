@@ -10,7 +10,8 @@ import (
 
 // Sign-in replaces the plex.tv side (PIN link, server list, Home users):
 // a Jellyfin client talks to one server at a known address, signs in with
-// a user name and password or with Quick Connect, and gets a token.
+// a user name and password or with Quick Connect, and gets a token. The
+// server may list its users to pick from (PublicUsers).
 
 // PublicInfo is the server's unauthenticated identity, the probe for an
 // address the user typed.
@@ -66,6 +67,38 @@ func (c *Client) SignIn(ctx context.Context, user, password string) (Credentials
 		return Credentials{}, err
 	}
 	return c.finishAuth(&a)
+}
+
+// PublicUser is a user the server lists on its sign-in screen. Name is as
+// the server has it, for signing in; fold it to draw it.
+type PublicUser struct {
+	Name     string `json:"Name"`
+	ID       string `json:"Id"`
+	Password bool   `json:"HasPassword"`
+	// Configured is the same answer under its other name; either one means
+	// signing in needs the password.
+	Configured bool   `json:"HasConfiguredPassword"`
+	ImageTag   string `json:"PrimaryImageTag"`
+}
+
+// Protected reports whether signing in as u needs a password.
+func (u PublicUser) Protected() bool { return u.Password || u.Configured }
+
+// PublicUsers lists the users the server shows on its sign-in screen (GET
+// /Users/Public, no token needed). Servers often hide every user, which is
+// an empty list, not an error.
+func (c *Client) PublicUsers(ctx context.Context) ([]PublicUser, error) {
+	var users []PublicUser
+	if err := c.getJSON(ctx, c.http, "/Users/Public", nil, &users); err != nil {
+		return nil, err
+	}
+	out := users[:0]
+	for _, u := range users {
+		if u.ID != "" && strings.TrimSpace(u.Name) != "" {
+			out = append(out, u)
+		}
+	}
+	return out, nil
 }
 
 // QuickConnectEnabled reports whether the server offers Quick Connect.
