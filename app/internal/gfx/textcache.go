@@ -9,13 +9,18 @@ import (
 // row and never reads the destination, which matters when the destination
 // is the write-combined frame ring. A line not yet rendered is queued and
 // simply absent for a frame.
+//
+// Lines live in two generations: new lines go into cur, and when cur is
+// full it becomes old and the previous old is dropped. A line found in old
+// moves back to cur, so whatever is drawn every frame survives the turn
+// and only lines not drawn for a whole generation are lost.
 type TextCache struct {
-	mu    sync.Mutex
-	lines map[textKey]*Image
-	busy  map[textKey]bool
-	work  chan textKey
-	wake  chan struct{}
-	limit int
+	mu       sync.Mutex
+	cur, old map[textKey]*Image
+	busy     map[textKey]bool
+	work     chan textKey
+	wake     chan struct{}
+	gen      int // lines per generation
 }
 
 type textKey struct {
@@ -26,29 +31,53 @@ type textKey struct {
 
 // NewTextCache starts n render workers; wake is signalled as lines land.
 func NewTextCache(n int, wake chan struct{}) *TextCache {
-	tc := &TextCache{lines: map[textKey]*Image{}, busy: map[textKey]bool{},
-		work: make(chan textKey, 512), wake: wake, limit: 600}
+	const gen = 300 // two generations hold at most 600 lines
+	tc := &TextCache{cur: make(map[textKey]*Image, gen), old: make(map[textKey]*Image, gen),
+		busy: map[textKey]bool{}, work: make(chan textKey, 512), wake: wake, gen: gen}
 	for i := 0; i < n; i++ {
 		go tc.worker()
 	}
 	return tc
 }
 
+func renderLine(k textKey) *Image {
+	w := k.f.Width(k.s) + 2
+	if w < 2 {
+		w = 2
+	}
+	c := NewCanvas(w, k.f.Height())
+	c.Fill(0, 0, c.W, c.H, k.bg)
+	c.Text(1, 0, k.f, k.col, k.s)
+	return &Image{W: c.W, H: c.H, Pix: c.Pix}
+}
+
+// put stores a line; tc.mu is held.
+func (tc *TextCache) put(k textKey, img *Image) {
+	if len(tc.cur) >= tc.gen {
+		clear(tc.old) // keeps its buckets, so turning over allocates nothing
+		tc.cur, tc.old = tc.old, tc.cur
+	}
+	tc.cur[k] = img
+}
+
+// lookup finds a line in either generation; tc.mu is held.
+func (tc *TextCache) lookup(k textKey) *Image {
+	if img, ok := tc.cur[k]; ok {
+		return img
+	}
+	if img, ok := tc.old[k]; ok {
+		delete(tc.old, k)
+		tc.put(k, img)
+		return img
+	}
+	return nil
+}
+
 func (tc *TextCache) worker() {
 	for k := range tc.work {
-		w := k.f.Width(k.s) + 2
-		if w < 2 {
-			w = 2
-		}
-		c := NewCanvas(w, k.f.Height())
-		c.Fill(0, 0, c.W, c.H, k.bg)
-		c.Text(1, 0, k.f, k.col, k.s)
-		img := &Image{W: c.W, H: c.H, Pix: c.Pix}
+		img := renderLine(k)
 		tc.mu.Lock()
-		if len(tc.lines) >= tc.limit {
-			tc.lines = map[textKey]*Image{} // crude, rare, and the lines come back within a frame
-		}
-		tc.lines[k] = img
+		tc.put(k, img)
 		delete(tc.busy, k)
 		tc.mu.Unlock()
 		select {
@@ -66,7 +95,7 @@ func (tc *TextCache) Get(f *Font, s string, col, bg Color) *Image {
 	k := textKey{f, s, col, bg}
 	tc.mu.Lock()
 	defer tc.mu.Unlock()
-	if img, ok := tc.lines[k]; ok {
+	if img := tc.lookup(k); img != nil {
 		return img
 	}
 	if !tc.busy[k] {
