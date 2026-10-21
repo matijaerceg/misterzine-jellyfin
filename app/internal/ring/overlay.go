@@ -454,9 +454,10 @@ func (o *Overlay) compose() {
 		span(o.barY, o.barY+o.barH-1)
 	}
 	dx := o.dotXLocked()
+	radius := 0 // the dot's, worked out once: transform reads the core's status
 	if o.dotOn {
 		sx, sy, _, _ := o.transform()
-		radius := int(float64(dotRadius)*min(sx, sy) + 0.5)
+		radius = int(float64(dotRadius)*min(sx, sy) + 0.5)
 		span(o.dotY-radius, o.dotY+radius)
 	}
 	if first > last || r.npage == 0 {
@@ -501,8 +502,6 @@ func (o *Overlay) compose() {
 			}
 		}
 		if o.dotOn {
-			sx, sy, _, _ := o.transform()
-			radius := int(float64(dotRadius)*min(sx, sy) + 0.5)
 			if dy := y - o.dotY; dy >= -radius && dy <= radius {
 				half := 0
 				for half*half+dy*dy <= radius*radius {
