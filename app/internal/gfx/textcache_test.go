@@ -56,6 +56,22 @@ func TestTextCacheShortLineAtOnce(t *testing.T) {
 	}
 }
 
+// Warming a line queues it for the workers, short or long, and renders
+// nothing on the caller.
+func TestTextCacheWarmQueues(t *testing.T) {
+	f := Load("med18")
+	tc := NewTextCache(0, nil)
+	tc.Warm(f, "Pilot", 0xffffff, 0)
+	tc.Warm(f, "Pilot", 0xffffff, 0)
+	if len(tc.work) != 1 || len(tc.cur) != 0 {
+		t.Fatalf("%d queued and %d rendered, want 1 queued and none rendered", len(tc.work), len(tc.cur))
+	}
+	tc = NewTextCache(1, make(chan struct{}, 1))
+	long := strings.Repeat("x", syncLen+1)
+	tc.Warm(f, long, 0xffffff, 0)
+	getNow(t, tc, f, long)
+}
+
 // A screenful of new short lines renders on the caller only up to the
 // field's budget; the rest are queued.
 func TestTextCacheSyncBudget(t *testing.T) {

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -47,17 +48,49 @@ type Season struct {
 	actW           []int
 	epAt           time.Time // when the season (its stills) last changed
 	text           epText    // the focused episode's lines, laid out once
+	pageGen        int       // counts compositions of the page, which may reuse its canvas
+	plainGen       int       // the composition plain was found for
+	plain          bool      // the page is bare background under the episode's text
+
+	// The page with the logo at rest and the details drawn over it, kept
+	// while only the filmstrip moves: a frame is then this layer around
+	// the stills and the strip over it, with no text drawn. The episode's
+	// text and the action row are drawn again only when they change.
+	kept     *gfx.Canvas
+	keptPage keptPage
+	keptEp   epKey
+	keptRow  keptRow
+	keptActs []string
+}
+
+// keptPage is what the kept layer holds under its details.
+type keptPage struct {
+	page   *gfx.Canvas
+	gen    int
+	logo   *gfx.Image
+	lx, ly int
+}
+
+// keptRow is where the kept layer's action row stands (with keptActs).
+type keptRow struct {
+	act, off int
+	acts     bool
 }
 
 // epText is an episode's facts, fitted title and wrapped synopsis, laid
 // out once rather than on every frame of a glide or a fade.
 type epText struct {
+	epKey
+	facts  []string
+	fitted string
+	lines  []string
+}
+
+// epKey is what an episode's text is laid out from.
+type epKey struct {
 	it                        *jellyfin.Item
 	index, dur, offset, views int
 	title, summary            string
-	facts                     []string
-	fitted                    string
-	lines                     []string
 }
 
 const (
@@ -580,7 +613,16 @@ func (s *Season) Draw(c *gfx.Canvas, now time.Time) bool {
 		}
 		s.holes = append(s.holes, gfx.Rect{X: max(x, 0), Y: FilmY, W: min(x+StillW, c.W) - max(x, 0), H: StillH})
 	}
-	anim := s.drawPage(c, now)
+	show, fading := s.preparePage(c, now)
+	if !fading && s.keep(c, now) {
+		c.BlitExcept(s.kept, s.holes)
+		s.shown = s.page
+		s.logoLayer().from = nil // at rest, as its draw leaves it
+		anim := s.drawStrip(c, now, ox)
+		s.preloadThumbs()
+		return anim
+	}
+	anim := s.paintPage(c, show, fading, now)
 	anim = s.drawStrip(c, now, ox) || anim
 	s.preloadThumbs()
 	if s.shown == nil {
@@ -606,14 +648,77 @@ func (s *Season) matchCanvas(c *gfx.Canvas) {
 	s.pageKey, s.entryKey = "", ""
 }
 
+// keep brings the kept layer up to date and reports whether this frame
+// can be drawn from it: nothing on the page moves but the filmstrip. The
+// episode's text and the action row are drawn again, over their rows of
+// the page, only when they change; the whole layer only when the page or
+// the logo did.
+func (s *Season) keep(c *gfx.Canvas, now time.Time) bool {
+	l := s.logoLayer()
+	it := s.focused()
+	if s.page == nil || it == nil || s.err != nil || s.pageFade().Transitioning(now) || l.t(now) < 1 ||
+		!s.app.Starting.IsZero() || s.actX.Running(now) {
+		return false // something moves, or there are no details to keep
+	}
+	pk := keptPage{page: s.page, gen: s.pageGen, logo: l.img, lx: l.x, ly: l.y}
+	tx := s.epText(it)
+	rk := keptRow{act: s.act, acts: s.acts, off: round(s.actX.At(now))}
+	if !canvasSizeIs(s.kept, c.W, c.H) {
+		s.kept = gfx.NewCanvas(c.W, c.H)
+		s.keptPage = keptPage{}
+	}
+	whole := s.keptPage != pk
+	ep := whole || s.keptEp != tx.epKey
+	row := whole || s.keptRow != rk || !slices.Equal(s.keptActs, s.actions)
+	if !ep && !row {
+		return true
+	}
+	ey0, ey1 := s.epRows()
+	ry0, ry1 := s.actRows()
+	if ey1 > ry0 {
+		ep, row = true, true // they share rows: both are drawn again
+	}
+	if l.img != nil && l.y < ry1 && l.y+l.img.H > ey0 {
+		whole, ep, row = true, true, true // the logo reaches down into them
+	}
+	restore := func(y0, y1 int) {
+		y1 = min(y1, c.H)
+		copy(s.kept.Pix[y0*c.W*4:y1*c.W*4], s.page.Pix[y0*c.W*4:y1*c.W*4])
+	}
+	if whole {
+		s.kept.Copy(s.page)
+		if l.img != nil {
+			l.imageOver(s.kept, s.page, l.x, l.y, l.img, 256, nil, 0, 0, 0)
+		}
+		s.keptPage = pk
+	} else {
+		if ep {
+			restore(ey0, ey1)
+		}
+		if row {
+			restore(ry0, ry1)
+		}
+	}
+	if ep {
+		s.drawEpisode(s.kept, s.page, tx)
+		s.keptEp = tx.epKey
+		s.warmNear()
+	}
+	if row {
+		s.drawActions(s.kept, s.page, now)
+		s.keptRow = rk
+		s.keptActs = append(s.keptActs[:0], s.actions...)
+	}
+	return true
+}
+
 // drawDetails is composed once into the slide target on entry. Repainting
 // these glyphs on every moving frame competes with the background blender.
 func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
-	anim := false
 	f := s.app.F
 	if s.err != nil {
 		s.app.text(c, SafeX, EpTitleY, f.Body, gfx.White, "Cannot load this season.")
-		return anim
+		return false
 	}
 	it := s.focused()
 	if it == nil {
@@ -622,38 +727,118 @@ func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
 			return true
 		}
 		s.app.textOver(c, page, SafeX, EpTitleY, f.Body, gfx.White, "No episodes.")
-		return anim
+		return false
 	}
-	// the highlighted episode: its facts, then its title; blended over
-	// the page, which may be mid-transition
+	s.drawEpisode(c, page, s.epText(it))
+	return s.drawActions(c, page, now)
+}
+
+// drawEpisode draws the highlighted episode: its facts, then its title and
+// synopsis; blended over the page, which may be mid-transition.
+func (s *Season) drawEpisode(c, page *gfx.Canvas, tx *epText) {
+	f := s.app.F
 	y := EpTitleY
-	tx := s.epText(it)
 	x := SafeX
 	for i, t := range tx.facts {
 		if i > 0 {
 			c.Fill(x+8, (y+f.SmallBold.Height()/2)&^1-1, 4, 4, gfx.White)
 			x += 20
 		}
-		s.app.textOver(c, page, x, y, f.SmallBold, gfx.White, t)
+		s.textOver(c, page, x, y, f.SmallBold, t)
 		x += f.SmallBold.Width(t)
 	}
 	y += f.SmallBold.Height() + 2
-	s.app.textOver(c, page, SafeX, y, f.Body, gfx.White, tx.fitted)
+	s.textOver(c, page, SafeX, y, f.Body, tx.fitted)
 	y += f.Body.Height() + 4
 	for _, line := range tx.lines {
-		s.app.textOver(c, page, SafeX, y, f.SmallBold, gfx.White, line)
+		s.textOver(c, page, SafeX, y, f.SmallBold, line)
 		y += f.SmallBold.Height() + 2
 	}
-	// actions in a row along the bottom, composed into a strip over the
-	// page: it scrolls when longer than the safe width, words crossing the
-	// edge fade out, and chevrons mark what lies beyond
+}
+
+// epRows are the rows the episode's text takes (two lines of synopsis at
+// most), and actRows those of the action row with its chevrons.
+func (s *Season) epRows() (int, int) {
+	f := s.app.F
+	return EpTitleY, EpTitleY + f.SmallBold.Height() + 2 + f.Body.Height() + 4 + 2*(f.SmallBold.Height()+2)
+}
+func (s *Season) actRows() (int, int) { return ActY - 6, ActY + 10 + s.app.F.Body.Height() }
+
+// textOver draws one of the episode's lines in white over the page. Where
+// the page is bare background the text cache's line is the same pixels,
+// rendered off this thread, and it is copied instead when it is there.
+func (s *Season) textOver(c, page *gfx.Canvas, x, y int, f *gfx.Font, str string) {
+	if tc := s.app.T; tc != nil && page == s.page && s.plainText() {
+		y0, y1 := s.epRows()
+		if x >= 1 && x+f.Width(str)+1 <= page.W && y >= y0 && y+f.Height() <= y1 {
+			if img := tc.Get(f, str, gfx.White, gfx.Bg); img != nil {
+				c.Blit(x-1, y, img)
+				return
+			}
+		}
+	}
+	s.app.textOver(c, page, x, y, f, gfx.White, str)
+}
+
+// plainText reports whether the page is bare background (as a fill leaves
+// it) across the episode's text rows; checked once per composition.
+func (s *Season) plainText() bool {
+	if s.plainGen == s.pageGen {
+		return s.plain
+	}
+	s.plainGen, s.plain = s.pageGen, true
+	y0, y1 := s.epRows()
+	if y1 > s.page.H {
+		s.plain = false
+		return false
+	}
+	bg := gfx.Bg
+	b, g, r := byte(bg), byte(bg>>8), byte(bg>>16)
+	px := s.page.Pix[y0*s.page.W*4 : y1*s.page.W*4]
+	for i := 0; i < len(px); i += 4 {
+		if px[i] != b || px[i+1] != g || px[i+2] != r || px[i+3] != 0 {
+			s.plain = false
+			break
+		}
+	}
+	return s.plain
+}
+
+// warmNear has the text cache render the lines of the episodes either side
+// of the cursor, so a step along the filmstrip finds them ready.
+func (s *Season) warmNear() {
+	tc := s.app.T
+	if tc == nil || !s.plainText() {
+		return
+	}
+	f := s.app.F
+	for j := s.cur - 1; j <= s.cur+1; j += 2 {
+		if j < 0 || j >= len(s.eps) {
+			continue
+		}
+		tx := s.layText(s.eps[j])
+		for _, t := range tx.facts {
+			tc.Warm(f.SmallBold, t, gfx.White, gfx.Bg)
+		}
+		tc.Warm(f.Body, tx.fitted, gfx.White, gfx.Bg)
+		for _, line := range tx.lines {
+			tc.Warm(f.SmallBold, line, gfx.White, gfx.Bg)
+		}
+	}
+}
+
+// drawActions draws the actions in a row along the bottom, composed into a
+// strip over the page: it scrolls when longer than the safe width, words
+// crossing the edge fade out, and chevrons mark what lies beyond.
+func (s *Season) drawActions(c, page *gfx.Canvas, now time.Time) bool {
+	f := s.app.F
 	starting := !s.app.Starting.IsZero()
 	off := round(s.actX.At(now))
 	startingAct := s.act
 	if starting && !s.acts {
 		startingAct, off = 0, 0 // filmstrip playback uses the first Play/Resume action
 	}
-	anim = anim || s.actX.Running(now)
+	anim := s.actX.Running(now)
 	rowW := s.actRowW()
 	sy, sh := ActY-6, f.Body.Height()+16
 	sx0, sx1 := SafeX-8, SafeX+SafeW+8
@@ -723,10 +908,20 @@ func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
 // epText lays out an episode's text, again only when what it shows changed.
 func (s *Season) epText(it *jellyfin.Item) *epText {
 	t := &s.text
-	if t.it == it && t.index == it.Index && t.dur == it.Duration && t.offset == it.ViewOffset &&
-		t.views == it.ViewCount && t.title == it.Title && t.summary == it.Summary {
-		return t
+	if t.epKey != epKeyOf(it) {
+		*t = s.layText(it)
 	}
+	return t
+}
+
+// epKeyOf is what an episode's text shows now.
+func epKeyOf(it *jellyfin.Item) epKey {
+	return epKey{it: it, index: it.Index, dur: it.Duration, offset: it.ViewOffset, views: it.ViewCount,
+		title: it.Title, summary: it.Summary}
+}
+
+// layText lays out an episode's text.
+func (s *Season) layText(it *jellyfin.Item) epText {
 	f := s.app.F
 	facts := []string{"Episode " + itoa(it.Index)}
 	if it.Duration > 0 {
@@ -737,10 +932,7 @@ func (s *Season) epText(it *jellyfin.Item) *epText {
 	} else if it.ViewCount > 0 {
 		facts = append(facts, "Watched")
 	}
-	*t = epText{it: it, index: it.Index, dur: it.Duration, offset: it.ViewOffset, views: it.ViewCount,
-		title: it.Title, summary: it.Summary, facts: facts,
-		fitted: f.Body.Fit(it.Title, SafeW), lines: wrap(f.SmallBold, it.Summary, SafeW, 2)}
-	return t
+	return epText{epKey: epKeyOf(it), facts: facts, fitted: f.Body.Fit(it.Title, SafeW), lines: wrap(f.SmallBold, it.Summary, SafeW, 2)}
 }
 
 // dotsLine is dots for the frame: cached text lines on the background.
@@ -758,6 +950,13 @@ func (s *Season) dotsLine(c *gfx.Canvas, x, y int, f *gfx.Font, col gfx.Color, t
 // drawPage composes the header (backdrop strip, logo, facts) once per
 // season and picture state, cross-fading between states.
 func (s *Season) drawPage(c *gfx.Canvas, now time.Time) bool {
+	show, fading := s.preparePage(c, now)
+	return s.paintPage(c, show, fading, now)
+}
+
+// preparePage brings the page up to date and returns the one to show now
+// (mid-fade: a step) and whether it is fading.
+func (s *Season) preparePage(c *gfx.Canvas, now time.Time) (*gfx.Canvas, bool) {
 	sea := s.season()
 	art := heroArt(s.show)
 	key := sea.ID + "|" + art
@@ -811,6 +1010,11 @@ func (s *Season) drawPage(c *gfx.Canvas, now time.Time) bool {
 	if !fading {
 		show = s.page
 	}
+	return show, fading
+}
+
+// paintPage copies the page around the stills and draws the logo over it.
+func (s *Season) paintPage(c, show *gfx.Canvas, fading bool, now time.Time) bool {
 	c.BlitExcept(show, s.holes)
 	s.shown = show
 	moving := s.logoLayer().draw(c, show, now)
@@ -827,6 +1031,7 @@ func LogoHOr(logo *gfx.Image, def int) int {
 
 func (s *Season) compose(c *gfx.Canvas, img, logo *gfx.Image, logoPending bool) {
 	f := s.app.F
+	s.pageGen++
 	c.Fill(0, 0, c.W, c.H, gfx.Bg)
 	if img != nil {
 		// the show page's backdrop, kept only as a header: below the logo

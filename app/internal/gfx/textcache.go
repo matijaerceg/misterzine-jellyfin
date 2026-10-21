@@ -148,6 +148,25 @@ func (tc *TextCache) Get(f *Font, s string, col, bg Color) *Image {
 	return nil
 }
 
+// Warm queues a line for the workers when it is neither cached nor on its
+// way, so it is there when first drawn. Nothing is rendered on the caller.
+func (tc *TextCache) Warm(f *Font, s string, col, bg Color) {
+	if s == "" {
+		return
+	}
+	k := textKey{f, s, col, bg}
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	if tc.busy[k] || tc.lookup(k) != nil {
+		return
+	}
+	select {
+	case tc.work <- k:
+		tc.busy[k] = true
+	default:
+	}
+}
+
 // Line draws a cached line with its cell top at y (x is the glyph origin).
 func (c *Canvas) Line(tc *TextCache, x, y int, f *Font, col, bg Color, s string) {
 	if img := tc.Get(f, s, col, bg); img != nil {
