@@ -95,6 +95,17 @@ builds unchanged.
   72 under a new generation. `EndBand`/`PresentBand` declare a band; `Hide`
   clears the show bit. The generation is kept ahead of word 72 and `ovl_gen`,
   because the player's library numbers its own descriptors from 1.
+- **Pacing log.** Every 600 drawn frames (or at least 60 drawn over more than
+  5 s) the app logs `frames N: avg A ms, worst W ms, missed fields M;
+  fps=F draw=a/w wait=a/w ack=a/w copy=a/w gc=G gcpause=P`. `fps` is frames drawn
+  per second over that window (about 1 when idle: the idle tick). Each `a/w` is
+  the average and worst in ms (`-`: none counted): `draw` from the start of the
+  frame to calling `End`, `wait` the `WaitField` before an animated frame (or
+  `EndEvery`'s wait for its field), `ack` `End`'s wait for the core to take the
+  previous descriptor, `copy` its copy into the page. `gc` is the GC cycles
+  completed in the window and `gcpause` their total stop-the-world pause in ms.
+  `missed field: drew D ms starting S ms into the field` follows a frame that
+  landed a field late.
 - **The overlay only during a session** (the vendored `docs/jellyfin.md` F1). The
   library's lock is an advisory exclusive `flock(LOCK_EX|LOCK_NB)` on
   `/tmp/h264ring.lock`, held by the player from `h264ring_open_devmem` to

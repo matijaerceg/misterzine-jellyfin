@@ -79,6 +79,8 @@ type Ring struct {
 	ackLate int         // waits that ran out (diagnostics)
 	shown0  uint32      // the core's shown-picture count at the last End
 
+	ackD, copyD time.Duration // the last publish's acknowledgment wait and copy (diagnostics)
+
 	dim     uint32   // Full minus the brightness asked for
 	overlay *Overlay // current playback composition, protected by mu
 
@@ -416,6 +418,7 @@ func (r *Ring) PresentBand(c *gfx.Canvas, first, last int) error {
 // byte, which the core shows as transparent) and scaled by the brightness,
 // then describes that page. Called with mu held.
 func (r *Ring) publishFrame(pix []byte, first, last int) {
+	r.ackD, r.copyD = 0, 0
 	if !r.writesAllowed() {
 		return
 	}
@@ -425,7 +428,10 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 	if first > last || r.npage == 0 {
 		return
 	}
+	t := time.Now()
 	p := r.flipTarget()
+	acked := time.Now()
+	r.ackD = acked.Sub(t)
 	if !r.writesAllowed() { // the acknowledgment wait may span a core switch
 		return
 	}
@@ -442,6 +448,7 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 		r.shown0 = r.c.lo(wFetch)
 		r.ended = r.Field()
 		r.endedT = time.Now()
+		r.copyD = r.endedT.Sub(acked)
 		return
 	}
 	// Preserve the design's 4:3 proportions as it is placed on a larger
@@ -496,6 +503,7 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 	r.shown0 = r.c.lo(wFetch)
 	r.ended = r.Field()
 	r.endedT = time.Now()
+	r.copyD = r.endedT.Sub(acked)
 }
 
 // flipTarget waits until the core has read our last descriptor, so that
@@ -786,6 +794,15 @@ func cadenceTarget(previous, current, fields uint32) (uint32, bool) {
 // how far into its field WaitField returned (diagnostics for missed fields).
 func (r *Ring) Late() (draw, into time.Duration) {
 	return r.endedT.Sub(r.waitedT), r.waitedT.Sub(r.lastT)
+}
+
+// PublishTimes is how long the last End waited for the core to take the
+// previous descriptor and how long its copy into the page took (zero when
+// it published nothing), for the pacing log.
+func (r *Ring) PublishTimes() (ack, fill time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.ackD, r.copyD
 }
 
 // Missed reports whether the heartbeat moved on between the last

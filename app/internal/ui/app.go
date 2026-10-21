@@ -5,12 +5,14 @@ package ui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand/v2"
 	"net/url"
 	"os"
 	"runtime"
 	"runtime/debug"
+	"runtime/metrics"
 	"strings"
 	"syscall"
 	"time"
@@ -53,6 +55,45 @@ type Presenter interface {
 type cadencePresenter interface {
 	EndEvery(uint32) bool
 	ResetCadence()
+}
+
+// publishTimer is a Presenter that can say where its last End spent its time.
+type publishTimer interface {
+	PublishTimes() (ack, fill time.Duration)
+}
+
+// timing is one quantity of the pacing report: avg/worst in ms.
+type timing struct {
+	sum, worst time.Duration
+	n          int
+}
+
+func (t *timing) add(d time.Duration) {
+	t.sum += d
+	t.n++
+	t.worst = max(t.worst, d)
+}
+
+func (t timing) String() string {
+	if t.n == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%.1f/%.1f", float64(t.sum)/float64(t.n)/1e6, float64(t.worst)/1e6)
+}
+
+// gcTotals reads the GC cycles completed so far and their total pause, as
+// wall time (the runtime counts a pause once per P).
+func gcTotals(s []metrics.Sample) (uint64, time.Duration) {
+	metrics.Read(s)
+	var n uint64
+	var pause time.Duration
+	if s[0].Value.Kind() == metrics.KindUint64 {
+		n = s[0].Value.Uint64()
+	}
+	if s[1].Value.Kind() == metrics.KindFloat64 {
+		pause = time.Duration(s[1].Value.Float64() / float64(runtime.GOMAXPROCS(0)) * 1e9)
+	}
+	return n, pause
 }
 
 // Screen is one page of the UI.
@@ -1173,6 +1214,10 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 	var worst, total time.Duration
 	frames, late := 0, 0
 	lastStat := time.Now()
+	var draw, wait, ack, fill timing // the pacing report's breakdown
+	timer, _ := a.Out.(publishTimer)
+	gcs := []metrics.Sample{{Name: "/gc/cycles/total:gc-cycles"}, {Name: "/cpu/classes/gc/pause:cpu-seconds"}}
+	gcN, gcPause := gcTotals(gcs)
 	idle := time.NewTicker(time.Second) // re-present when idle: another
 	defer idle.Stop()                   // process may have blanked the ring
 	drain := func() bool {
@@ -1199,6 +1244,7 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 		default:
 		}
 		cadenced := a.pacedTransition()
+		fieldWait := time.Duration(-1) // the WaitField before this frame, if any
 		if animating {
 			// one frame per field while something moves; drain input meanwhile
 			// Show layout transitions instead render ahead and publish every
@@ -1207,7 +1253,9 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 				return
 			}
 			if !cadenced {
+				w := time.Now()
 				a.Out.WaitField(20 * time.Millisecond)
+				fieldWait = time.Since(w)
 			}
 			if !drain() {
 				return
@@ -1275,6 +1323,7 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 			} else {
 				a.Out.End()
 			}
+			ended := time.Now()
 			a.selectionPresented()
 			if v, ok := a.top().(*Show); ok {
 				v.tracePublished()
@@ -1287,6 +1336,18 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 			total += d
 			if d > worst {
 				worst = d
+			}
+			draw.add(drawn.Sub(t0))
+			var ackD, fillD time.Duration
+			if timer != nil {
+				ackD, fillD = timer.PublishTimes()
+				ack.add(ackD)
+				fill.add(fillD)
+			}
+			if cadenced {
+				wait.add(max(0, ended.Sub(drawn)-ackD-fillD)) // EndEvery's wait for its field
+			} else if fieldWait >= 0 {
+				wait.add(fieldWait)
 			}
 			if cadenceMissed {
 				late++
@@ -1304,8 +1365,13 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 				}
 			}
 			if frames++; frames%600 == 0 || (frames >= 60 && time.Since(lastStat) > 5*time.Second) {
-				a.Log.Printf("frames %d: avg %.1f ms, worst %.1f ms, missed fields %d", frames, float64(total)/float64(frames)/1e6, float64(worst)/1e6, late)
+				n, pause := gcTotals(gcs)
+				a.Log.Printf("frames %d: avg %.1f ms, worst %.1f ms, missed fields %d; fps=%.1f draw=%v wait=%v ack=%v copy=%v gc=%d gcpause=%.2f",
+					frames, float64(total)/float64(frames)/1e6, float64(worst)/1e6, late,
+					float64(frames)/time.Since(lastStat).Seconds(), draw, wait, ack, fill, n-gcN, float64(pause-gcPause)/1e6)
 				worst, total, late, frames = 0, 0, 0, 0
+				draw, wait, ack, fill = timing{}, timing{}, timing{}, timing{}
+				gcN, gcPause = n, pause
 				lastStat = time.Now()
 			}
 		}
