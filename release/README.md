@@ -117,14 +117,17 @@ returns to sign-in with the address kept.
 
 Try a lower **Video bitrate** in Options, and check that your Jellyfin server
 can transcode the video in real time: its dashboard shows the transcode's
-speed. The bitrate only limits transcodes; a file the decoder supports plays as
+speed. The steps below 3 Mbps (2, 1 and 0.4 Mbps) are for weak Wi-Fi; they
+also make the transcoded picture smaller, which costs little on a CRT. A file
+whose video is above the chosen bitrate is transcoded rather than streamed as
 stored.
 
 On HDMI, if films stutter or motion judders, look in **Options** below
-**Video crop**: the app adds rows for MiSTer INI settings that hurt playback,
-such as variable refresh rate forced on, HDMI held at a fixed refresh rate, DVI mode
-(no sound over HDMI) and a later `[MiSTer]` section overriding the app's own.
-Select a row for the lines to add. See
+**Video crop**: the app adds rows for MiSTer INI settings that hurt playback.
+**HDMI refresh** means HDMI is held at a fixed rate that the core's Output Mode
+or Refresh Rate Match does not keep to, **HDMI sound** means DVI mode (no sound
+over HDMI), and **INI section** means a later `[MiSTer]` section overrides the
+app's `[MisterZine Jellyfin]` section. Select a row for the lines to add. See
 [HDMI setup](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/docs/HDMI.md).
 
 ### Updates or downloads fail

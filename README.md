@@ -58,9 +58,9 @@ what it does to your library or your MiSTer.
   collections, search, and resume positions and watched marks kept in step
   with Jellyfin.
 - Direct streaming of files the decoder supports; the server transcodes the
-  rest. H.264 High/Main video up to 1280x720, with a video bitrate cap for
-  transcodes of up to 8 Mbit/s. Higher frame rates are limited to lower widths;
-  see [playback details](docs/PLAYBACK.md).
+  rest. H.264 High/Main video up to 1280x720, with a video bitrate cap from
+  0.4 to 8 Mbit/s; the low steps are for weak Wi-Fi. Higher frame rates are
+  limited to lower widths; see [playback details](docs/PLAYBACK.md).
 - Pause, seeking, audio and subtitle track choice, skip intro and credits,
   autoplay and shuffle.
 - Subtitles burned into the picture by the server, and a surround downmix

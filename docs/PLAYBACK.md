@@ -15,10 +15,12 @@ limit. The app then checks the returned video details against the core's own
 limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280x720, at
 most 30 frames per second above 854 pixels wide (60 at or below), and an
 average bitrate of at most 6 Mbit/s above 854 pixels wide (8 Mbit/s at or
-below). A file that fits is streamed directly whatever the bitrate setting.
-Otherwise the app makes a second PlaybackInfo request for a transcode with the
-configured bitrate limit (two requests for a transcoded item, one for a direct
-one), as before; the bitrate setting only applies to transcodes.
+below). It also checks the video bitrate against the **Video bitrate**
+setting: the setting is there for a link that cannot carry more, so a file
+whose video is above it is never streamed as stored. A file that fits both is
+streamed directly. Otherwise the app makes a second PlaybackInfo request for a
+transcode with the configured bitrate limit (two requests for a transcoded
+item, one for a direct one).
 
 Jellyfin cannot report every property the core depends on (CABAC versus
 CAVLC entropy coding, MBAFF versus field-coded interlace). MBAFF is refused and
@@ -110,7 +112,9 @@ Anti-Twitter request, so the OSD choice stays in force during playback.
 The device profile offers H.264 High or Main, 8-bit 4:2:0 video up to 1280x720.
 The core supports up to 60 frames per second at 854 pixels wide or less, and up
 to 30 frames per second above that width. The profile caps the configured video
-bitrate at 8 Mbit/s for transcodes. Supported audio is decoded by `jfplay` and downmixed to
+bitrate at 8 Mbit/s for transcodes. The bitrate steps below 3 Mbit/s also make
+the transcode smaller, so a low bitrate is spent on fewer pixels: at most
+854x480 at 1 and 2 Mbit/s, and 640x360 at 0.4 Mbit/s. Supported audio is decoded by `jfplay` and downmixed to
 stereo PCM for the core. Other video is requested as an HLS H.264/AAC
 transcode.
 
