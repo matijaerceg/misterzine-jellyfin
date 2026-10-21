@@ -53,6 +53,7 @@ type Wall struct {
 	blobFor        [4]uint32
 	blobBusy       bool
 
+	azPager   *Pager    // the library's A to Z listing, for its total
 	collPager *Pager    // the library's collections listing, once asked for
 	collAsked time.Time // when a failed collections listing was last asked again
 }
@@ -429,6 +430,17 @@ func (w *Wall) collections() *Pager {
 	return w.collPager
 }
 
+// azListing is the library's A to Z listing, whose total the title shows
+// whichever view is on. The wall holds on to it, as to its collections, so
+// drawing does not look it up (encoding its query) every frame.
+func (w *Wall) azListing() *Pager {
+	if w.azPager == nil {
+		path, q := jellyfin.SectionListing(w.section.Key, w.section.Type, jellyfin.ViewAZ)
+		w.azPager = w.app.pager(path, q, nil)
+	}
+	return w.azPager
+}
+
 // tabCount is how many view tabs show: the collection's one, or the
 // library's views with Collections last, once the library is known to
 // have a collection (or while it is the view). Until its first page has
@@ -762,8 +774,7 @@ func (w *Wall) drawPage(c *gfx.Canvas, now time.Time) (*gfx.Canvas, bool) {
 	if w.tabs {
 		key += "|tabs"
 	}
-	azPath, azQuery := jellyfin.SectionListing(w.section.Key, w.section.Type, jellyfin.ViewAZ)
-	total := w.app.pager(azPath, azQuery, nil).Total()
+	total := w.azListing().Total()
 	key += "|" + itoa(total)
 	if key != w.pageKey {
 		w.fade.Done()

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"image/png"
 	"net/http"
@@ -58,10 +59,13 @@ func testPicture(n int) *gfx.Image {
 
 var testPixels = make([]byte, 2<<20)
 
+// tk is a picture's key by name alone.
+func tk(name string) artKey { return artKey{thumb: name} }
+
 func TestArtEvictionWhenAllEntriesAreRecent(t *testing.T) {
 	a := NewArt(nil, 0, nil)
 	for i := 0; i <= ArtBudget>>20; i++ {
-		a.add(string(rune(i+1)), &artEntry{img: testPicture(1 << 20), used: a.frame})
+		a.add(tk(string(rune(i+1))), &artEntry{img: testPicture(1 << 20), used: a.frame})
 	}
 	if a.bytes != ArtBudget || len(a.have) != ArtBudget>>20 {
 		t.Fatalf("cache exceeded its memory bound: %d bytes in %d pictures", a.bytes, len(a.have))
@@ -76,14 +80,14 @@ func TestArtBudgetEvictsLeastRecentlyUsedBytes(t *testing.T) {
 	poster := PosterW * PosterH * 4
 	n := ArtBudget / poster
 	for i := 0; i < n; i++ {
-		a.add(itoa(i), &artEntry{img: testPicture(poster)})
+		a.add(tk(itoa(i)), &artEntry{img: testPicture(poster)})
 	}
 	for i := 0; i <= wantTTL; i++ {
 		a.Frame()
 	}
-	a.have["0"].used = a.frame // on screen
+	a.have[tk("0")].used = a.frame // on screen
 	backdrop := 720 * 480 * 4
-	a.add("backdrop", &artEntry{img: testPicture(backdrop), used: a.frame, backdrop: true})
+	a.add(tk("backdrop"), &artEntry{img: testPicture(backdrop), used: a.frame, backdrop: true})
 	if a.bytes > ArtBudget {
 		t.Fatalf("%d bytes held, budget %d", a.bytes, ArtBudget)
 	}
@@ -91,11 +95,11 @@ func TestArtBudgetEvictsLeastRecentlyUsedBytes(t *testing.T) {
 	if want := (backdrop - (ArtBudget - n*poster) + poster - 1) / poster; dropped != want {
 		t.Fatalf("dropped %d posters for a backdrop, want %d", dropped, want)
 	}
-	if a.have["0"] == nil || a.have["backdrop"] == nil {
+	if a.have[tk("0")] == nil || a.have[tk("backdrop")] == nil {
 		t.Fatal("dropped a picture in use")
 	}
 	for i := 1; i <= dropped; i++ {
-		if a.have[itoa(i)] != nil {
+		if a.have[tk(itoa(i))] != nil {
 			t.Fatalf("poster %d survived a newer one", i)
 		}
 	}
@@ -113,16 +117,16 @@ func TestArtBudgetEvictsLeastRecentlyUsedBytes(t *testing.T) {
 func TestArtBackdropCap(t *testing.T) {
 	a := NewArt(nil, 0, nil)
 	for i := 0; i <= ArtBackdrops; i++ {
-		a.add("poster"+itoa(i), &artEntry{img: testPicture(PosterW * PosterH * 4)})
-		a.add("backdrop"+itoa(i), &artEntry{img: testPicture(720 * 480 * 4), backdrop: true})
+		a.add(tk("poster"+itoa(i)), &artEntry{img: testPicture(PosterW * PosterH * 4)})
+		a.add(tk("backdrop"+itoa(i)), &artEntry{img: testPicture(720 * 480 * 4), backdrop: true})
 		a.Frame()
 		a.Frame()
 	}
-	if a.backdrops != ArtBackdrops || a.have["backdrop0"] != nil || a.have["backdrop1"] == nil {
-		t.Fatalf("%d backdrops held, the oldest kept: %v", a.backdrops, a.have["backdrop0"] != nil)
+	if a.backdrops != ArtBackdrops || a.have[tk("backdrop0")] != nil || a.have[tk("backdrop1")] == nil {
+		t.Fatalf("%d backdrops held, the oldest kept: %v", a.backdrops, a.have[tk("backdrop0")] != nil)
 	}
 	for i := 0; i <= ArtBackdrops; i++ {
-		if a.have["poster"+itoa(i)] == nil {
+		if a.have[tk("poster"+itoa(i))] == nil {
 			t.Fatalf("poster %d made way for a backdrop", i)
 		}
 	}
@@ -269,6 +273,66 @@ func TestHomeBackdropPositionAndFade(t *testing.T) {
 	home.homeBackdrop = true
 	if plain.key() == home.key() {
 		t.Fatal("home treatment changed shared show artwork")
+	}
+}
+
+// The queue is ordered by when each want was last asked for: a want asked
+// again goes ahead of those since, and only the newest wantCap are kept.
+func TestArtWantQueueOrder(t *testing.T) {
+	a := NewArt(nil, 0, nil)
+	for i := 0; i < wantCap+2; i++ {
+		a.Get(itoa(i), WallPW, WallPH)
+	}
+	a.Get("2", WallPW, WallPH)
+	if len(a.wants) != wantCap {
+		t.Fatalf("%d wants kept, want %d", len(a.wants), wantCap)
+	}
+	want := []string{"2"}
+	for i := wantCap + 1; i > 2; i-- {
+		want = append(want, itoa(i))
+	}
+	for _, thumb := range want {
+		if r, ok := a.nextWant(); !ok || r.thumb != thumb {
+			t.Fatalf("got %q, want %q", r.thumb, thumb)
+		}
+	}
+	if r, ok := a.nextWant(); ok {
+		t.Fatalf("the oldest wants survived the cap: %q", r.thumb)
+	}
+}
+
+// A wall frame asks for every poster on screen and the rows around it.
+func BenchmarkArtGetHit(b *testing.B) {
+	a := NewArt(nil, 0, nil)
+	var thumbs []string
+	for i := 0; i < 64; i++ {
+		thumb := fmt.Sprintf("%032x/Primary/%016x", i, i*7)
+		thumbs = append(thumbs, thumb)
+		img := &gfx.Image{W: WallPW, H: WallPH}
+		a.have[(artReq{thumb: thumb, w: WallPW, h: WallPH}).key()] = &artEntry{img: img}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if img, _ := a.GetAge(thumbs[i%len(thumbs)], WallPW, WallPH); img == nil {
+			b.Fatal("miss")
+		}
+	}
+}
+
+// Posters still on their way are asked for again every frame.
+func BenchmarkArtGetMiss(b *testing.B) {
+	a := NewArt(nil, 0, nil)
+	var thumbs []string
+	for i := 0; i < 64; i++ {
+		thumbs = append(thumbs, fmt.Sprintf("%032x/Primary/%016x", i, i*7))
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if img := a.Get(thumbs[i%len(thumbs)], WallPW, WallPH); img != nil {
+			b.Fatal("hit")
+		}
 	}
 }
 

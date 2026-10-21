@@ -52,7 +52,7 @@ func TestSeasonRetainsAllThumbsBeyondSharedCache(t *testing.T) {
 		}
 		s.preloadThumbs()
 		// Simulate shared-cache eviction; season-owned images must survive.
-		a.have = map[string]*artEntry{}
+		a.have = map[artKey]*artEntry{}
 	}
 	if len(s.thumbs) != len(s.eps) {
 		t.Fatalf("retained %d of %d thumbnails", len(s.thumbs), len(s.eps))

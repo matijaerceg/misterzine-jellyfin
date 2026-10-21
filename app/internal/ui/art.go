@@ -23,15 +23,16 @@ type Art struct {
 	generation      uint64 // discards downloads from a previous account or server
 	mu              sync.Mutex
 	cond            *sync.Cond
-	have            map[string]*artEntry
-	order           []string // LRU, oldest first
+	have            map[artKey]*artEntry
+	order           []artKey // LRU, oldest first
 	bytes           int      // pixels held in have
 	backdrops       int      // backdrops in have
 	warm            []artReq // persistent, low-priority home-screen cache warming
-	warmed          map[string]bool
-	wants           []artReq // pending, oldest first; workers take from the end
-	busy            map[string]bool
-	failed          map[string]bool
+	warmed          map[artKey]bool
+	wants           map[artKey]artReq // pending; workers take the newest (highest seq)
+	wantSeq         uint64
+	busy            map[artKey]bool
+	failed          map[artKey]bool
 	frame           uint64 // bumped by Frame; wants carry the frame they were last asked in
 	Wake            chan struct{}
 	backgroundUntil time.Time
@@ -56,9 +57,10 @@ type artReq struct {
 	bright, fade int
 	homeBackdrop bool // home-only positioning and stronger poster-area gradient
 	asked        uint64
-	prefetch     bool // spare work: visible requests always go first
-	diskOnly     bool // whole-home warming downloads without decoding
-	noStore      bool // never written to the disk cache, though a cached copy is read
+	seq          uint64 // when last asked for, in order: the newest goes first
+	prefetch     bool   // spare work: visible requests always go first
+	diskOnly     bool   // whole-home warming downloads without decoding
+	noStore      bool   // never written to the disk cache, though a cached copy is read
 }
 
 // ArtBudget bounds the decoded pictures' pixels across visible and nearby
@@ -80,22 +82,30 @@ const ArtBackdrops = 10
 // wantTTL is how many frames a want survives without being asked again.
 const wantTTL = 3
 
-func (r artReq) key() string {
-	if r.logo {
-		return fmt.Sprintf("%s|%dx%d|logo", r.thumb, r.w, r.h)
+// wantCap is how many wants are kept, the newest.
+const wantCap = 64
+
+// artKey names a decoded picture: the request without its scheduling. It is
+// a plain value, so looking a picture up every frame builds no string.
+type artKey struct {
+	thumb        string
+	w, h         int
+	bright, fade int
+	logo         bool
+	homeBackdrop bool
+}
+
+func (r artReq) key() artKey {
+	k := artKey{thumb: r.thumb, w: r.w, h: r.h, logo: r.logo}
+	if !r.logo && (r.homeBackdrop || r.fade > 0) {
+		k.bright, k.fade, k.homeBackdrop = r.bright, r.fade, r.homeBackdrop
 	}
-	if r.homeBackdrop {
-		return fmt.Sprintf("%s|%dx%d|home/%d/%d", r.thumb, r.w, r.h, r.bright, r.fade)
-	}
-	if r.fade > 0 {
-		return fmt.Sprintf("%s|%dx%d|%d/%d", r.thumb, r.w, r.h, r.bright, r.fade)
-	}
-	return fmt.Sprintf("%s|%dx%d", r.thumb, r.w, r.h)
+	return k
 }
 
 // NewArt starts n fetch workers; wake is signalled when a picture lands.
 func NewArt(c *jellyfin.Client, n int, wake chan struct{}) *Art {
-	a := &Art{client: c, have: map[string]*artEntry{}, busy: map[string]bool{}, failed: map[string]bool{}, Wake: wake}
+	a := &Art{client: c, have: map[artKey]*artEntry{}, wants: map[artKey]artReq{}, busy: map[artKey]bool{}, failed: map[artKey]bool{}, Wake: wake}
 	a.cond = sync.NewCond(&a.mu)
 	for i := 0; i < n; i++ {
 		go a.worker(i == n-1)
@@ -108,12 +118,12 @@ func (a *Art) SetClient(c *jellyfin.Client) {
 	a.mu.Lock()
 	a.client = c
 	a.generation++
-	a.have = map[string]*artEntry{}
-	a.wants = nil
-	a.busy = map[string]bool{}
+	a.have = map[artKey]*artEntry{}
+	a.wants = map[artKey]artReq{}
+	a.busy = map[artKey]bool{}
 	a.order = nil
 	a.bytes, a.backdrops = 0, 0
-	a.failed = map[string]bool{}
+	a.failed = map[artKey]bool{}
 	a.warm, a.warmed = nil, nil
 	a.mu.Unlock()
 }
@@ -211,24 +221,22 @@ func (a *Art) nextWant() (artReq, bool) { return a.nextRequest(true) }
 
 func (a *Art) nextRequest(background bool) (artReq, bool) {
 	background = background && !time.Now().Before(a.backgroundUntil)
-	keep := a.wants[:0]
-	for _, r := range a.wants {
-		if r.asked+wantTTL >= a.frame {
-			keep = append(keep, r)
+	var next artReq
+	found := false
+	for k, r := range a.wants {
+		if r.asked+wantTTL < a.frame {
+			delete(a.wants, k)
+			continue
+		}
+		if !found || next.prefetch && !r.prefetch || next.prefetch == r.prefetch && r.seq > next.seq {
+			next, found = r, true
 		}
 	}
-	a.wants = keep
-	i := len(keep) - 1
-	for j := len(keep) - 1; j >= 0; j-- {
-		if !keep[j].prefetch {
-			i = j
-			break
-		}
+	if found && (!next.prefetch || background) {
+		delete(a.wants, next.key())
+		return next, true
 	}
-	if !background && (i < 0 || keep[i].prefetch) {
-		return artReq{}, false
-	}
-	if i < 0 {
+	if background {
 		for len(a.warm) > 0 {
 			r := a.warm[0]
 			a.warm = a.warm[1:]
@@ -237,11 +245,8 @@ func (a *Art) nextRequest(background bool) (artReq, bool) {
 				return r, true
 			}
 		}
-		return artReq{}, false
 	}
-	r := keep[i]
-	a.wants = append(keep[:i], keep[i+1:]...)
-	return r, true
+	return artReq{}, false
 }
 
 // Warm schedules an image once for this server, behind visible and nearby
@@ -254,7 +259,7 @@ func (a *Art) Warm(r artReq) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.warmed == nil {
-		a.warmed = make(map[string]bool)
+		a.warmed = make(map[artKey]bool)
 	}
 	k := r.key()
 	if a.warmed[k] {
@@ -279,7 +284,7 @@ func (a *Art) wallBand(thumb string) *gfx.Image {
 
 // add takes a decoded picture in, as the newest, and evicts beyond the
 // budget. Called under mu.
-func (a *Art) add(k string, e *artEntry) {
+func (a *Art) add(k artKey, e *artEntry) {
 	if old := a.have[k]; old != nil {
 		a.drop(k, old)
 	} else {
@@ -301,7 +306,7 @@ func (a *Art) add(k string, e *artEntry) {
 }
 
 // drop forgets a decoded picture; its key leaves order separately.
-func (a *Art) drop(k string, e *artEntry) {
+func (a *Art) drop(k artKey, e *artEntry) {
 	delete(a.have, k)
 	a.bytes -= e.size
 	if e.backdrop {
@@ -486,8 +491,7 @@ func (a *Art) get(r artReq) (*gfx.Image, time.Duration, bool) {
 }
 
 func (a *Art) getImage(r artReq, band bool) (*gfx.Image, time.Duration, bool) {
-	thumb, w, h := r.thumb, r.w, r.h
-	if thumb == "" {
+	if r.thumb == "" {
 		return nil, 0, true
 	}
 	k := r.key()
@@ -507,24 +511,31 @@ func (a *Art) getImage(r artReq, band bool) (*gfx.Image, time.Duration, bool) {
 		return nil, 0, false
 	}
 	r.asked = a.frame
-	// refresh an existing want (move it to the end: newest) or add one
-	for i := range a.wants {
-		if a.wants[i].thumb == thumb && a.wants[i].w == w && a.wants[i].h == h && a.wants[i].logo == r.logo &&
-			a.wants[i].fade == r.fade && a.wants[i].bright == r.bright && a.wants[i].homeBackdrop == r.homeBackdrop {
-			// A background touch must not demote a visible want this frame.
-			if a.wants[i].asked == a.frame && !a.wants[i].prefetch {
-				r.prefetch = false
-			}
-			a.wants = append(a.wants[:i], a.wants[i+1:]...)
-			break
-		}
+	// refresh an existing want (it becomes the newest) or add one
+	if old, ok := a.wants[k]; ok && old.asked == a.frame && !old.prefetch {
+		// A background touch must not demote a visible want this frame.
+		r.prefetch = false
 	}
-	a.wants = append(a.wants, r)
-	if len(a.wants) > 64 {
-		a.wants = a.wants[len(a.wants)-64:]
+	a.wantSeq++
+	r.seq = a.wantSeq
+	a.wants[k] = r
+	if len(a.wants) > wantCap {
+		a.dropOldestWant()
 	}
 	a.cond.Broadcast()
 	return nil, 0, false
+}
+
+// dropOldestWant forgets the want asked for longest ago. Called under mu.
+func (a *Art) dropOldestWant() {
+	var oldest artKey
+	seq := ^uint64(0)
+	for k, r := range a.wants {
+		if r.seq < seq {
+			oldest, seq = k, r.seq
+		}
+	}
+	delete(a.wants, oldest)
 }
 
 // Pending reports whether anything is still being fetched or wanted.

@@ -102,7 +102,7 @@ func TestWallPrefetchBounds(t *testing.T) {
 	for _, cur := range []int{0, 20, 79} {
 		w, _ := benchWall()
 		w.cur = cur
-		w.app.Art.have = map[string]*artEntry{}
+		w.app.Art.have = map[artKey]*artEntry{}
 		w.prefetchRows()
 		want := 0
 		for i := 0; i < w.total(); i++ {
