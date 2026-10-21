@@ -101,6 +101,12 @@ type Ring struct {
 	blink                  int // fbcon's cursor blink to put back (-1: unknown)
 	sessionAt              time.Time
 	lastKey                uint32 // Key()'s last value, for a torn read
+
+	// edge is the last heartbeat WaitField saw begin, between edgeT and
+	// edgeTo; period is the field's length measured from such edges.
+	edge          uint32
+	edgeT, edgeTo time.Time
+	period        time.Duration
 }
 
 var (
@@ -773,27 +779,103 @@ func (r *Ring) TraceStatus() (field, published, shown uint32) {
 	return st.Heartbeat, r.gen, st.OvlGen
 }
 
-// WaitField blocks until the heartbeat changes, at most maxWait. It sleeps
-// until a few ms before the next is due and polls for the rest: the
-// kernel's sleep granularity is coarse enough to miss one.
+const (
+	// fieldWake is how long before the edge it expects WaitField wakes; it
+	// reads the heartbeat continuously from then until fieldWake after the
+	// edge, and every fieldPoll outside that window (no edge known yet, or
+	// not where expected). Its sleeps are the kernel's (exactSleep), which
+	// wake within tens of microseconds; Go's own round to the millisecond.
+	fieldWake = time.Millisecond
+	fieldPoll = 200 * time.Microsecond
+	// fieldPhase is how many fields an edge's time predicts the next by.
+	fieldPhase = 30
+)
+
+// WaitField blocks until the heartbeat changes, at most maxWait. Once it
+// has timed a few edges it sleeps until fieldWake before the next and
+// returns as close after it as continuous reading did: 1 ms of reading a
+// field instead of the 4 (60 Hz) to 7 (50 Hz) it took with a fixed period.
 func (r *Ring) WaitField(maxWait time.Duration) {
-	const field = 16683 * time.Microsecond
 	start := r.Field()
 	now := time.Now()
 	if start != r.last {
 		r.last, r.lastT = start, now
 	}
-	if due := r.lastT.Add(field - 4*time.Millisecond); due.After(now) && due.Sub(now) < maxWait {
-		time.Sleep(due.Sub(now))
-	}
 	deadline := now.Add(maxWait)
-	for r.Field() == start && time.Now().Before(deadline) {
+	var due time.Time // the edge expected (zero: not known)
+	if n := start + 1 - r.edge; !r.edgeT.IsZero() && r.period > 0 && n >= 1 && n <= fieldPhase {
+		due = r.edgeT.Add(time.Duration(n) * r.period)
+		if wake := due.Add(-fieldWake); wake.After(now) {
+			exactSleep(min(wake.Sub(now), maxWait))
+		}
 	}
-	if f := r.Field(); f != start {
-		r.last, r.lastT = f, time.Now()
+	// the edge came between two reads: the last that saw start (the first
+	// read, before any sleep), the first that did not
+	f, seen := start, now
+	for {
+		f = r.Field()
+		t := time.Now()
+		if f != start {
+			r.edgeSeen(f, seen, t)
+			break
+		}
+		if seen = t; !t.Before(deadline) {
+			break
+		}
+		if due.IsZero() || t.Before(due.Add(-fieldWake)) || t.After(due.Add(fieldWake)) {
+			exactSleep(min(fieldPoll, deadline.Sub(t)))
+		}
 	}
-	r.waited = r.Field()
+	r.waited = f
 	r.waitedT = time.Now()
+}
+
+// edgeSeen takes heartbeat f as having begun between from and to. Edges
+// read continuously are timed to fieldExact, and two of them measure the
+// period; a polled one (a first field, a refresh rate just changed) only
+// bounds it. Only a period too long can sleep past an edge, so a shorter
+// one is taken at once and a longer one by fieldStep a field: a heartbeat
+// that stumbled once cannot make the next sleep miss.
+func (r *Ring) edgeSeen(f uint32, from, to time.Time) {
+	const (
+		fieldExact = 50 * time.Microsecond
+		fieldStep  = fieldWake / 4
+	)
+	r.last, r.lastT = f, to
+	if to.Sub(from) > fieldWake {
+		// slept through it: the edge came early, or the wake late; until
+		// edges are timed again, poll
+		r.edgeT = time.Time{}
+		return
+	}
+	if n := time.Duration(f - r.edge); !r.edgeT.IsZero() && n >= 1 && n <= 4*fieldPhase {
+		shortest, longest := from.Sub(r.edgeTo)/n, to.Sub(r.edgeT)/n
+		exact := to.Sub(from) <= fieldExact && r.edgeTo.Sub(r.edgeT) <= fieldExact
+		p := shortest // polled: all that is sure
+		if exact {
+			p = (shortest + longest) / 2
+		}
+		switch {
+		case shortest < 8*time.Millisecond || longest > 50*time.Millisecond:
+			// not a field: a stalled or restarted core
+		case r.period == 0 || exact && p < r.period || r.period > longest:
+			r.period = p
+		case !exact && r.period >= shortest:
+			// polled, and the period fits it
+		default:
+			r.period += min((p-r.period)/4+1, fieldStep)
+		}
+	}
+	r.edge, r.edgeT, r.edgeTo = f, from, to
+}
+
+// exactSleep sleeps on the kernel's high-resolution timer: Go's own sleeps
+// wait in the network poller, which counts whole milliseconds. The render
+// thread is locked to its OS thread, which this blocks.
+func exactSleep(d time.Duration) {
+	ts := syscall.NsecToTimespec(int64(d))
+	for d > 0 && syscall.Nanosleep(&ts, &ts) == syscall.EINTR {
+	}
 }
 
 // EndEvery publishes on a fixed heartbeat cadence (see cadenceTarget).
