@@ -13,6 +13,7 @@ import (
 
 func TestMain(m *testing.M) {
 	SupportersURL = "" // no test reaches the site; the ones that fetch serve their own
+	Discover = nil     // nor broadcasts on the network; the sign-in's own tests answer
 	os.Exit(m.Run())
 }
 

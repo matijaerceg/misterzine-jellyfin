@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -512,6 +513,91 @@ func TestSwitchUserReplacesSession(t *testing.T) {
 	pump(t, a, "the queue", func() bool { return len(a.later) == 0 })
 	if a.Client == nil || a.Cfg.ServerToken != "GUESTTOKEN" {
 		t.Fatal("the old session's refusal signed the new one out")
+	}
+}
+
+// discovering has the sign-in find servers (those given) for the length of
+// the test, the search waiting for release to close when it is given.
+func discovering(t *testing.T, release chan struct{}, servers ...jellyfin.FoundServer) {
+	old := Discover
+	t.Cleanup(func() { Discover = old })
+	Discover = func(context.Context, time.Duration) ([]jellyfin.FoundServer, error) {
+		if release != nil {
+			<-release
+		}
+		return servers, nil
+	}
+}
+
+// The sign-in first looks for servers on the network. Those found come
+// above Enter address, the one on record chosen; picking one probes its
+// address and moves on to the ways to sign in, and Back from those, or
+// from Enter address, returns to the list.
+func TestSignInServersFound(t *testing.T) {
+	s := newSignInServer(t)
+	discovering(t, nil, jellyfin.FoundServer{Address: "http://192.0.2.10:8096", ID: "other", Name: "Attic"},
+		jellyfin.FoundServer{Address: s.URL, ID: "ab2fcab83d844492a4ecc65a0fca36cd", Name: "test-server"})
+	a := signInApp(t)
+	a.Cfg.ServerID = "ab2fcab83d844492a4ecc65a0fca36cd"
+	l := openLogin(a)
+	if l.step != stepFind || !l.busy {
+		t.Fatalf("the sign-in opens at step %d, not the search", l.step)
+	}
+	pump(t, a, "the search", func() bool { return l.step != stepFind })
+	if got := strings.Join(l.serverRows(), ", "); l.step != stepServers || got != "Attic, test-server, Enter address" || l.scur != 1 {
+		t.Fatalf("after the search: step %d, rows %q, cursor %d", l.step, got, l.scur)
+	}
+	l.Key(input.Event{Key: input.Enter}, time.Now())
+	pump(t, a, "the probe", func() bool { return !l.busy })
+	if l.step != stepMethod || l.host != s.URL || l.info.ServerName != "test-server" {
+		t.Fatalf("picking a server: step %d at %q, %q", l.step, l.host, l.err)
+	}
+	if l.Back(); l.step != stepServers || l.scur != 1 {
+		t.Fatal("Back from the ways to sign in did not return to the servers found")
+	}
+	l.Key(input.Event{Key: input.Down}, time.Now())
+	l.Key(input.Event{Key: input.Enter}, time.Now())
+	if l.step != stepAddress {
+		t.Fatalf("Enter address went to step %d", l.step)
+	}
+	if l.Back(); l.step != stepServers {
+		t.Fatal("Back from the address did not return to the servers found")
+	}
+	if l.Back(); len(a.stack) != 2 {
+		t.Fatal("Back from the servers found did not open Options")
+	}
+}
+
+// With no server found the sign-in types the address as it always did. OK
+// during the search, or typing on a keyboard, gives up waiting for it.
+func TestSignInNoServersFound(t *testing.T) {
+	discovering(t, nil)
+	a := signInApp(t)
+	l := openLogin(a)
+	pump(t, a, "the search", func() bool { return l.step != stepFind })
+	if l.step != stepAddress || l.busy {
+		t.Fatalf("no server found: step %d", l.step)
+	}
+
+	release := make(chan struct{})
+	discovering(t, release, jellyfin.FoundServer{Address: "http://192.0.2.10:8096", ID: "one", Name: "Den"})
+	l = openLogin(a)
+	l.Key(input.Event{Key: input.Enter}, time.Now())
+	if l.step != stepAddress || l.busy {
+		t.Fatalf("OK during the search: step %d", l.step)
+	}
+	close(release)
+	time.Sleep(50 * time.Millisecond)
+	pump(t, a, "the queue", func() bool { return len(a.later) == 0 })
+	if l.step != stepAddress || l.servers != nil {
+		t.Fatal("a search given up on still changed the screen")
+	}
+	never := make(chan struct{}) // no answer before the test ends
+	t.Cleanup(func() { close(never) })
+	discovering(t, never)
+	l = openLogin(a)
+	if !l.Keyboard(input.Event{Keyboard: true, Text: 'j'}, time.Now()) || l.step != stepAddress || l.pad.text != "j" {
+		t.Fatalf("typing during the search: step %d, %q", l.step, l.pad.text)
 	}
 }
 

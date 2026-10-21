@@ -11,8 +11,9 @@ import (
 	"plexcrt/internal/jellyfin"
 )
 
-// Login is the sign-in: the server's address, typed on the on-screen
-// keyboard and checked against the server's public info; then one of the
+// Login is the sign-in: a server found on the local network, or the
+// server's address typed on the on-screen keyboard, checked against the
+// server's public info; then one of the
 // users the server lists (a password typed only for those that have one),
 // Quick Connect (a code to approve in another signed-in Jellyfin app) or a
 // user name and password. The session is saved into the settings, which
@@ -40,7 +41,9 @@ type Login struct {
 	// switching is Options > Switch user: the session on record stays
 	// until another is saved, and Back from the list returns to it
 	switching bool
-	code      string // the Quick Connect code shown
+	servers   []jellyfin.FoundServer // the servers found on the local network
+	scur      int                    // the server list's cursor
+	code      string                 // the Quick Connect code shown
 	busy      bool
 	// client is the sign-in's own client: its session goes into the
 	// settings, and the app makes its own client from them.
@@ -55,12 +58,22 @@ const (
 	stepQuick                     // showing the code, waiting for approval
 	stepUser                      // typing the user name
 	stepPassword                  // typing the password
+	stepFind                      // looking for servers on the local network
+	stepServers                   // the servers found, or typing an address
 )
 
 // QuickPoll is how often a Quick Connect code is checked for approval.
 var QuickPoll = 2 * time.Second
 
-// NewLogin starts at the server's address, the one on record filled in.
+// Discover looks for servers on the local network (jellyfin.Discover); nil
+// skips the search. The tests put nil or their own in its place.
+var Discover = jellyfin.Discover
+
+// DiscoverWait is how long the sign-in waits for servers to answer.
+var DiscoverWait = 1500 * time.Millisecond
+
+// NewLogin starts at the servers found on the local network, or at the
+// server's address when none answer, the one on record filled in.
 func NewLogin(app *App) *Login {
 	l := &Login{app: app, at: time.Now()}
 	addr := ""
@@ -68,7 +81,63 @@ func NewLogin(app *App) *Login {
 		addr = app.Cfg.ServerURL
 	}
 	l.pad = newKeyPad(addr, "Connect >", false)
+	if Discover != nil {
+		l.find()
+	}
 	return l
+}
+
+// find asks the local network for Jellyfin servers. Those that answer are
+// offered above typing an address, the one on record chosen; with none the
+// address is typed as before.
+func (l *Login) find() {
+	l.to(stepFind)
+	gen := l.gen.Load()
+	l.busy, l.stat = true, "Looking for servers on your network..."
+	discover, wait := Discover, DiscoverWait
+	go func() {
+		found, err := discover(bg(), wait)
+		if err != nil {
+			l.app.Log.Printf("sign-in: discovery: %v", err)
+		}
+		l.later(gen, func() {
+			l.servers = found
+			if len(found) == 0 {
+				l.to(stepAddress)
+				return
+			}
+			l.scur = 0
+			for i, s := range found {
+				if l.app.Cfg != nil && s.ID != "" && s.ID == l.app.Cfg.ServerID {
+					l.scur = i
+				}
+			}
+			l.to(stepServers)
+		})
+	}()
+}
+
+// serverRows are the server list's rows: the servers found, then typing
+// an address.
+func (l *Login) serverRows() []string {
+	var out []string
+	for _, s := range l.servers {
+		name := s.Name
+		if name == "" {
+			name = s.Address
+		}
+		out = append(out, name)
+	}
+	return append(out, "Enter address")
+}
+
+// otherServer returns to the servers found, or to the address without any.
+func (l *Login) otherServer() {
+	if len(l.servers) > 0 {
+		l.to(stepServers)
+		return
+	}
+	l.to(stepAddress)
 }
 
 // NewSwitchUser is the sign-in for Options > Switch user: the server on
@@ -382,6 +451,9 @@ func (l *Login) save(cr jellyfin.Credentials) {
 
 // Keyboard types into the address, the user name or the password.
 func (l *Login) Keyboard(ev input.Event, now time.Time) bool {
+	if l.step == stepFind && ev.Text != 0 && !ev.Release {
+		l.to(stepAddress) // typing an address gives up the search
+	}
 	if l.busy || (l.step != stepAddress && l.step != stepUser && l.step != stepPassword) {
 		return false
 	}
@@ -413,10 +485,33 @@ func (l *Login) typed() {
 }
 
 func (l *Login) Key(ev input.Event, now time.Time) {
-	if ev.Release || l.busy && l.step != stepQuick {
+	if ev.Release || l.busy && l.step != stepQuick && l.step != stepFind {
 		return
 	}
 	switch l.step {
+	case stepFind:
+		if ev.Key == input.Enter && !ev.Repeat {
+			l.to(stepAddress) // no waiting: the address is typed
+		}
+	case stepServers:
+		rows := l.serverRows()
+		switch ev.Key {
+		case input.Up:
+			l.scur = max(0, l.scur-1)
+		case input.Down:
+			l.scur = min(len(rows)-1, l.scur+1)
+		case input.Enter:
+			if ev.Repeat {
+				return
+			}
+			if l.scur == len(l.servers) {
+				l.to(stepAddress)
+				return
+			}
+			// the address it gave, probed as if typed
+			l.pad = newKeyPad(l.servers[l.scur].Address, "Connect >", false)
+			l.probe()
+		}
 	case stepAddress, stepUser, stepPassword:
 		if l.pad.Key(ev) == padDone {
 			l.typed()
@@ -452,7 +547,7 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 				}
 				l.to(stepUser)
 			case methodServer:
-				l.to(stepAddress)
+				l.otherServer()
 			}
 		}
 	case stepQuick:
@@ -463,11 +558,18 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 }
 
 // Back steps back: the password to the user name (or to the users, for
-// one picked from them), the methods to the address, the address to
-// Options. Switching user, the methods return to the session untouched.
+// one picked from them), the methods to the servers found or the address,
+// the address to the servers found or Options, the servers to Options.
+// Switching user, the methods return to the session untouched.
 func (l *Login) Back() bool {
 	switch l.step {
-	case stepAddress:
+	case stepFind:
+		l.app.Push(NewOptions(l.app)) // the search goes on behind
+	case stepAddress, stepServers:
+		if l.step == stepAddress && len(l.servers) > 0 {
+			l.to(stepServers)
+			return true
+		}
 		l.gen.Add(1)
 		l.busy, l.stat = false, ""
 		l.app.Push(NewOptions(l.app))
@@ -477,7 +579,7 @@ func (l *Login) Back() bool {
 			l.app.Pop()
 			return true
 		}
-		l.to(stepAddress)
+		l.otherServer()
 	case stepQuick, stepUser:
 		l.to(stepMethod)
 	case stepPassword:
@@ -516,20 +618,18 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 		l.app.text(c, SafeX, y, f.Big, gfx.Grey, f.Big.Fit(l.serverName(), SafeW))
 		y += f.Big.Height() + 8
 		l.app.text(c, SafeX, y, f.Body, gfx.GreyLo, f.Body.Fit(l.host, SafeW))
-		y += f.Body.Height() + 24
-		// a long list of users scrolls, clear of the status lines
-		rows := l.rows()
-		shown := max(1, (SafeBottom-2*f.Body.Height()-10-y)/ListRowH)
-		first := centredFirst(l.cur, shown, len(rows))
-		menuScrollbar(c, y, (shown-1)*ListRowH+f.Body.Height(), first, shown, len(rows))
-		for i := first; i < min(len(rows), first+shown); i++ {
-			col := gfx.GreyHi
-			if i == l.cur {
-				col = gfx.White
-				focusBar(c, SafeX, y, f.Body.Height())
-			}
-			l.app.text(c, SafeX, y, f.Body, col, f.Body.Fit(rows[i].label, SafeW-24))
-			y += ListRowH
+		l.list(c, y+f.Body.Height()+24, l.methods(), l.cur, nil)
+	case stepFind, stepServers:
+		l.app.text(c, SafeX, y, f.Big, gfx.Grey, "Sign in to Jellyfin")
+		y += f.Big.Height() + 8
+		if l.step == stepServers {
+			l.app.text(c, SafeX, y, f.Body, gfx.GreyHi, "Servers on your network")
+			l.list(c, y+f.Body.Height()+24, l.serverRows(), l.scur, func(i int) string {
+				if i < len(l.servers) && l.servers[i].Name != "" {
+					return l.servers[i].Address
+				}
+				return ""
+			})
 		}
 	case stepQuick:
 		l.app.text(c, SafeX, y, f.Big, gfx.Grey, "Quick Connect")
@@ -552,6 +652,12 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 	back := map[loginStep]string{stepAddress: "Back: Options", stepMethod: "Back: change server",
 		stepQuick: "Back: other ways to sign in", stepUser: "Back: other ways to sign in", stepPassword: "Back: user name"}[l.step]
 	switch {
+	case l.step == stepFind:
+		back = "OK: enter the address   Back: Options"
+	case l.step == stepServers:
+		back = "Back: Options"
+	case l.step == stepAddress && len(l.servers) > 0:
+		back = "Back: servers found"
 	case l.step == stepMethod && l.switching:
 		back = "Back: Options" // signed in as before
 	case l.step == stepPassword && l.picked:
@@ -582,6 +688,32 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 		}
 	}
 	return anim
+}
+
+// list draws rows from y, row cur focused, each with note (when given)
+// small on its right. A long list scrolls, clear of the status lines.
+func (l *Login) list(c *gfx.Canvas, y int, rows []string, cur int, note func(int) string) {
+	f := l.app.F
+	shown := max(1, (SafeBottom-2*f.Body.Height()-10-y)/ListRowH)
+	first := centredFirst(cur, shown, len(rows))
+	menuScrollbar(c, y, (shown-1)*ListRowH+f.Body.Height(), first, shown, len(rows))
+	for i := first; i < min(len(rows), first+shown); i++ {
+		col := gfx.GreyHi
+		if i == cur {
+			col = gfx.White
+			focusBar(c, SafeX, y, f.Body.Height())
+		}
+		w := SafeW - 24
+		if note != nil {
+			if n := note(i); n != "" {
+				n = f.Small.Fit(n, w/2)
+				l.app.textRight(c, SafeX+w, y+f.Body.Height()-f.Small.Height(), f.Small, gfx.GreyLo, n)
+				w -= f.Small.Width(n) + 16
+			}
+		}
+		l.app.text(c, SafeX, y, f.Body, col, f.Body.Fit(rows[i], w))
+		y += ListRowH
+	}
 }
 
 // serverName is the probed server's name, its address without one.
