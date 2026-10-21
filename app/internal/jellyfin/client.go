@@ -1,7 +1,7 @@
 // Package jellyfin is the thin server client for a Jellyfin server: sign-in,
 // libraries, item listings, shows, artwork, search, Continue Watching,
 // watched state and playback reporting, all as JSON over the server's REST
-// API. It replaces internal/plex for the UI (docs/JELLYFIN_API.md).
+// API. It is the UI's only server client (docs/JELLYFIN_API.md).
 //
 // Every request carries the token in the Authorization header
 // (MediaBrowser ..., Token="..."), never in a URL: Jellyfin 12 refuses the

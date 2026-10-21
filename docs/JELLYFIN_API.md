@@ -1,95 +1,98 @@
 # Jellyfin API layer (`app/internal/jellyfin`)
 
-Step 3 of `HANDOFF.md`: a Go package that replaces `app/internal/plex` for the
-UI. The UI still imports `plex`; this document is the contract for the later
-swap. Captured against Jellyfin 12.2.0 on 2026-10-15.
+`app/internal/jellyfin` is the app's only server client: every request the
+menus, the artwork cache and the player make to a Jellyfin server goes through
+it. `app/internal/ui` and `cmd/plexcrt` import it; nothing else talks to the
+server. It replaced the Plex client the app started from, and some field names
+still follow that client (see [Item fields](#item-fields-and-the-plex-names-they-replace)).
+The server behaviour below was captured against Jellyfin 12.2.0 on 2026-10-15.
 
-## 1. What the UI consumes from `internal/plex` today
+## 1. How the app uses it
 
-`internal/plex` is imported by 61 files under `app/internal/ui` (27 of them
-non-test) and by `cmd/plexcrt/main.go`. Counted references in those files:
+**One client per session.** `ui.NewClient` makes the client for the session on
+record in the settings (`config.go`): the server address, the session's
+credentials and the install's `ClientID` as the device id. The client gets its
+own copy of the credentials (a `MemoryStore`), so request goroutines never read
+the settings the UI thread edits. `App.Client` holds it, and `App.Connect`
+hands the same client to the artwork loader (`Art`), the poster-wall pagers
+and the player. `cmd/plexcrt/main.go` makes it at start when a session is on
+record; otherwise the app opens on the sign-in screen.
 
-| Symbol | Refs | Used for |
-|---|---:|---|
-| `plex.Item` | 281 | everything listed or opened |
-| `plex.Section` | 43 | libraries (`Key`, `Title`, `Type` movie/show) |
-| `plex.Hub` | 38 | home rows (`Title`, `Key`, `Ident`, `Items`, `IsContinueWatching`) |
-| `plex.Client` | 30 | held by `App.Plex`, `Art`, `Pager`, `seasonData`, `Theme`, `Aspects` |
-| `plex.New` | 21 | `New(host, token, cacheDir, clientID)` (main.go, app.go, tests) |
-| `plex.Stream` | 21 | audio/subtitle pickers (`ID`, `Title`, `Selected`) |
-| `plex.Server`, `Servers`, `Reach`, `LocalNameBlocked` | 14 | connect.go: plex.tv server list and probing |
-| `plex.HomeUser`, `HomeUsers`, `SwitchHomeUser`, `AccountHomeIdentity` | 9 | home_users.go: Plex Home |
-| `plex.Pin`, `NewPin`, `CheckPin`, `AccountName` | 6 | login.go / options.go: plex.tv link |
-| `plex.Letter` | 5 | alphabet jump (`Key`, `Size`) |
-| `plex.Marker` | 3 | skip intro / credits |
-| `plex.Fold`, `plex.FolderListing` | 3 | text folding, folder views |
+**Signing in** (`login.go`). The typed address goes through `HostCandidates`
+and each candidate is probed with `PublicInfo` (a bare name tries https, then
+http on port 8096). Then Quick Connect (`QuickConnectEnabled`, `Start`,
+`Check`, `Finish`) or a user name and password (`SignIn`). The resulting
+`Credentials` are saved in the settings (`Config.SetCredentials`), which is
+the `TokenStore` that outlives the client; `Connect` then makes a new client.
+A token file passed with `-host` and `-token` is imported in `main.go`, with
+`Me` to learn the user id.
 
-Client methods called by the UI (non-test call sites):
+**When the session ends.** Any load that fails with `ErrUnauthorized` (the
+home rows, libraries, search, playback) goes to `App.SessionEnded`, which
+forgets the session, keeps the server address and returns to the sign-in
+screen with a notice. **Sign out** in Options forgets the session the same way
+and revokes the token in the background (`SignOut`).
 
-| Method | Sites | Where |
-|---|---:|---|
-| `Item(ratingKey)` | 13 | refresh after play, pre-play, season, wall, view_refresh |
-| `Items(path, q, max)` | 5 | children of a show/season/collection (app.go, season_data.go, view_refresh.go) |
-| `Sections()` | 4 | app.go, home.go, aspects.go |
-| `Scrobble(key, watched)` | 3 | preplay.go, season.go |
-| `Page(path, q, start, size)` | 1 | pager.go (every poster wall) |
-| `Hubs(30)`, `SectionRecent(key, 30)` | 2 | home.go |
-| `ContinueWatching()`, `RemoveFromContinueWatching(key)` | 2 | continue_watching.go |
-| `Search(ctx, q)` | 1 | search.go |
-| `Art`, `Logo`, `ArtData`, `LogoData` | 4 | art.go |
-| `ThemeFile(ctx, key, path)` | 1 | theme.go |
-| `ShowEpisodes`, `ShowAspect`, `FirstEpisodeAspects` | 3 | app.go (shuffle), aspects.go |
-| `FirstChars(section, q)` | 1 | wall.go |
-| `SelectAudio`, `SelectSubtitle` | 2 | app.go (stream pickers) |
-| fields `Host`, `Token`, `ClientID`, `CacheDir` | ~10 | config, launcher, art cache keys |
+**Browsing.** Where the UI calls the client:
 
-`Item` fields read by the UI, by frequency: `Key` 66, `RatingKey` 57, `Title`
-47, `Type` 36, `ViewOffset` 22, `Thumb` 16, `Subs` 16, `Audio` 15, `Duration`
-15, `Year` 13, `Logo` 12, `ViewCount` 11, `PartID` 9, `Leaves` 9, `Summary` 8,
-`Markers` 8, `Aspect` 8, `GrandTitle` 5, `Index` 5, `Children` 4, then
-`Colors`, `Viewed`, `Art`, `GrandKey`, `ParentKey`, `Parent`, `Subtype`,
-`Library` (3 each), `Still`, `Genres` (2), `Theme` (1). Methods: `Playable`,
-`IsFolder`, `Label`, `SortLabel`.
+| Methods | Where |
+|---|---|
+| `Hubs`, `SectionRecent`, `Sections` | `home.go` (home rows), `app.go` (library list) |
+| `Page` with `SectionListing` and the `View*` names | `pager.go`, `wall.go` (every poster wall and its tabs) |
+| `Items` | `app.go`, `season_data.go`, `view_refresh.go` (a show's seasons and episodes, a collection) |
+| `Item` | `preplay.go`, `season.go`, `playing.go`, `view_refresh.go`, `wall.go`, `home.go`, `app.go` (the full item before play, refreshes after) |
+| `FirstChars` | `wall.go` (the alphabet jump) |
+| `ShowEpisodes` | `app.go` (shuffle) |
+| `ShowAspect`, `FirstEpisodeAspects`, `Page` | `aspects.go` (the picture shape of each title, swept in the background) |
+| `ContinueWatching`, `RemoveFromContinueWatching` | `continue_watching.go` |
+| `Scrobble` | `preplay.go`, `season.go` (mark watched or unwatched) |
+| `Search` | `search.go` |
+| `Art`, `Logo`, `ArtData`, `LogoData` | `art.go` (posters, backdrops and logos, cached on the SD card) |
+| `ThemeFile` | `theme.go` (a show's theme song) |
 
-**Errors and auth expiry today:** the plex client returns plain
-`fmt.Errorf("%s: HTTP %d")` errors; there is no typed 401, so an expired
-token surfaces as a generic load failure and the user has to sign out by
-hand. Listings that fail show an empty/partial wall (`home_partial_test.go`).
+**Playing.** `directplay.go` asks the server how to play an item with
+`PlaybackInfo`: the device profile, the chosen audio and subtitle streams and
+the start point (see [PLAYBACK.md](PLAYBACK.md) for the decision). `player.go`
+turns the answer into a URL with `StreamURL` (a transcode) or
+`DirectStreamURL` (the file as stored), hands it to the player with
+`AuthHeader()` so the token stays out of the URL, and reports the session with
+`ReportStart`, `ReportProgress` (every 10 s) and `ReportStopped`. Jellyfin has
+no per-file default track, so the app keeps the audio and subtitle choice per
+movie or show in its settings (`Config.Streams`) and sends it with every
+`PlaybackInfo` and report.
 
-**Plex paths the UI builds itself** (must change at the swap): `wall.go`
-`wallViews` (`/library/sections/%s/all?sort=...`, `/hubs/sections/%s/continueWatching/items`,
-`.../folder`, `.../collections`), the collection fallback
-`/library/collections/{key}/children`, and `plex.FolderListing`.
+## 2. The package's surface
 
-## 2. The new package's surface
-
-Same shapes, Plex-only parts dropped, renamed where the Plex name lied.
 Every method that does I/O takes a `context.Context` first.
 
 ```go
 c := jellyfin.New(host, cacheDir, deviceID, store) // store: TokenStore (nil = memory)
 c.SignIn(ctx, user, pw)            // -> Credentials{UserID, UserName, Token, ServerID}
 c.QuickConnectEnabled / QuickConnectStart / QuickConnectCheck / QuickConnectFinish
-c.PublicInfo(ctx)  c.Me(ctx)  c.SignOut(ctx)  jellyfin.NormalizeHost(typed)
+c.PublicInfo(ctx)  c.Me(ctx)  c.SignOut(ctx)  c.SignedIn()  c.UserID()
+jellyfin.NormalizeHost(typed)  jellyfin.HostCandidates(typed)
 
 c.Sections(ctx) []Section
 c.Page(ctx, listing, q, start, size) ([]*Item, total, error)
 c.Items(ctx, listing, q, max)
-jellyfin.SectionListing(sectionKey, sectionType, view) (listing, q) // replaces wallViews paths
-c.Item(ctx, id)            // full: media sources, streams, markers
-c.Seasons / ShowEpisodes / ShowAspect / FirstEpisodeAspects / FirstChars
+jellyfin.SectionListing(sectionKey, sectionType, view) (listing, q) // view: ViewAZ, ViewAdded, ...
+c.Item(ctx, id)            // full: media sources, streams, markers (c.Markers)
+c.Seasons / ShowEpisodes / ShowAspect / FirstEpisodeAspects / FirstChars(ctx, section, sectionType)
 c.Hubs(ctx, n)  c.SectionRecent(ctx, key, n)  c.ContinueWatching(ctx)  c.RemoveFromContinueWatching(ctx, id)
 c.Scrobble(ctx, id, watched)  c.Search(ctx, q)
 c.Art / Logo / ArtData / LogoData (ctx, ref, w, h)  c.ImageURL(ref, ImageQuery)  c.ThemeFile(ctx, showID, songID)
 c.PlaybackInfo(ctx, id, PlaybackRequest)  c.StreamURL / DirectStreamURL
 c.ReportStart / ReportProgress / ReportStopped(ctx, PlayState)
-c.AuthHeader()  // for the launcher: same header on the stream request
+c.AuthHeader()  // for the player: same header on the stream request
 jellyfin.ErrUnauthorized, *jellyfin.HTTPError, Fold, LangName, Ticks, Seconds
 ```
 
-### Item field renames (for `gofmt -r` at the swap)
+### Item fields and the Plex names they replace
 
-| plex | jellyfin | note |
+The app began on a Plex client, and `Item` keeps that client's field names
+where the meaning carried over. These are the ones that changed:
+
+| Plex client | jellyfin | note |
 |---|---|---|
 | `RatingKey` | `ID` | Jellyfin item id (32 hex) |
 | `GrandTitle` | `SeriesTitle` | |
@@ -106,22 +109,24 @@ jellyfin.ErrUnauthorized, *jellyfin.HTTPError, Fold, LangName, Ticks, Seconds
 `Type` values are kept: `movie`, `show`, `season`, `episode`, `collection`,
 plus `folder` (so `IsFolder()` is `Type == "folder"`). `Section.Type` is
 `movie` or `show`; Jellyfin `movies` and `tvshows` views map to them, other
-collection types (music, mixed, homevideos, ...) are skipped as the plex
-client skipped music and photos. `Hub.Ident` is `home.continue` or
-`home.recent.<library id>`.
+collection types (music, mixed, homevideos, ...) are skipped. `Hub.Ident` is
+`home.continue` or `home.recent.<library id>`. `Item.Library` and `Subtype`
+are not filled: Jellyfin does not report a box set's content type or an
+item's library without extra requests.
 
 ### Errors
 
 * `401` -> an `*HTTPError` for which `errors.Is(err, ErrUnauthorized)` holds.
-  Not retried. The UI should drop to sign-in on it (the swap adds that check
-  where loads fail; `SignIn` with a wrong password is also `ErrUnauthorized`).
+  Not retried. The UI returns to sign-in on it (`App.SessionEnded`); on the
+  sign-in screen, `SignIn` with a wrong password is also `ErrUnauthorized`.
 * Other non-2xx -> `*HTTPError{Method, Path, Status}`. The message holds only
   the path, never the query (Quick Connect secrets) or the token.
 * GET and DELETE are retried on network errors and 5xx: `Retries` (2) more
   attempts, `Backoff` 250 ms then x3, aborting on context cancellation.
   POSTs (sign-in, reports, played state) are never retried.
-* Timeouts: 10 s per request, 30 s for the home rows (as in plex).
-* `Logf` (optional) gets retry notices only: method and path, no query.
+* Timeouts: 10 s per request, 30 s for the home rows.
+* `Logf` (optional) gets retry notices only: method and path, no query. The
+  app does not set it.
 
 ## 3. Jellyfin mapping
 
@@ -134,10 +139,11 @@ Authorization: MediaBrowser Client="MisterZine", Device="MiSTer CRT", DeviceId="
 ```
 
 `Token="..."` is added once signed in. `DeviceId` must be stable per install
-(Jellyfin keys sessions and Quick Connect on it); the plex client id serves.
-The token is never put in a URL: Jellyfin 12 refuses `?api_key=` on the
-`/socket` websocket (REST still accepts it, but URLs end up in logs and in
-`ps`). `AuthHeader()` is exported so the playback launcher sends the same.
+(Jellyfin keys sessions and Quick Connect on it); the app passes the
+`ClientID` from its settings. The token is never put in a URL: Jellyfin 12
+refuses `?api_key=` on the `/socket` websocket (REST still accepts it, but URLs
+end up in logs and in `ps`). `AuthHeader()` is exported so the player sends
+the same.
 
 ### Endpoint map
 
@@ -189,7 +195,8 @@ Item keys (`Item.Key`): show -> `/Shows/{id}/Seasons`; season ->
 `/Shows/{seriesId}/Episodes?seasonId={id}`; collection/folder ->
 `/Items?parentId={id}`; leaves have none.
 
-`SectionListing(key, type, view)` replaces the wall's Plex paths:
+`SectionListing(key, type, view)` is the listing of each tab of a library's
+poster wall (`wall.go`):
 
 | view | listing |
 |---|---|
@@ -206,19 +213,19 @@ An image ref is `itemId/Type/tag`, built only from tags the item reports
 (`ImageTags.Primary/Logo/Thumb`, `BackdropImageTags[0]`; for episodes and
 seasons the parent's `SeriesPrimaryImageTag`, `ParentBackdropImageTags`,
 `ParentLogoImageTag`), so a ref never names a picture that does not exist.
-Episodes keep the plex convention: `Thumb` is the show's poster, `Still` the
-episode's own picture. `ImagePath`/`ImageURL` turn a ref into
+For an episode, `Thumb` is the show's poster and `Still` the episode's own
+picture. `ImagePath`/`ImageURL` turn a ref into
 `/Items/{id}/Images/{Type}?tag=...&fillWidth=&fillHeight=&quality=90&format=Jpg`
-(cover-crop, as Plex's `minSize=1&upscale=1`) or `maxWidth=&maxHeight=&format=Png`
+(cover-crop) or `maxWidth=&maxHeight=&format=Png`
 for logos. The tag changes when the picture does, so the disk cache key
 (host + ref + size) never goes stale.
 
 ### Playback hand-off
 
-`PlaybackInfo` passes the device profile through as raw JSON (the playback
-design owns it). The answer's `MediaSources[].TranscodingUrl` is a server path
+`PlaybackInfo` passes the device profile through as raw JSON (the UI builds it;
+see [PLAYBACK.md](PLAYBACK.md)). The answer's `MediaSources[].TranscodingUrl` is a server path
 **with the session token embedded as `ApiKey=`**; `StreamURL` strips it so
-the launcher sends `AuthHeader()` instead. `DirectStreamURL` builds
+the player sends `AuthHeader()` instead. `DirectStreamURL` builds
 `/Videos/{id}/stream.{container}?static=true&mediaSourceId=...` for sources
 that `SupportsDirectStream`. Audio/subtitle choices are stream indexes
 (`Stream.ID`), sent per play in `PlaybackInfo` and in the reports. A subtitle
@@ -255,27 +262,16 @@ never sends one.
 * The test server had nothing in progress, so `resume.json` is assembled from
   captured episode/movie records with a resume point set.
 
-## 5. Left for the UI swap (not done here)
+## 5. What the Plex client had that this one does not
 
-* Replace `*plex.Client` with `*jellyfin.Client` in `ui` and `cmd/plexcrt`,
-  add `ctx` arguments, and apply the field renames above.
-* `wall.go`: rebuild `wallViews` on `SectionListing`; drop `FolderListing`
-  and the `/library/collections/.../children` fallback (use `Item.Key`).
-  `FirstChars` now takes the section type instead of a Plex query.
-* Stream pickers: Jellyfin has no per-file default like Plex's
-  `PUT /library/parts`. `SelectAudio`/`SelectSubtitle` are gone; the UI keeps
-  the choice (per item or per show) and passes it to `PlaybackInfo` and the
-  reports. The server's `RememberAudioSelections` user setting covers part
-  of this server-side.
-* `RemoveFromContinueWatching` clears the resume point (Jellyfin has no hide
-  that keeps it), and cannot remove a Next Up entry. The UI text may need to say so.
-* Sign-in screens (`login.go`, `connect.go`, `home_users.go`, `config.go`):
+* Per-file default tracks (Plex's `PUT /library/parts`): there is no
+  `SelectAudio`/`SelectSubtitle`. The app keeps the choice itself
+  (`Config.Streams`) and passes it with every play. The server's
+  `RememberAudioSelections` user setting covers part of this server-side.
+* Hiding an item from Continue Watching while keeping its place:
+  `RemoveFromContinueWatching` clears the resume point, and cannot remove a
+  Next Up entry.
+* Sign-in by PIN, server discovery, home users and connection probing
+  (Plex's `Reach`/`LocalNameBlocked`) have no counterpart. Sign-in is the
   server address -> `HostCandidates` + `PublicInfo` (a bare name tries https,
-  then http on port 8096); user/password -> `SignIn`
-  or Quick Connect; persist `Credentials` through a `TokenStore` backed by
-  the config; on `ErrUnauthorized` anywhere, return to sign-in. Plex Home,
-  PINs, server discovery and `Reach`/`LocalNameBlocked` have no counterpart.
-* `Item.Library` and `Subtype` are not filled (Jellyfin does not report a
-  box set's content type or an item's library without extra requests).
-* The playback launcher: device profile, transcode URL choice and the report
-  cadence (`ReportProgress` about every 10 s) belong to step 5.
+  then http on port 8096); user/password -> `SignIn` or Quick Connect.
