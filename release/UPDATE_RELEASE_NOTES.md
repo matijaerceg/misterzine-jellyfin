@@ -1,30 +1,39 @@
-# MisterZine Jellyfin 0.1.0-beta.1
+# MisterZine Jellyfin 0.1.0-beta.2
 
-First packaged beta of the CRT-first Jellyfin application.
+Second beta: fixes from beta.1 testing, subtitles drawn by the app, easier
+sign-in and smoother menus.
 
-- Sign in and browse with a controller; enter the shared MisterZine supporter
-  code to start playback. Access is remembered across updates and rollback.
-- Separate Jellyfin installer, main-menu entry and updater; Plex installs keep
-  their own settings and release channel.
-- A static, faint-logo loading screen replaces the FPGA test pattern as soon
-  as the app can draw. A brief pattern during FPGA startup can still appear.
-- Direct streaming and Jellyfin transcoding, burned-in subtitles, pause/resume,
-  seeking, buffered-range display and surround downmix boost.
-- Files the decoder can take as stored play directly. Others are checked
-  before playback and transcoded from the start. If a direct stream cannot keep
-  up, playback switches to a transcode once, at the same position.
-- Turning subtitles on restarts the stream as a server transcode, which can
-  take tens of seconds to resume depending on the server.
-- Three breathing dots show while playback starts or waits for data.
-- 4:3/16:9 display shape, saved calibration and crop, vertical de-flicker,
-  menu/paused dimming and playback-only 240p/288p.
-- NTSC/PAL output with optional 50/60 refresh matching. No 48 Hz mode.
-  Optional 24-to-25 film speed-up requires fixed PAL and raises audio pitch.
+- Text subtitles (SRT, ASS/SSA, WebVTT) are drawn by the app at Normal, Large
+  or Extra large size. Choosing, hiding or resizing them never restarts the
+  video, and a file with text subtitles can still play directly. Picture
+  subtitles, and text in scripts the app's fonts lack, are still burned in by
+  the server.
+- Sign-in lists the Jellyfin servers found on the local network, then the
+  users a server shows. **Options > Switch user** changes user without typing
+  the address again. A bare server name that gives no answer is tried again as
+  `http://name:8096`.
+- Video bitrate offers 0.4, 1 and 2 Mbps for weak Wi-Fi, with a smaller
+  transcoded picture. A file above the chosen bitrate is transcoded to it
+  instead of streamed as stored.
+- Chosen audio and subtitle tracks stay chosen on a movie page, and an
+  episode's Audio and Subtitles actions no longer disappear after switching
+  seasons.
+- The 4:3 filter leaves out collections it would empty.
+- Options shows the display check again (HDMI refresh, HDMI sound, INI
+  section), judged against the core's Output Mode and Refresh Rate Match.
+- Menus drop far fewer frames, held directions stop where they are released,
+  Options changes save in the background, and leaving a show with theme music
+  no longer pauses. If a settings save fails, the change stays for the session
+  and a notice says so.
+- Running the installer again over the installed release reports it as up to
+  date, restores the Scripts entries, main-menu entry, boot hook and Downloader
+  entry, and restarts the app.
 
 Playback updates Jellyfin watched state and resume positions. Network seeking,
 server compatibility and different hardware setups remain beta test areas.
-The included FPGA image reports `jf-0.1.0-beta.2`; its original qualification manifest
-is included so the image remains traceable.
+The included FPGA image is the beta.1 design rebuilt to report
+`jf-0.1.0-beta.2`; its original qualification manifest is included so the
+image remains traceable.
 
 Installers and update notices become available when this release and its
 catalogue are published. See README.md for setup and feedback instructions.
