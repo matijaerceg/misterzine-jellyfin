@@ -34,14 +34,12 @@ type Canvas struct {
 // NewCanvas allocates a canvas.
 func NewCanvas(w, h int) *Canvas { return &Canvas{W: w, H: h, Pix: make([]byte, w*h*4)} }
 
-// Image is a picture in canvas layout (BGRx), ready to blit. Dim, if set,
-// is the same picture darkened, made off-thread so drawing it is a copy.
-// Alpha marks a picture with a real alpha channel (premultiplied): it is
-// drawn with BlitOver, on ordinary canvases only.
+// Image is a picture in canvas layout (BGRx), ready to blit. Alpha marks a
+// picture with a real alpha channel (premultiplied): it is drawn with
+// BlitOver, on ordinary canvases only.
 type Image struct {
 	W, H  int
 	Pix   []byte
-	Dim   *Image
 	Alpha bool
 }
 

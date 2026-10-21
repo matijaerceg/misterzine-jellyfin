@@ -341,9 +341,6 @@ func fetchArt(client *jellyfin.Client, r artReq) (*gfx.Image, error) {
 		return img, nil
 	}
 	img = img.Crop(r.w, (r.h*9+4)/8).ScaleH(r.h)
-	if r.w == PosterW || r.w == WallPW {
-		img.Dim = img.Dimmed(WatchedBright)
-	}
 	if r.homeBackdrop {
 		homeBackdropTreat(img, r.bright)
 	} else if r.fade > 0 {

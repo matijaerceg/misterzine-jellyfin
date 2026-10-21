@@ -31,6 +31,8 @@ type Wall struct {
 	holes   []gfx.Rect
 	tabs    bool        // the cursor is on the view tabs above the grid
 	fading  bool        // a poster faded in this frame: keep drawing
+	dim     *gfx.Image  // the focused poster dimmed while the cursor is on the tabs
+	dimFor  *gfx.Image  // the poster dim was made from
 	band    *gfx.Canvas // the info band is composed here (text over posters)
 	bandKey string
 	bandAt  time.Time
@@ -987,8 +989,13 @@ func (w *Wall) drawPoster(c *gfx.Canvas, it *jellyfin.Item, x, y int, focus bool
 	var age time.Duration
 	if it != nil {
 		img, age = w.app.Art.GetAge(it.Thumb, WallPW, WallPH)
-		if focus && w.tabs && img != nil && img.Dim != nil {
-			img = img.Dim // reuse the loader's shaded copy; no per-frame dimming
+		if focus && w.tabs && img != nil {
+			// shaded once for the one poster that needs it, not per frame
+			// and not by the loader for every poster
+			if w.dimFor != img {
+				w.dim, w.dimFor = img.Dimmed(WatchedBright), img
+			}
+			img = w.dim
 		}
 	}
 	w.holes = append(w.holes, gfx.Rect{X: x, Y: hy0, W: WallPW, H: hy1 - hy0})
