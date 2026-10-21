@@ -94,8 +94,9 @@ interlaced fields is shown: **Weave**, **Bob** or **Blend**.
 
 VRR lets the display follow a core whose refresh rate changes. This core's
 rate changes during playback when **Refresh Rate Match** switches family, and
-slightly in Native HDMI and 240p playback. MiSTer switches VRR off whenever
-`vsync_adjust` is 1 or 2. Forcing FreeSync
+slightly in Native HDMI and 240p playback. With VRR forced on, HDMI follows
+the core's rate, as it does with `vsync_adjust`, so Options do not flag it.
+MiSTer switches VRR off whenever `vsync_adjust` is 1 or 2. Forcing FreeSync
 (`vrr_mode=2`) was reported to make 24 fps films stutter with the earlier
 MisterZine Plex app, whose core ran at a fixed 59.94 Hz; it has not been tested
 with this app. Keep `vrr_mode=0` in the section above unless you have checked
@@ -109,28 +110,31 @@ films up.
 
 ## Settings Options warn about
 
-When the app starts, it reads the INI MiSTer loaded for it, including an
-alternative INI chosen in the MiSTer menu, and applies MiSTer's own section
-rules. It reads the file, not live values. **Options** then shows a row, below
-**Video crop**, for each setting that hurts playback. Select a row to see which
-file to change and what to add; the lines go in the `[MisterZine Jellyfin]`
-section at the end of that file.
+When the app starts, its launcher reads the INI MiSTer loaded for the core,
+including an alternative INI chosen in the MiSTer menu, and applies MiSTer's
+own section rules. It reads the file, not live values. **Options** then shows
+a row, below **Video crop**, for each setting that hurts playback, weighed
+against the core's current **Output Mode** and **Refresh Rate Match**. Select
+a row to see which file to change and what to add; the lines go in a
+`[MisterZine Jellyfin]` section at the end of that file, and take effect once
+you start the app again from the MiSTer menu.
 
-- **HDMI VRR: Forced on**: `vrr_mode` is 2, 3 or 4 with `vsync_adjust=0`. The
-  automatic setting (`vrr_mode=1`) depends on what the display reports, so it
-  is not flagged.
-- **HDMI refresh** (for example **50 Hz**): HDMI keeps a fixed rate well away
-  from 60 Hz. Modes 3, 7 and 9 are 50 Hz. With `vsync_adjust=0` the rate is
-  `video_mode`'s. With `vsync_adjust` 1 or 2, MiSTer follows the core instead,
-  unless `refresh_min` or `refresh_max` leaves out 59.94 Hz, or a
-  `video_mode_pal` is set without a `video_mode_ntsc`. The check assumes the
-  60 Hz family: if you chose a 50 Hz HDMI mode for a 576-line Output Mode on
-  purpose, the row can be ignored.
+- **HDMI refresh** (with the rate, for example **60 Hz**): HDMI keeps a fixed
+  rate, and either it is well away from the Output Mode's own (50 Hz for the
+  576-line modes, 59.94 Hz for the others), or Refresh Rate Match is on and
+  can move playback to a rate HDMI does not follow. Modes 3, 7 and 9 are
+  50 Hz. With `vsync_adjust=0` the rate is `video_mode`'s. With `vsync_adjust`
+  1 or 2, MiSTer follows the core instead, unless `refresh_min` or
+  `refresh_max` leaves out the core's rate, or a `video_mode_pal` is set
+  without a `video_mode_ntsc`. For a mismatched Output Mode the note suggests
+  a fixed mode at the right rate (`video_mode=8`, or `9` for the 576-line
+  modes; `0` or `7` for 1280x720). With Refresh Rate Match on it suggests
+  `vsync_adjust=1`, or turning matching off.
 - **HDMI sound: Off (DVI mode)**: `dvi_mode=1` sends no sound over HDMI. Sound
   still plays from the analog audio output.
-- A row marked **Overridden**: a `[MiSTer]` section further down the file
-  changes a video setting the app's section sets to a different value. Move
-  the app's section to the end.
+- **INI section: Overridden**: a `[MiSTer]` section further down the file
+  changes a video setting the `[MisterZine Jellyfin]` section sets to a
+  different value. Move that section to the end.
 
 Each alternative INI is checked on its own, so a section for this core kept in
 only some of them, such as an HDMI INI but not a CRT one, is not flagged.
