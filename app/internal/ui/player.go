@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/url"
 	"os"
@@ -412,18 +413,92 @@ func hasFullTimelineHLS(protocol, transcodeURL string) bool {
 	return err == nil && strings.HasSuffix(strings.ToLower(u.Path), ".m3u8")
 }
 
+// readPlayerStatus is the worker's status file as keys and values, nil
+// when there is none. The map is shared (playerStatus): read it only.
 func readPlayerStatus(path string) map[string]string {
-	b, err := os.ReadFile(path)
+	values, _, err := playerStatus.read(path)
 	if err != nil {
 		return nil
 	}
-	out := map[string]string{}
-	for _, line := range strings.Split(string(b), "\n") {
+	return values
+}
+
+// playerStatus is the worker's status file as last read. The play loop
+// asks for it ten times a second and the session four times, but jfplay
+// writes it every 250 ms, each time whole into a new file renamed over
+// the old: the same file (inode, size and time) has the same contents.
+var playerStatus statusFiles
+
+// statusSettle is how long after its time a file is taken as written: one
+// read sooner might share a timestamp with a write still to come, were
+// the file ever rewritten in place.
+const statusSettle = 50 * time.Millisecond
+
+type statusFiles struct {
+	mu    sync.Mutex
+	files map[string]statusFile
+}
+
+type statusFile struct {
+	ino     uint64
+	size    int64
+	written time.Time
+	values  map[string]string
+}
+
+// read is the status file at path, parsed, and when it was written; the
+// file is read and parsed again only when it has changed since.
+func (c *statusFiles) read(path string) (map[string]string, time.Time, error) {
+	st, err := os.Stat(path)
+	if err != nil {
+		c.mu.Lock()
+		delete(c.files, path)
+		c.mu.Unlock()
+		return nil, time.Time{}, err
+	}
+	c.mu.Lock()
+	cached, ok := c.files[path]
+	c.mu.Unlock()
+	if ok && cached.ino == statusInode(st) && cached.size == st.Size() && cached.written.Equal(st.ModTime()) {
+		return cached.values, cached.written, nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	defer f.Close()
+	if st, err = f.Stat(); err != nil {
+		return nil, time.Time{}, err
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	values := map[string]string{}
+	for _, line := range strings.Split(string(data), "\n") {
 		if k, v, ok := strings.Cut(line, "="); ok {
-			out[k] = v
+			values[k] = v
 		}
 	}
-	return out
+	file := statusFile{ino: statusInode(st), size: st.Size(), written: st.ModTime(), values: values}
+	c.mu.Lock()
+	if time.Since(file.written) > statusSettle {
+		if c.files == nil {
+			c.files = map[string]statusFile{}
+		}
+		c.files[path] = file
+	} else {
+		delete(c.files, path)
+	}
+	c.mu.Unlock()
+	return values, file.written, nil
+}
+
+func statusInode(st os.FileInfo) uint64 {
+	if s, ok := st.Sys().(*syscall.Stat_t); ok {
+		return uint64(s.Ino)
+	}
+	return 0
 }
 
 func (s *Session) update(report bool) {

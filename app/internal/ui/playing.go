@@ -265,16 +265,10 @@ func (p *Playing) peekStripH() int {
 
 // status reads the launcher's position file.
 func (p *Playing) status() {
-	data, written, err := readStatusFile("/tmp/jfplay.status")
+	values, written, err := playerStatus.read("/tmp/jfplay.status")
 	if err != nil {
 		p.bufferStart, p.bufferEnd = 0, 0
 		return
-	}
-	values := map[string]string{}
-	for _, line := range strings.Split(string(data), "\n") {
-		if key, value, ok := strings.Cut(line, "="); ok {
-			values[key] = value
-		}
 	}
 	pos, err := strconv.ParseFloat(values["position"], 64)
 	if err != nil {

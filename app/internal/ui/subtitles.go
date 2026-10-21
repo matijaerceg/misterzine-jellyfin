@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"io"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -453,18 +451,3 @@ func (p *Playing) showSubtitle(osd OSD, lines []string) {
 // isSubtitleKey reports whether what the overlay last showed is the
 // subtitle panel: it coming and going is not something Back waits for.
 func isSubtitleKey(last string) bool { return strings.HasPrefix(last, "sub|") }
-
-// readStatusFile reads the worker's status file and when it was written.
-func readStatusFile(path string) ([]byte, time.Time, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	defer f.Close()
-	st, err := f.Stat()
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	data, err := io.ReadAll(f)
-	return data, st.ModTime(), err
-}
