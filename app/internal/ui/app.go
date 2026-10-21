@@ -599,6 +599,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 	}
 	// two cores: more Ps only spin looking for work against the decoder
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(2))
+	defer playbackPriority()() // Run's thread, raised for the menus
 	a.playing = true
 	defer func() { a.playing = false }()
 	defer setOpaque(false)

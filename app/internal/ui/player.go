@@ -413,6 +413,19 @@ func hasFullTimelineHLS(protocol, transcodeURL string) bool {
 	return err == nil && strings.HasSuffix(strings.ToLower(u.Path), ".m3u8")
 }
 
+// playbackPriority puts the calling thread at the ordinary priority for a
+// playback and returns what puts it back. Run raises its locked thread
+// (nice -5) for the menus, and the play loop runs on that thread: there it
+// would outrank jfplay (nice 0), which feeds the decoder. A thread already
+// at 0 (a test's, not locked to its goroutine) is left as it is.
+func playbackPriority() (restore func()) {
+	prio, err := syscall.Getpriority(syscall.PRIO_PROCESS, 0) // 20 - nice
+	if err != nil || prio == 20 || syscall.Setpriority(syscall.PRIO_PROCESS, 0, 0) != nil {
+		return func() {}
+	}
+	return func() { syscall.Setpriority(syscall.PRIO_PROCESS, 0, 20-prio) }
+}
+
 // readPlayerStatus is the worker's status file as keys and values, nil
 // when there is none. The map is shared (playerStatus): read it only.
 func readPlayerStatus(path string) map[string]string {
