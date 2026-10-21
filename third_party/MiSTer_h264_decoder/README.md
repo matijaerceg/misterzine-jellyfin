@@ -20,18 +20,25 @@ presents picture and sound against one clock, and drives:
 - **HDMI** -- the same, or the picture at its own pixels, up to **1280x720**.
 
 It is not tied to one service. Game streaming, a media server, local files and a USB camera all
-come in through the same interface, and four programs that use it are included.
+come in through the same interface.
 
-## Included programs
+**This is MisterZine Jellyfin's fork of the core.** It is released only inside
+[MisterZine Jellyfin](https://github.com/matijaerceg/misterzine-jellyfin), whose installer puts
+the app and this core on the SD card together ([manual](site/content/using/jellyfin.md)).
 
-Each one starts from MiSTer's **Scripts** menu and is driven with the gamepad.
+## Programs in this repository
+
+The source of four programs that feed the core is in `clients/`. MisterZine Jellyfin releases
+include none of them: build one yourself to use it
+([Install the core](site/content/getting-started/install.md#the-other-programs)). Each starts
+from MiSTer's **Scripts** menu and is driven with the gamepad.
 
 | Program | What it does |
 |---|---|
 | **Moonlight** ([manual](site/content/using/moonlight.md)) | Streams games from a PC running Sunshine. The MiSTer's keyboard, mouse and gamepads reach the PC; rumble comes back. |
-| **Jellyfin** ([manual](site/content/using/jellyfin.md)) | A cast target for a Jellyfin server: pick a film in any Jellyfin app and it plays on the MiSTer, with text subtitles. |
 | **Video player** ([manual](site/content/using/player.md)) | Plays files from the SD card, a USB drive or a network share. H.264 goes to the core; MPEG-2, DivX / Xvid, WMV, Theora and Motion JPEG are decoded on the ARM and shown the same way. |
 | **Camera viewer** ([manual](site/content/using/camera.md)) | Shows a USB webcam or capture device -- the MiSTer as a 15 kHz monitor for another source. |
+| **Jellyfin cast client** ([`clients/jellyfin`](clients/jellyfin/README.md)) | The upstream core's cast target for a Jellyfin server, kept as source. MisterZine Jellyfin replaces it for users of this fork. |
 
 ## What the core handles
 
@@ -45,7 +52,7 @@ Each one starts from MiSTer's **Scripts** menu and is driven with the gamepad.
 | **Input** | The keyboard, mouse and gamepads plugged into the MiSTer reach the program; the program can drive the gamepads' rumble. |
 
 Higher rates (720p at 60 frames/s, 1080p) decode correctly but fall behind, visibly, so the
-included programs avoid them: the player and Moonlight refuse them by name, Jellyfin asks the
+programs avoid them: the player and Moonlight refuse them by name, MisterZine Jellyfin asks the
 server for a transcode. The full list: [compatibility](site/content/reference/compatibility.md).
 
 ## Write your own program
@@ -72,9 +79,10 @@ is a complete reference player.
 ## Status
 
 **A proof of concept, offered as is.** Everything above runs on the hardware (a DE10-Nano,
-tested over HDMI, on CRTs and through a RetroTINK); the Jellyfin client, the video player and the
-camera viewer are early. **No support is provided**: issues and pull requests may go unanswered,
-and nothing here is a promise of future work. Release 1.1 packages what is here.
+tested over HDMI, on CRTs and through a RetroTINK); the video player and the camera viewer are
+early. **No support is provided**: issues and pull requests may go unanswered, and nothing here
+is a promise of future work. MisterZine Jellyfin releases carry the core built from this
+source.
 
 **If you fork it**, these are the places to start:
 
@@ -83,8 +91,7 @@ and nothing here is a promise of future work. Release 1.1 packages what is here.
 - [`docs/`](docs/) -- why each part is designed the way it is, with the measurements behind it;
 - [`bench/h264/`](bench/h264/) -- the simulation benches (`run_*.sh`; `--red` proves each one can
   fail), and [`tools/mister.py`](tools/mister.py), which drives a real MiSTer over ssh for
-  hardware tests;
-- [`CLAUDE.md`](CLAUDE.md) -- the project's working rules and the lessons behind them.
+  hardware tests.
 
 ## Building
 
@@ -94,10 +101,12 @@ defined in this repository.
 ```bash
 USE_DOCKER=1 ./build_release.sh --compile      # the core -> releases/H264_*.rbf
 USE_DOCKER=1 hps/build_arm.sh                  # the library, h264play, h264stat
-USE_DOCKER=1 clients/moonlight/build.sh        # likewise clients/jellyfin, clients/player, clients/uvc
+USE_DOCKER=1 clients/moonlight/build.sh        # likewise clients/player, clients/uvc (and clients/jellyfin)
 ```
 
 Copy the `.rbf` to `_Other/` on the SD card and each client's `build/dist/*` to the card's root.
+MisterZine Jellyfin builds and installs its own copy of the core (`release/build_package.py` in
+that repository).
 [Building from source](site/content/about/building.md) has the details.
 
 ## Documentation

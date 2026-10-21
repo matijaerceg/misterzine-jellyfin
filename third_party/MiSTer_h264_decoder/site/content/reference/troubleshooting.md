@@ -4,9 +4,9 @@
 |---|---|
 | Nothing on screen after loading the core | Try another HDMI mode or display; check that the rest of the MiSTer's video works. If the analog output also shows nothing, [report it](reporting-a-bug.md) with the core version. |
 | The screen stays black before the app menu appears | The core has no startup image. If the menu does not appear, check the app launcher log and launch the installed MisterZine Jellyfin menu entry again. |
-| A program cannot reach the core (its log says "Protocol not supported") | The program was built for a newer core than the one on the SD card: a program accepts a core of its own interface version or later. Install the core and the programs from the same release. "Device or resource busy" means another program is using the core: quit it first. |
+| A program cannot reach the core (its log says "Protocol not supported") | The program was built for a newer core than the one on the SD card: a program accepts a core of its own interface version or later. Build the core and the programs from the same source ([Install the core](../getting-started/install.md#the-other-programs)). "Device or resource busy" means another program is using the core: quit it first. |
 | The screen stays black after a video played | The program stopped sending video after a stream switch or a seek. Restart the program; its log says what happened. |
-| A stream does not play and the status block shows a refusal | The stream uses something the core does not decode: CAVLC, MBAFF interlacing, monochrome, 4:2:2 / 4:4:4, 10-bit or lossless coding ([Compatibility](compatibility.md)). The program's log names it. A program can rewrite CAVLC into CABAC with the client library ([CAVLC streams](../integrating/library.md#cavlc-streams)); the Moonlight client and the video player do, the Jellyfin client does not (it asks the server for a transcode instead). |
+| A stream does not play and the status block shows a refusal | The stream uses something the core does not decode: CAVLC, MBAFF interlacing, monochrome, 4:2:2 / 4:4:4, 10-bit or lossless coding ([Compatibility](compatibility.md)). The program's log names it. A program can rewrite CAVLC into CABAC with the client library ([CAVLC streams](../integrating/library.md#cavlc-streams)); the Moonlight client and the video player do; MisterZine Jellyfin does not (it checks the stream first and asks the server for a transcode instead). |
 | A CAVLC stream plays with late or dropped pictures | The program rewrites it into CABAC on the ARM, which keeps up to about 4-5 Mbit/s at 480p60; ask the source for a lower bitrate, or for CABAC ([CAVLC streams](../integrating/library.md#cavlc-streams)). |
 | A 60 frames/s stream plays with dropped frames | The core decodes up to 854x480 at 60 (or 1280x720 at 30) frames/s in real time; a larger picture or a higher rate falls behind, and the late pictures are counted in the status block ([Compatibility](compatibility.md)). |
 | A 720p film or transcode at 30 frames/s plays a little jerky | A very dense 720p30 encode (well above 8 Mbit/s: a high-bitrate file or transcode) can be more than the decoder keeps up with; up to about 8 Mbit/s, 24 and 30 frames/s films, transcodes and game streams play in real time. Choose a lower bitrate or 854x480 for the transcode, or convert the file ([Compatibility](compatibility.md)). |
@@ -32,18 +32,18 @@ The client's log is `/media/fat/moonlight/moonlight.log`
 
 ## Jellyfin
 
-The client's log is `/media/fat/jellyfin/jellyfin.log`
-([Watching from a Jellyfin server](../using/jellyfin.md)).
+MisterZine Jellyfin has its own help
+([Watching from a Jellyfin server](../using/jellyfin.md)). Its
+[troubleshooting](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/release/README.md#troubleshooting)
+covers installing, signing in, stutter, updates and reports. In the app, **Options** →
+**Send a report** saves the app's and the player's logs to
+`/media/fat/misterzine-jellyfin/report.txt`; **Scripts** →
+**MisterZine-Jellyfin-Diagnostics** writes the same file when the app does not start.
+These rows are about the picture the core receives:
 
 | Symptom | What to check |
 |---|---|
-| **Scripts → jellyfin** says to set `server=` | Edit `jellyfin.ini`: the server's address as a browser opens it, starting with `https://` or `http://`. |
-| "The server does not answer" on the screen | The address in `server=` and the MiSTer's network. An `https://` address needs the server's certificate to be a public one (Let's Encrypt and the like); for a server on your own network, use its `http://` address and port. |
-| "Quick Connect is off on this server" | Turn on Quick Connect in the server's dashboard (**General**), or put `user=` and `password=` in `jellyfin.ini`. |
-| The MiSTer is not in the app's list of devices to play on | It shows only once the MiSTer says **Ready to play**, and only to the account it signed in with. Some apps list devices only after a refresh. |
-| "This item cannot play" | The server's own conversion produced something the core does not decode (the message names it). Check the server's transcoding settings: H.264 encoding must not use x264's `ultrafast` preset. |
-| "Playback failed" | The log names the error. A film the server cannot convert (its transcoding disabled for your account) fails this way. |
-| A film stutters or falls behind | The server's conversion is not keeping up: its dashboard shows the transcode's speed. |
+| A film stutters or falls behind | The server's conversion is not keeping up: its dashboard shows the transcode's speed. A lower **Video bitrate** in the app's Options also helps. |
 | Faint blocky lines across the picture during fades and dark scenes, on a film the server converts | Artifacts of the server's conversion (common with HEVC or HDR films): dark fades are hard to encode, and the MiSTer shows what it receives. In the server's dashboard (**Playback** → **Transcoding**), choose a slower encoder preset or a higher quality for hardware encoding, and turn on tone mapping for HDR films. A film already in H.264 at 1280x720 or less is played as it is, with no conversion ([What plays](../using/jellyfin.md#what-plays)). |
 
 ## Video files
@@ -53,7 +53,7 @@ The player's log is `/media/fat/h264player/h264player.log`
 
 | What you see | What to do |
 |---|---|
-| **Scripts → h264player** says the player is not installed | Copy the release's `h264player/` folder to `/media/fat/`. |
+| **Scripts → h264player** says the player is not installed | Copy `h264player/` from the player's build to `/media/fat/` ([Install the core](../getting-started/install.md#the-other-programs)). |
 | "No video folders" | Put videos in `/media/fat/video` (the player makes it), plug in a USB drive, or list your folders in `h264player.ini` with `root=` lines. |
 | A file is missing from the list | The list shows only the file types the player opens -- `.mkv`, `.mp4`, `.m4v`, `.mov`, `.ts`, `.m2ts`, `.mts`, `.264`, `.h264`, `.avi`, `.divx`, `.mpg`, `.mpeg`, `.vob`, `.m1v`, `.m2v`, `.wmv`, `.asf`, `.ogv` and `.3gp` -- and no hidden ones (names starting with a dot). |
 | "Cannot play: 1920x1080 is larger than 720p" (or another size) | The core decodes pictures up to 1280x720 (3,600 macroblocks). Convert the file ([Compatibility](compatibility.md#converting-a-file)). |
@@ -74,7 +74,7 @@ The viewer's log is `/media/fat/h264cam/h264cam.log` ([Showing a USB camera](../
 
 | What you see | What to do |
 |---|---|
-| **Scripts → h264cam** says the viewer is not installed | Copy the release's `h264cam/` folder to `/media/fat/`. |
+| **Scripts → h264cam** says the viewer is not installed | Copy `h264cam/` from the viewer's build to `/media/fat/` ([Install the core](../getting-started/install.md#the-other-programs)). |
 | **Scripts → h264cam** says "Another H264 program (h264player) is running: quit it first." (or moonlight, jellyfin) | That program is using the core: quit it (Back + Start), then run h264cam again. |
 | "Plug in a USB camera or video capture device" stays on the screen with a camera plugged in | The camera is not a USB Video Class (UVC) device, or it needs more power than the port gives: try a powered USB hub. The log says when a device is found. |
 | "... cannot be shown: it sends only uncompressed video ..." | A capture device or camera without Motion JPEG. The MiSTer's USB port carries about 6 MB/s of live video: only its smallest modes would fit, and it has none. Use a camera or capture device that sends MJPEG. |
@@ -85,9 +85,11 @@ The viewer's log is `/media/fat/h264cam/h264cam.log` ([Showing a USB camera](../
 
 ## The screen dims or goes black
 
-The [video player](../using/player.md#the-screensaver), the
-[Jellyfin client](../using/jellyfin.md#the-screensaver) and the
+The [video player](../using/player.md#the-screensaver) and the
 [camera viewer](../using/camera.md#the-screensaver) dim the screen after 5 minutes while
 nothing plays, and turn it black after 30, against burn-in. Press any button to bring it back.
-The player's and the Jellyfin client's times are in their `.ini` (`screensaver_dim=`,
-`screensaver_black=`).
+The player's times are in its `.ini` (`screensaver_dim=`, `screensaver_black=`).
+
+[MisterZine Jellyfin](../using/jellyfin.md#the-screensaver) dims the screen to a quarter of
+its brightness after 3 minutes without a press in the menus or on a paused video, and does
+not turn it black. The next press only brings it back.

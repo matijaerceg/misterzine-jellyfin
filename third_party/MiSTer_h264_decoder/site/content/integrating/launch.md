@@ -91,8 +91,8 @@ for (;;) {                                           /* every millisecond or so 
   an action event (`H264RING_EV_ACTION`, its number in `H264RING_EV_CODE`) and MiSTer then
   closes its menu: the action arrives **before** the "menu closed" event. Take it even while
   you are ignoring input for the open menu, and act on it after the close. Ignore an action
-  you have no use for. The bundled programs: while something plays, the video player and the Jellyfin
-  client stop it on Send Home and show their title-and-progress panel on Program menu; the camera viewer quits
+  you have no use for. The programs in `clients/`: while something plays, the video player and the Jellyfin
+  cast client stop it on Send Home and show their title-and-progress panel on Program menu; the camera viewer quits
   and opens its list of modes; the Moonlight client presses the PC's Guide button and ignores
   Program menu.
 - **What MiSTer keeps:** F12 (its menu), the Menu key, its screenshot, volume and

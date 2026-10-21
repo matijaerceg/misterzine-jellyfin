@@ -38,8 +38,10 @@ draws itself, into the Linux framebuffer; the core shows it over the video on ev
 - **The reference feeder, `h264play`** -- plays an H.264 file through the library; the
   example to start from.
 - **`h264stat`** -- prints the status block, alone or beside a running feeder.
-- **The four bundled programs** (`clients/` in the repository: Moonlight, Jellyfin, the video
-  player, the camera viewer) -- complete programs on the same library, GPL-3.0-or-later.
+- **The four programs in `clients/`** (Moonlight, the upstream core's cast-only Jellyfin client,
+  the video player, the camera viewer) -- complete programs on the same library,
+  GPL-3.0-or-later. MisterZine Jellyfin releases include none of them; MisterZine Jellyfin
+  feeds the core with its own player.
   `clients/common/` holds what three of them share: the session, the on-screen interface drawn
   into the overlay, input, subtitles, and decoding other formats on the ARM.
 - **Launching the core, and input** (MiSTer's menu keeps the devices; the core passes on its

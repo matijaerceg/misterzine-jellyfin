@@ -21,20 +21,28 @@ to prove each bench can fail; `bench/h264/README.md` lists them).
 
 ## The programs
 
-The four programs and the client library are ARM programs, cross-compiled in their own
-Docker images. Each client's build writes the SD card's layout to its `build/dist/`: copy
-its contents to the card's root.
+MisterZine Jellyfin (the app and its player) is built by the MisterZine Jellyfin repository
+this fork lives in ([its build guide](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/docs/BUILD.md));
+nothing below is part of it. The programs in `clients/` and the client library are ARM programs,
+cross-compiled in their own Docker images. Each client's build writes the SD card's layout
+to its `build/dist/`: copy its contents to the card's root, and put the core you built in
+`_Other/`, where these programs load it from.
 
 ```bash
 USE_DOCKER=1 hps/build_arm.sh               # the library, h264play, h264stat, cavlc2cabac -> hps/build/arm/
 USE_DOCKER=1 clients/moonlight/build.sh     # Scripts/moonlight.sh, moonlight/
-USE_DOCKER=1 clients/jellyfin/build.sh      # Scripts/jellyfin.sh, jellyfin/
 USE_DOCKER=1 clients/player/build.sh        # Scripts/h264player.sh, h264player/
 USE_DOCKER=1 clients/uvc/build.sh           # Scripts/h264cam.sh, h264cam/
+USE_DOCKER=1 clients/jellyfin/build.sh      # Scripts/jellyfin.sh, jellyfin/ (see below)
 ```
 
+`clients/jellyfin` is the upstream core's cast-only Jellyfin client, kept as source. It is
+not part of MisterZine Jellyfin releases, and this manual does not describe it; its own
+`clients/jellyfin/README.md` does.
+
 The images build on one another (the compiler, then Moonlight's libraries, then FFmpeg for
-the Jellyfin client, the video player and the camera viewer): the first build takes a while.
+the video player, the camera viewer and the Jellyfin cast client): the first build takes a
+while.
 
 Each one has a test that runs on the PC against a simulated core (add `--red` to prove it
 can fail). They need gcc, python3, ffmpeg, and the development packages of FFmpeg, libcurl,

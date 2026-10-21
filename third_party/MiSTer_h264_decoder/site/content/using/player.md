@@ -10,8 +10,8 @@ sound and subtitles. You pick the file with a gamepad.
     Theora, Motion JPEG -- play up to DVD size (720x576) at up to 30 frames per second: the
     MiSTer's ARM processor decodes them. Many files from the internet are 1080p or HEVC; the
     player names what it cannot play, and [Compatibility](../reference/compatibility.md#video-files)
-    shows how to convert a file on a computer. For your Jellyfin library, use the
-    [Jellyfin client](jellyfin.md) instead: its server converts everything as it plays.
+    shows how to convert a file on a computer. For your Jellyfin library, use
+    [MisterZine Jellyfin](jellyfin.md) instead: your server converts what the core cannot play.
 
 ## What plays
 
@@ -37,8 +37,9 @@ press Y for another audio track.
 
 ## Installing
 
-Copy the release's `Scripts/h264player.sh` and `h264player/` folder to the root of the SD card
-(`/media/fat/`), beside the core itself ([Install the core](../getting-started/install.md)).
+MisterZine Jellyfin releases do not include the player: build it and copy its
+`Scripts/h264player.sh` and `h264player/` folder to the root of the SD card (`/media/fat/`), with
+the core in `_Other/` ([The other programs](../getting-started/install.md#the-other-programs)).
 
 ## Where the videos go
 
