@@ -91,7 +91,7 @@ func (o *Options) items() []option {
 			cfg.Crop = Crops[max(0, min(len(Crops)-1, cfg.Crop.index()+d))].Mode
 		}, at: func() (int, int) { return cfg.Crop.index(), len(Crops) }},
 	}...)
-	for _, w := range o.app.Display.Warnings() {
+	for _, w := range o.app.Display.Warnings(o.app.coreOutput()) {
 		items = append(items, option{label: w.label, val: func() string { return w.value }, do: func() { o.app.Push(NewDisplayNote(o.app, w)) }})
 	}
 	items = append(items, []option{

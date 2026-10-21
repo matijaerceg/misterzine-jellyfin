@@ -66,17 +66,24 @@ class InstallerTests(unittest.TestCase):
         def select(card, root, folder):
             events.append('core')
             return True
+        def display(card):
+            events.append('display')
+            self.assertEqual(card, self.root.parent)
+            return '{"ini": "MiSTer.ini", "vrr": "off"}'
         def launch(*args, **kwargs):
             events.append('app')
+            self.assertEqual(kwargs['env']['MISTERZINE_PLEX_DISPLAY'], '{"ini": "MiSTer.ini", "vrr": "off"}')
             return child
         with mock.patch.object(manager, 'recover_activation', return_value=True), \
                 mock.patch.object(manager, 'ensure_selected_core', side_effect=select), \
+                mock.patch.object(manager, 'display_env', side_effect=display), \
                 mock.patch.object(manager.subprocess, 'run', side_effect=preflight), \
                 mock.patch.object(manager.subprocess, 'Popen', side_effect=launch), \
                 mock.patch.object(manager, 'rotate_log'), \
                 mock.patch('builtins.open', mock.mock_open()):
             manager.run(self.root)
-        self.assertEqual(events, ['preflight', 'core', 'app'])
+        # the INI check once main has read the INI for the core, before the app
+        self.assertEqual(events, ['preflight', 'core', 'display', 'app'])
 
     def test_bad_package_never_changes_active_release(self):
         self.package_version('alpha-1')

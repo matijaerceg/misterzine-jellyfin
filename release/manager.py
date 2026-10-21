@@ -958,7 +958,10 @@ def vrr_state(values):
 # other number, including ones past the table, which main reads as 0, is 60 Hz.
 FIFTY_HZ_MODES = frozenset({3, 7, 9})
 VIDEO_MODE_FLAGS = frozenset({'+vsync', '-vsync', '+hsync', '-hsync', 'cvt', 'cvtrb', 'pr'})
-# The Plex core's refresh rate (rtl/crt480i.v), whatever it plays.
+# The core's rate in its 480-line Output Modes. Its 576-line modes, and
+# playback Refresh Rate Match moves to that family, run at 50 Hz, which the
+# vsync_adjust checks below do not model; the app compares a fixed HDMI rate
+# with the Output Mode the core reports (Warnings in app/internal/ui/display.go).
 CORE_HZ = 59.94
 
 
@@ -1018,7 +1021,7 @@ def parse_video_mode(value):
 
 
 def clock_out_of_range(value):
-    """Whether main must give up following Plex in this mode because the pixel
+    """Whether main must give up following the core in this mode because the pixel
     clock it needs at 59.94 Hz is outside 2-300 MHz (video_mode_adjust). Only
     the full timing form gives the totals; every numbered mode stays inside,
     and the width,height,rate form counts as inside, which leaves its rate
@@ -1044,7 +1047,7 @@ def fixed_hdmi_refresh(values):
     that mode ('video_mode', say), or (None, '') when HDMI follows the core or
     it cannot be told (video_mode_load, video_mode_select and video_mode_adjust
     in main's video.cpp). HDMI follows the core with forced VRR, and with
-    vsync_adjust, unless refresh_min or refresh_max leaves out Plex's 59.94 Hz
+    vsync_adjust, unless refresh_min or refresh_max leaves out the core's 59.94 Hz
     or only a PAL mode is given. Direct video sends the core's own timing;
     direct_video=2 is resolved at start-up. With no video mode at all, main
     takes the display's own."""
@@ -1106,7 +1109,7 @@ def section_elsewhere(card, active):
 
 def display_check(card, altcfg=read_altcfg):
     """What the app's Options show about the MiSTer INI: which file main read
-    for Plex and ini_findings for it. vrr is 'unknown' when the file main read
+    for the core and ini_findings for it. vrr is 'unknown' when the file main read
     cannot be told or read."""
     path, number = active_ini(card, altcfg)
     if path is None:
@@ -1878,7 +1881,8 @@ def run(root):
     subprocess.run(args + ['-check'], check=True)
     if not ensure_selected_core(card, root, folder):
         raise RuntimeError('The selected Jellyfin H264 core did not load; return to the MiSTer menu and retry.')
-    env = dict(os.environ, MISTERZINE_H264_RBF=rbf)
+    # The INI check for Options, now that main has read the INI for the core.
+    env = dict(os.environ, MISTERZINE_H264_RBF=rbf, MISTERZINE_PLEX_DISPLAY=display_env(card))
     rotate_log('/tmp/misterzine-jellyfin.log')
     child = None
     original_term = signal.getsignal(signal.SIGTERM)

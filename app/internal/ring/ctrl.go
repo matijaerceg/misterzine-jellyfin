@@ -63,7 +63,8 @@ type Status struct {
 	VideoOut         int // 1 interlaced, 2 progressive, 3 native (HDMI)
 	DisplayWide      bool
 	DisplayKnown     bool
-	DisplayProfile   int
+	DisplayProfile   int  // the OSD's Output Mode: 0 480i60, 1 480p60, 2 576i50, 3 576p50, 4 Native HDMI
+	DisplayMatch     bool // Refresh Rate Match is 50/60: playback may switch to the other family
 	EffectiveProfile int
 }
 
@@ -111,6 +112,7 @@ func (c *ctrl) status() (Status, bool) {
 			DisplayWide:      display>>6&1 != 0,
 			DisplayKnown:     displayKnown,
 			DisplayProfile:   int(display & 7),
+			DisplayMatch:     display>>3&1 != 0,
 			EffectiveProfile: int(display >> 7 & 15),
 		}, true
 	}

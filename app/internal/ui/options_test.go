@@ -55,7 +55,7 @@ func groupNames(t *testing.T, items []option, names ...string) map[string]string
 func TestOptionsGroups(t *testing.T) {
 	a := betaTestApp(t)
 	a.Client = &jellyfin.Client{}
-	a.Display = DisplayCheck{INI: "MiSTer.ini", VRR: "forced", VRRMode: 2}
+	a.Display = DisplayCheck{INI: "MiSTer.ini", VRR: "off", DVI: true}
 	o := &Options{app: a}
 	items := o.items()
 	groups := []string{"Playback", "Picture", "Sound", "Account", "App"}
@@ -63,7 +63,7 @@ func TestOptionsGroups(t *testing.T) {
 	for label, want := range map[string]string{
 		"Only show 4:3 media": "Playback", "Autoplay next episode": "Playback", "Skip intro and credits buttons": "Playback",
 		"Video bitrate":                    "Playback",
-		"Video calibration (preview only)": "Picture", "Video crop": "Picture", "HDMI VRR": "Picture",
+		"Video calibration (preview only)": "Picture", "Video crop": "Picture", "HDMI sound": "Picture",
 		"Theme music": "Sound", "Navigation sounds": "Sound",
 		"Sign out": "Account",
 		"Updates":  "App", "Send a report": "App", "Version": "App",
