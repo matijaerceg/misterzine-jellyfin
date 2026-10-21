@@ -650,7 +650,8 @@ def activate(card, launch=start_and_check):
                        + '. Return to the MiSTer menu and open MisterZine Jellyfin again to finish restoring it.', detail)
                 raise
             status(root, 'failed', release, cause + (' The previous release was restored.' if old
-                   else ' No earlier release is installed. Run MisterZine-Jellyfin-Install to retry.'), detail)
+                   else ' No earlier release is installed. Run ' + manager.installer_script(release.get('channel'))
+                   + ' from Scripts to retry.'), detail)
             if old:
                 if launch is start_and_check:
                     # Older releases do not emit a readiness marker. Restore them

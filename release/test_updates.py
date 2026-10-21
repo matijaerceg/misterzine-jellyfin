@@ -1005,7 +1005,7 @@ class UpdateTests(unittest.TestCase):
                 manager.maintain(self.card, wait=0, released=released)
         self.assertTrue(entry.exists())
         self.assertEqual(freed, ['app', 'update', True])
-        self.assertIn('Plex or its installer is running', out.getvalue())
+        self.assertIn('MisterZine Jellyfin or its installer is running', out.getvalue())
         self.assertIn('an update is under way', out.getvalue())
         self.assertIn('Zaparoo reload ok', out.getvalue())
 

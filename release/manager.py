@@ -27,6 +27,12 @@ from xml.sax.saxutils import escape
 PAYLOAD = {'plexcrt', 'jfplay', 'ffmpeg', 'H264.rbf'}
 SCRIPTS = {'Rollback': 'rollback', 'Diagnostics': 'diagnostics', 'Uninstall': 'uninstall'}
 HELPERS = ('manager.py', 'update_service.py', 'catalogue.py', 'menu_launcher.py')
+
+
+def installer_script(channel):
+    """The installer a user puts in Scripts for a channel (build_distribution.py
+    names them). Install does not add one, so messages name the downloaded one."""
+    return 'MisterZine-Jellyfin-Install-' + ('Public' if channel == 'public' else 'Beta')
 BOOT_START = '# BEGIN MISTERZINE JELLYFIN LAUNCHER'
 BOOT_END = '# END MISTERZINE JELLYFIN LAUNCHER'
 # Reports go to the same service the MisterZine Frontend uses: a plain-text
@@ -144,8 +150,9 @@ def maintains_zaparoo(root):
 
 def zaparoo_body(root, folder=None):
     load = core_file(root, folder).relative_to(root.parent).with_suffix('').as_posix()
-    return ('# MisterZine Jellyfin in Zaparoo\'s Other list. Written by the Plex installer and\n'
-            '# rewritten on every update; do not edit. Uninstalling Plex removes it.\n'
+    return ('# MisterZine Jellyfin in Zaparoo\'s Other list. Written by the MisterZine Jellyfin\n'
+            '# installer and rewritten on every update; do not edit. Uninstalling\n'
+            '# MisterZine Jellyfin removes it.\n'
             '[[launchers.custom]]\n'
             'id = "misterzine-jellyfin"\n'
             'kind = "virtual_system"\n'
@@ -156,7 +163,7 @@ def zaparoo_body(root, folder=None):
 
 
 def zaparoo_entry(card, enable=True, folder=None, reload=None):
-    """List Plex under Other in Zaparoo, pointing at the selected release.
+    """List MisterZine Jellyfin under Other in Zaparoo, pointing at the selected release.
 
     Zaparoo does not scan _Other; its Other list is its built-ins plus custom
     launchers, which it also reads from files in zaparoo/launchers. This file
@@ -285,7 +292,7 @@ def reconcile(card):
 
     An in-app update is installed by the previous release's code, which writes
     its own idea of these, and nothing else checks them later (Zaparoo can
-    arrive after Plex). So each release checks them itself at boot and once an
+    arrive after MisterZine Jellyfin). So each release checks them itself at boot and once an
     update to it has committed. The boot hook is left to install and
     uninstall: other tools edit user-startup.sh too, and without the hook
     nothing would run this check anyway. Each piece is optional: a failure is
@@ -401,7 +408,7 @@ def maintain(card, wait=60, released=lambda: None):
             with locked(root):
                 reload = reconcile(card)
     except RuntimeError:
-        print('upkeep: skipped, Plex or its installer is running', flush=True)
+        print('upkeep: skipped, MisterZine Jellyfin or its installer is running', flush=True)
         return 0
     finally:
         released()
@@ -1177,7 +1184,7 @@ def defines_launcher(path, ident='misterzine-jellyfin'):
 
 
 def zaparoo_facts(root, version=None):
-    """Why Plex does or does not show in Zaparoo, without paths or contents."""
+    """Why MisterZine Jellyfin does or does not show in Zaparoo, without paths or contents."""
     version = version or zaparoo_version
     card = root.parent
     folder = card / 'zaparoo'
@@ -1601,7 +1608,9 @@ def recover_activation(root):
     if previous:
         message += ' and ' + str(previous.get('current', 'the previous release')) + ' was restored.'
     else:
-        message += '. No earlier release is installed; run MisterZine-Jellyfin-Install to retry.'
+        # A stable release has no prerelease part in its version (build_package.py).
+        channel = 'public' if target and '-' not in str(target) else 'beta'
+        message += '. No earlier release is installed; run ' + installer_script(channel) + ' from Scripts to retry.'
     try:
         earlier = json.loads((root / 'updates/status.json').read_text())
         cause = earlier.get('message', '') if earlier.get('stage') in ('activating', 'failed') else ''
@@ -1738,7 +1747,7 @@ class GraphicsConsole:
                 self.ioctl(fd, KDSETMODE, KD_GRAPHICS)
                 if self.told < 5:
                     self.told += 1
-                    trace('console %s was in text mode and would draw over the picture; graphics mode while Plex runs' % name)
+                    trace('console %s was in text mode and would draw over the picture; graphics mode while MisterZine Jellyfin runs' % name)
             elif first:
                 trace('console %s in graphics mode' % name)
         except OSError as exc:
@@ -1787,7 +1796,7 @@ def screen_to_ourselves(holders=fb_holders, console=GraphicsConsole):
 
 
 def lost_core_status(mem, recheck=0.1, sleep=time.sleep):
-    """The ring's status word when it no longer carries the Plex core's
+    """The ring's status word when it no longer carries the H264 core's
     signature, else None. A framebuffer mode write zeroes it until the core's
     next vsync, so a bad reading counts only if it is still bad a few fields
     later."""
@@ -1837,7 +1846,7 @@ def load_menu(card, cmd=Path('/dev/MiSTer_cmd'), wait=10):
     menu shows it came up. False when it did not."""
     rbf = card / 'menu.rbf'
     if not rbf.is_file():
-        trace('no %s; the Plex core stays loaded' % rbf)
+        trace('no %s; the H264 core stays loaded' % rbf)
         return False
     before = mister_processes()
     with open(cmd, 'w') as out:
@@ -1846,7 +1855,7 @@ def load_menu(card, cmd=Path('/dev/MiSTer_cmd'), wait=10):
     deadline = time.monotonic() + wait
     while not any(pid not in before and menu_core(arg) for pid, arg in mister_processes().items()):
         if time.monotonic() > deadline:
-            trace('no MiSTer menu within %d s; the Plex core may still be loaded' % wait)
+            trace('no MiSTer menu within %d s; the H264 core may still be loaded' % wait)
             return False
         time.sleep(.05)
     trace('MiSTer menu loaded')
@@ -1952,7 +1961,7 @@ def main():
             elif args.action == 'remove':
                 remove(args.card)
         if to_menu:
-            # With the lock let go, so Plex picked again meanwhile still launches.
+            # With the lock let go, so MisterZine Jellyfin picked again meanwhile still launches.
             linger_for_start_check()
             return EXIT_TO_MENU     # the updater's start check reads it
     except KeyboardInterrupt:

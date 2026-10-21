@@ -347,7 +347,7 @@ func TestUpdaterLaunchErrorIsAFailure(t *testing.T) {
 	_, rows := u.view()
 	rows[0].do() // Update now
 	s := a.updates.status
-	if s.Stage != "failed" || s.Release == nil || s.Release.ID != "pub" || !strings.Contains(s.Message, "MisterZine-Jellyfin-Install") {
+	if s.Stage != "failed" || s.Release == nil || s.Release.ID != "pub" || !strings.Contains(s.Message, "Run MisterZine-Jellyfin-Install-Beta from Scripts") {
 		t.Fatalf("launch error: %+v", s)
 	}
 	readStatus(t, a)

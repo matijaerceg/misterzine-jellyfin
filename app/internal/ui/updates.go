@@ -283,7 +283,7 @@ func (a *App) startUpdate(action string, r *updates.Release) {
 	exited, err := updates.Start(root, action, r)
 	a.updates.exited = exited
 	if err != nil {
-		a.fail(shown, "Could not start the updater. Run MisterZine-Jellyfin-Install to repair update support.")
+		a.fail(shown, "Could not start the updater. Run "+updates.Installer()+" from Scripts to repair update support.")
 		return
 	}
 	a.updates.status = updates.Status{Stage: stage, Release: shown}
