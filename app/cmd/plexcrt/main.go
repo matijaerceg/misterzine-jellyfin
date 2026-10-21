@@ -235,9 +235,9 @@ func merge(a, b <-chan input.Event, stop <-chan struct{}) <-chan input.Event {
 				if !ok {
 					return
 				}
-				out <- ev
+				input.Send(out, ev) // the poller's rule again: this buffer is the one a stall fills
 			case ev := <-b:
-				out <- ev
+				input.Send(out, ev)
 			case <-stop:
 				return
 			}

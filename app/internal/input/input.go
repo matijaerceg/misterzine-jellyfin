@@ -168,7 +168,19 @@ func newPoller(src Source, out chan<- Event, specials bool) *poller {
 	return p
 }
 
-func (p *poller) send(ev Event) { p.out <- ev }
+func (p *poller) send(ev Event) { Send(p.out, ev) }
+
+// Send puts ev on out, the only sender's, except an auto-repeat while out
+// still holds an event: repeats come on the clock, and a stalled reader
+// would otherwise get them all after the key is let go. Presses and
+// releases always go, in order. False when ev was dropped.
+func Send(out chan<- Event, ev Event) bool {
+	if ev.Repeat && len(out) > 0 {
+		return false
+	}
+	out <- ev
+	return true
+}
 
 func (p *poller) special(s Special, code int) {
 	if p.specials {
@@ -225,8 +237,9 @@ func (p *poller) pads(cur uint32, now time.Time) {
 			p.held = None
 		} else if now.Sub(p.heldSince) > repeatDelay && now.Sub(p.lastRep) > repeatRate {
 			p.lastRep = now
-			p.reps++
-			p.send(Event{Key: p.held, Repeat: true, Count: p.reps})
+			if Send(p.out, Event{Key: p.held, Repeat: true, Count: p.reps + 1}) {
+				p.reps++
+			}
 		}
 	}
 }
