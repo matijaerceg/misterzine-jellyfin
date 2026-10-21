@@ -39,8 +39,9 @@ func (r *Ring) Watch(logf func(string, ...any), wake func(), stop <-chan struct{
 		}
 		// The old control block survives a core change. Stop using it once
 		// Main names another core; heartbeat checks also inhibit writes during
-		// reconfiguration before Main updates the name.
-		if !r.coreAvailable() {
+		// reconfiguration before Main updates the name. Reading the name here
+		// keeps the writers' copy of it fresh.
+		if !r.CoreAvailable() {
 			name, _ := CoreName()
 			logf("watch: core changed to %q; stopping overlay writes", name)
 			return

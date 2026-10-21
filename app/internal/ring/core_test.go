@@ -981,7 +981,7 @@ func TestCoreSwitchStopsFramebufferAndDescriptorWrites(t *testing.T) {
 	}
 	fb := append([]byte(nil), f.fb...)
 	ctrl := append([]uint32(nil), f.m...)
-	if f.r.coreAvailable() {
+	if f.r.CoreAvailable() {
 		t.Fatal("core switch was not detected")
 	}
 	f.r.End()
@@ -1010,8 +1010,40 @@ func TestMappedRingRejectsMissingCoreIdentity(t *testing.T) {
 		t.Fatal("host fake should tolerate a missing core name")
 	}
 	f.r.ctrlMem = []byte{0} // marks a real mapped control block
-	if f.r.coreAvailable() {
+	if f.r.CoreAvailable() {
 		t.Fatal("mapped ring should reject a missing core identity")
+	}
+}
+
+// The writers check the core several times a frame: they take the last
+// reading of MiSTer's core name while it is fresh (Watch reads it every
+// 50 ms), and read it themselves once it is stale, so a ring nobody
+// watches still stops at a core switch.
+func TestWritersReuseAFreshCoreNameReading(t *testing.T) {
+	f := newFake(t, false)
+	old := coreNameFile
+	coreNameFile = filepath.Join(t.TempDir(), "CORENAME")
+	t.Cleanup(func() { coreNameFile = old })
+	if err := os.WriteFile(coreNameFile, []byte("MisterZine Jellyfin\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.r.ctrlMem = []byte{0}
+	if !f.r.CoreAvailable() {
+		t.Fatal("app core was marked unavailable")
+	}
+	if err := os.WriteFile(coreNameFile, []byte("Other Core\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !f.r.coreAvailable() {
+		t.Fatal("a fresh reading was read again")
+	}
+	f.r.coreNamed.Store(time.Now().Add(-coreNameFresh).UnixNano())
+	if f.r.coreAvailable() {
+		t.Fatal("a stale reading was trusted")
+	}
+	f.r.coreNamed.Store(time.Now().UnixNano())
+	if f.r.coreAvailable() {
+		t.Fatal("core loss latch cleared by a fresh stamp")
 	}
 }
 

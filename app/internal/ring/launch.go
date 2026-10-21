@@ -22,7 +22,12 @@ var (
 // CoreLoaded reports whether MiSTer main says the H.264 core is loaded.
 func CoreLoaded() bool {
 	name, ok := CoreName()
-	return ok && (name == "MisterZine Jellyfin" || name == "H264") // accept old installations during upgrade
+	return ok && appCore(name)
+}
+
+// appCore reports whether a core name is the app's core.
+func appCore(name string) bool {
+	return name == "MisterZine Jellyfin" || name == "H264" // accept old installations during upgrade
 }
 
 // CoreName reads the name MiSTer main publishes for the currently loaded core.

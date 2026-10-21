@@ -1,6 +1,8 @@
 package ring
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"unsafe"
 
@@ -8,6 +10,11 @@ import (
 )
 
 func benchmarkRing(b *testing.B, w, h int, native, wide bool) *Ring {
+	b.Helper()
+	return benchmarkRingAR(b, w, h, native, wide, 16, 9)
+}
+
+func benchmarkRingAR(b *testing.B, w, h int, native, wide bool, arx, ary int) *Ring {
 	b.Helper()
 	words := make([]uint32, ctrlLen/4)
 	put := func(word int, lo, hi uint32) {
@@ -17,7 +24,7 @@ func benchmarkRing(b *testing.B, w, h int, native, wide bool) *Ring {
 	put(wSeqHead, 1, 0)
 	put(wSeqTail, 1, 0)
 	put(wRaster, uint32(w)|uint32(h)<<12|uint32(map[bool]int{true: 1}[native])<<24, 0)
-	put(wAspect, 16|9<<12, 0)
+	put(wAspect, uint32(arx)|uint32(ary)<<12, 0)
 	if wide {
 		put(wDisplay, 1<<6, 0)
 	}
@@ -29,11 +36,11 @@ func benchmarkRing(b *testing.B, w, h int, native, wide bool) *Ring {
 }
 
 func benchmarkFrame(b *testing.B, w, h int, native, wide bool) {
-	r := benchmarkRing(b, w, h, native, wide)
-	cw, ch := W, H
-	if wide {
-		cw = 960
-	}
+	benchmarkPublish(b, benchmarkRing(b, w, h, native, wide))
+}
+
+func benchmarkPublish(b *testing.B, r *Ring) {
+	cw, ch := r.PlaybackCanvasSize()
 	c := gfx.NewCanvas(cw, ch)
 	px := unsafe.Slice((*uint32)(unsafe.Pointer(&c.Pix[0])), cw*ch)
 	for i := range px {
@@ -56,6 +63,20 @@ func BenchmarkPublishFrame(b *testing.B) {
 	b.Run("720x576", func(b *testing.B) { benchmarkFrame(b, 720, 576, false, false) })
 	b.Run("720x576-wide", func(b *testing.B) { benchmarkFrame(b, 720, 576, false, true) })
 	b.Run("1280x720", func(b *testing.B) { benchmarkFrame(b, 1280, 720, true, true) })
+	// a scope picture on Native: the 16:9 layout is pillarboxed
+	b.Run("1280x534-pillarbox", func(b *testing.B) { benchmarkPublish(b, benchmarkRingAR(b, 1280, 534, true, true, 12, 5)) })
+}
+
+// BenchmarkPublishFrameNamedCore publishes with MiSTer's core name file in
+// place, as on the device, where every write checks it.
+func BenchmarkPublishFrameNamedCore(b *testing.B) {
+	old := coreNameFile
+	coreNameFile = filepath.Join(b.TempDir(), "CORENAME")
+	b.Cleanup(func() { coreNameFile = old })
+	if err := os.WriteFile(coreNameFile, []byte("MisterZine Jellyfin\n"), 0o644); err != nil {
+		b.Fatal(err)
+	}
+	benchmarkFrame(b, 720, 480, false, false)
 }
 
 func BenchmarkMovingPlaybackPanel(b *testing.B) {

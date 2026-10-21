@@ -50,12 +50,17 @@ const (
 	// cadenceWait covers one 50 Hz field plus scheduling margin, while
 	// bounding how long a stopped core can hold the render thread.
 	cadenceWait = 25 * time.Millisecond
+	// coreNameFresh is how long a reading of MiSTer's core name stands for
+	// the writers: two of Watch's 50 ms polls, as long as a stalled
+	// heartbeat takes to stop writes.
+	coreNameFresh = 100 * time.Millisecond
 )
 
 // Ring is the mapped control block and overlay pages.
 type Ring struct {
 	c           ctrl
-	coreLost    atomic.Bool // latched once MiSTer names a different core
+	coreLost    atomic.Bool  // latched once MiSTer names a different core
+	coreNamed   atomic.Int64 // when MiSTer last named this core (Unix ns, 0: not yet)
 	writeBeat   atomic.Uint32
 	writeBeatAt atomic.Int64
 	ctrlMem     []byte
@@ -637,25 +642,36 @@ func (r *Ring) reassert() bool {
 	return true
 }
 
-// coreAvailable latches a core switch as soon as MiSTer publishes its name.
-// A real mapped ring also treats a missing or empty name as loss; attached
-// host-side test rings have no MiSTer name file.
-func (r *Ring) CoreAvailable() bool { return r.coreAvailable() }
-
-func (r *Ring) coreAvailable() bool {
+// CoreAvailable reads MiSTer's core name and latches a core switch as soon
+// as MiSTer publishes it. A real mapped ring also treats a missing or empty
+// name as loss; attached host-side test rings have no MiSTer name file.
+// Watch and the app's watchdog call it every 50 ms, which keeps the answer
+// the writers use (coreAvailable) fresh.
+func (r *Ring) CoreAvailable() bool {
 	if r.coreLost.Load() {
 		return false
 	}
 	name, ok := CoreName()
-	if !ok && r.ctrlMem != nil {
+	if !ok && r.ctrlMem != nil || ok && !appCore(name) {
 		r.coreLost.Store(true)
 		return false
 	}
-	if ok && name != "MisterZine Jellyfin" && name != "H264" {
-		r.coreLost.Store(true)
-		return false
-	}
+	r.coreNamed.Store(time.Now().UnixNano())
 	return true
+}
+
+// coreAvailable is the writers' check, made several times a frame: the
+// last reading of the name while it is under coreNameFresh old, a reading
+// otherwise (no Watch running). MiSTer names a new core only once the FPGA
+// is reconfigured, which stops the heartbeat writesAllowed checks first.
+func (r *Ring) coreAvailable() bool {
+	if r.coreLost.Load() {
+		return false
+	}
+	if at := r.coreNamed.Load(); at != 0 && time.Now().UnixNano()-at < int64(coreNameFresh) {
+		return true
+	}
+	return r.CoreAvailable()
 }
 
 // writesAllowed is a non-blocking ownership and heartbeat check. During FPGA
