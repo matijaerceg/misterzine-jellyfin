@@ -957,15 +957,14 @@ func (r *Ring) Slot() []byte {
 }
 
 // fillOpaque copies BGRx pixels into a page as ARGB8888 with alpha 255,
-// each channel scaled by level/256 (Full: unchanged). One aligned 32-bit
-// store a pixel.
+// each channel scaled by level/256 (Full: unchanged, and copied in blocks
+// on ARM: see copyOpaque).
 func fillOpaque(dst, src []uint32, level uint32) {
 	if level >= Full {
-		for i, p := range src {
-			dst[i] = p | 0xFF000000
-		}
+		copyOpaque(dst, src)
 		return
 	}
+	dst = dst[:len(src)]
 	for i, p := range src {
 		rb := (p & 0xFF00FF) * level >> 8 & 0xFF00FF
 		g := (p & 0xFF00) * level >> 8 & 0xFF00
