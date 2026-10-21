@@ -1,10 +1,10 @@
 # Architecture
 
 MisterZine Jellyfin is a Jellyfin client for the MiSTer FPGA. It forks the
-MisterZine Plex app but does **not** ship its own FPGA core: video decoding and
-output come from the third-party H.264 decoder core vendored at
+MisterZine Plex app. Video decoding and output come from this project's own
+fork of the H.264 decoder core, kept at
 [`third_party/MiSTer_h264_decoder`](../third_party/MiSTer_h264_decoder)
-(GPL-3.0-or-later core, MIT client library). Its integration manual is under
+(GPL-3.0-or-later core, MIT client library) and shipped with each release. Its integration manual is under
 `third_party/MiSTer_h264_decoder/site/content/integrating/` (overview, overlay,
 launch) and the C interface is `hps/include/h264ring.h`.
 
@@ -36,12 +36,13 @@ launch) and the C interface is `hps/include/h264ring.h`.
   `libh264ring`. The Go app requests streams and reports progress to Jellyfin.
 - **Installer and updater** (`release/manager.py`, `update_service.py`,
   `catalogue.py`, `build_package.py`) keep the versioned-release, hash-checked,
-  rollback-capable layout of the Plex app. Payload names still describe the
-  Plex build; adapting packaging to the Jellyfin worker is still pending.
+  rollback-capable layout of the Plex app. The payload is `plexcrt`, `jfplay`,
+  `ffmpeg` and `H264.rbf`.
 
 Release channels (`public`, `beta`) remain; the channel is set at link time
-with `-X plexcrt/internal/updates.Channel=...`. There is no access gating:
-every build plays.
+with `-X plexcrt/internal/updates.Channel=...`. Builds from this repository
+have no access gating; official beta builds add the supporter code from a
+private repository ([supporter builds](SUPPORTER_BUILDS.md)).
 
 ## What is still Plex
 
@@ -59,17 +60,14 @@ These parts still carry Plex behaviour and have to be rewritten or retargeted:
 - Done: the playback launcher (`ui/player.go`, `docs/PLAYBACK.md`) asks
   PlaybackInfo with the core's device profile (`ui/deviceprofile.go`), runs
   `jfplay` on the direct stream or the HLS transcode, reports progress, seeks
-  by restarting the player, and sets the core's Analog Aspect for the crop
-  choice. Subtitles are not rendered yet.
-- `ui/config.go` still carries Plex-era comments and values around bitrate,
-  audio boost and subtitle size; `seasonsOf` in `ui/app.go` still skips Plex's
+  in place (restarting the player when it cannot), and sets the core's Analog
+  Aspect for the crop choice. Selected subtitles are burned in by the server.
+- `ui/config.go` still keeps a Plex-era subtitle size value that nothing uses; `seasonsOf` in `ui/app.go` still skips Plex's
   `/allLeaves` seasons, which Jellyfin never returns.
 - The Collections tab lists every box set on the server in every film or show
   library, because Jellyfin's box sets do not belong to a library.
-- The installer payload list (`release/manager.py` `PAYLOAD`,
-  `release/build_package.py`) still names `plexplay.py`, `plexfb` and the Plex
-  core `.rbf`.
-- Branding strings (MisterZine Plex Core) throughout, unchanged for now.
+- Internal names (the `plexcrt` executable and module, `MISTERZINE_PLEX_*`
+  and `PLEXCRT_*` environment variables) still carry the Plex name.
 
 ## The ring and input packages on the H.264 core (as built, 2026-10-15)
 
