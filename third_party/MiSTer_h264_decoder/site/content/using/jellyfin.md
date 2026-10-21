@@ -1,119 +1,59 @@
 # Watching from a Jellyfin server
 
-The core comes with a Jellyfin client: the films and shows on your
-[Jellyfin](https://jellyfin.org) server, shown by the core on HDMI and on the analog output, a
-CRT included, with their sound and subtitles. You pick what to watch in any Jellyfin app (on
-your phone, in a web browser) and play it on the MiSTer, the way you would play it on a TV.
+This build of the core is the one **MisterZine Jellyfin** ships with: an app that
+browses and plays the films and shows on your [Jellyfin](https://jellyfin.org)
+server, on a CRT or over HDMI, driven with the gamepad. The app's own manual
+covers installing, signing in and every screen:
 
-!!! warning "Early"
-    The client is new. It has no menu of its own to browse your library: you choose what
-    to play in another Jellyfin app, and the MiSTer plays it. Stereo sound.
+- [Installation and help](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/release/README.md)
+- [Full reference](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/docs/REFERENCE.md)
+- [HDMI setup](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/docs/HDMI.md)
+
+!!! note "Not the upstream cast client"
+    The upstream core comes with a cast-only Jellyfin client, started from
+    **Scripts** → **jellyfin** and set up in `jellyfin.ini`. Its source is still in
+    `clients/jellyfin`, but MisterZine Jellyfin releases do not include it. The app
+    has its own menus: you browse and choose on the MiSTer, not from a phone.
+
+## Installing and starting
+
+Run the MisterZine Jellyfin installer from **Scripts**. It installs the app and
+this core together and adds **MisterZine Jellyfin** to the MiSTer main menu. Open
+that entry: it loads the core and starts the app. Sign in with the server's
+address, then Jellyfin **Quick Connect** or a user name and password.
 
 ## What plays
 
-Anything on your server. When a file already suits the core -- H.264 at 10 Mbit/s or less, up
-to 1280x720 at 30 frames per second or up to 854x480 at 60 -- the MiSTer plays the file itself.
-Anything else -- 1080p and 4K films, HEVC, interlaced recordings -- the server converts as it
-sends it (a **transcode**) to a picture the core plays in real time: **1280x720** when Video
-Output is **Native (HDMI)** (what Auto picks on a MiSTer used with HDMI only), so a 1080p film
-keeps its detail on an HD display; **854x480** on the Interlaced and Progressive outputs, which
-are 480 lines (576 at 50 Hz) and would show no more.
+Files the core can certainly play are streamed as they are stored: H.264 High or
+Main, 8-bit, up to 1280x720 at 30 frames per second or up to 854 pixels wide at
+60, within a bitrate the core keeps up with. Anything else, and anything with
+subtitles turned on, is converted by your server as it sends it (a
+**transcode**) to H.264 within the same limits. Subtitles are burned into the
+picture by the server.
 
-Films and shows made at 25 frames per second (PAL) switch the output to 50 Hz when
-**Refresh Rate** is **Auto** ([Settings](settings.md)).
+The output follows the core's [Settings](settings.md): **Output Mode**, **Display
+Shape**, **Refresh Rate Match**, **240p Playback** and **Play 24fps at 25fps**.
+The app's menus are drawn over the video, as [your own screens](../integrating/overlay.md)
+are for any program.
 
-## Installing
+## Controls
 
-Copy the release's `Scripts/jellyfin.sh` and `jellyfin/` folder to the root of the SD card
-(`/media/fat/`), beside the core itself ([Install the core](../getting-started/install.md)).
-
-## First run: the settings
-
-Run **Scripts** → **jellyfin** from the MiSTer menu. The first time, it creates
-`/media/fat/jellyfin/jellyfin.ini` and stops. Edit that file (from your PC over the network, or
-on the SD card) and set `server=` to your server's address, as a web browser opens it:
-
-```ini
-server=https://jellyfin.example.com
-name=MiSTer
-user=
-password=
-```
-
-| Setting | Meaning |
-|---|---|
-| `server` | your Jellyfin server: `https://...`, or `http://` and its address and port (`http://jellyfin.local:8096`) |
-| `name` | how the MiSTer appears in Jellyfin's list of devices to play on |
-| `user`, `password` | only for a server with **Quick Connect** turned off: the account to sign in with. They are kept in the file as written; prefer Quick Connect |
-| `screensaver_dim`, `screensaver_black` | optional: the minutes before the screen dims, then goes black, while nothing plays (5 and 30; 0 turns that step off): [The screensaver](#the-screensaver) |
-
-## Signing in
-
-Run **jellyfin** again. The core loads and shows a six-digit code. In any Jellyfin app where you
-are signed in, open **Settings** → **Quick Connect** and enter the code. The MiSTer signs in to
-your account and remembers it; you do this once.
-
-## Playing something
-
-When the MiSTer shows **Ready to play**, open Jellyfin on your phone or in a browser, choose a
-film or an episode, and pick the MiSTer (the `name` from the settings) as the device to play on
--- the **cast** / **Play on** button in the Jellyfin apps. It starts playing on the MiSTer; the
-app becomes its remote: pause, seek, stop, volume, the audio and subtitle tracks.
-
-When something starts, the MiSTer shows its title and progress for a few seconds; the panel
-stays up while the film is paused.
-
-**Subtitles** in text formats (SRT, ASS, WebVTT) are drawn by the MiSTer over the picture.
-Picture subtitles (DVD and Blu-ray subtitles) are burned into the picture by your server, which
-makes it convert the film.
-
-## Controls on the MiSTer
-
-A gamepad or the keyboard controls the film playing:
-
-| Gamepad | Keyboard | |
-|---|---|---|
-| A, Start | Space, Enter, K | pause / play |
-| Left / Right | Left / Right | back 10 seconds / forward 30 seconds |
-| LB, Down / RB, Up | Page Down / Page Up | back / forward 5 minutes |
-| X | S | the next subtitle track (or off) |
-| Y | A | the next audio track |
-| B | I | show the title and progress |
-| Back + Start | Esc, Q | stop -- and, on the **Ready to play** screen, quit to the MiSTer menu |
-
-**Seeking** adds up: tap Right three times, or hold it, and the panel shows where you are going;
-the film jumps there once you stop pressing. The picture stays on screen, frozen, while the film
-starts again at the new place (the panel says **Loading**): about two seconds for a file the MiSTer
-plays directly, about three for a converted one (a transcode) while your server restarts its
-conversion.
-
-Switching **subtitles** between text tracks (or off) is instant. A picture subtitle the server must
-burn in restarts the film where it was.
-
-**Send Home to the program** in the MiSTer menu stops what plays; **Program menu** shows the
-title and progress ([Settings](settings.md)).
-
-**To quit:** on the **Ready to play** screen press Back + Start (or Esc), or load another core
-from the MiSTer menu. The MiSTer returns to its menu.
+The app reads the gamepad and keyboard through the core ([Controls](controls.md)).
+The D-pad moves, OK selects and Back goes back. During playback OK opens the
+controls; the first Back closes what is on screen and the next one stops. The
+app's reference lists every control.
 
 ## The screensaver
 
-After 5 minutes while nothing plays (the **Ready to play** screen, the sign-in code, or a film
-paused), the screen dims. A line of text fades in and out at different places, saying what is
-up: **Ready to play**, the sign-in code, or the paused film and where it stopped. After 30
-minutes the screen goes black, with the same line. This protects OLED, plasma and CRT screens
-from burn-in.
-
-A button, or playing something from a Jellyfin app, brings the screen back; a button press that
-wakes it does nothing else. To change the times, add these lines to `jellyfin.ini` (minutes;
-0 turns a step off):
-
-```ini
-screensaver_dim=5
-screensaver_black=30
-```
+After three minutes without a press in the menus, or on a paused video, the app
+dims the screen to a quarter of its brightness. The next press only brings it
+back. The sign-in screens never dim.
 
 ## If it does not work
 
-The client writes what it did to `/media/fat/jellyfin/jellyfin.log`. See
-[Troubleshooting](../reference/troubleshooting.md#jellyfin).
+In the app, **Options** → **Send a report** saves a report with the app's and
+the player's logs to `/media/fat/misterzine-jellyfin/report.txt`;
+**Scripts** → **MisterZine-Jellyfin-Diagnostics** writes the same file when the
+app does not start. See the app's
+[help page](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/release/README.md)
+for what to check.
