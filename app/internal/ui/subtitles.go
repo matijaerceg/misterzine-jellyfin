@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -169,14 +170,28 @@ func cleanCue(text []string) []string {
 func isASCIILetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 
 // at is the text showing at sec: the lines of every cue on screen then,
-// the earlier cue's first (two speakers), nil for none.
+// the earlier cue's first (two speakers), nil for none. One cue alone is
+// its own lines, not a copy: this runs every field.
 func (t subtitleTrack) at(sec float64) []string {
 	n := sort.Search(len(t), func(i int) bool { return t[i].start > sec })
 	var lines []string
+	one := -1
 	for i := max(0, n-subtitleLookBack); i < n; i++ {
-		if t[i].end > sec {
-			lines = append(lines, t[i].lines...)
+		if t[i].end <= sec {
+			continue
 		}
+		if one < 0 && lines == nil {
+			one = i
+			continue
+		}
+		if lines == nil {
+			lines = append(lines, t[one].lines...)
+		}
+		lines = append(lines, t[i].lines...)
+	}
+	if lines == nil && one >= 0 {
+		l := t[one].lines
+		return l[:len(l):len(l)]
 	}
 	return lines
 }
@@ -204,8 +219,12 @@ func subtitleDrawable(data []byte) bool {
 // app fetching them first.
 type subtitleMemory struct {
 	mu      sync.Mutex
-	undrawn map[string]bool
+	undrawn map[subtitleStream]bool
 }
+
+// subtitleStream is a track of an item: a key that is looked up every
+// field without building a string.
+type subtitleStream struct{ item, stream string }
 
 // drawsSubtitle reports whether the app draws subtitle track s of an item
 // itself (Player.DrawsSubtitle): a text track not found undrawable. The
@@ -216,7 +235,7 @@ func (a *App) drawsSubtitle(itemID string, s jellyfin.Stream) bool {
 	}
 	a.subtitles.mu.Lock()
 	defer a.subtitles.mu.Unlock()
-	return !a.subtitles.undrawn[itemID+"|"+s.ID]
+	return !a.subtitles.undrawn[subtitleStream{itemID, s.ID}]
 }
 
 // undrawable remembers a text track the app cannot draw.
@@ -224,9 +243,9 @@ func (a *App) undrawable(itemID, id string) {
 	a.subtitles.mu.Lock()
 	defer a.subtitles.mu.Unlock()
 	if a.subtitles.undrawn == nil {
-		a.subtitles.undrawn = map[string]bool{}
+		a.subtitles.undrawn = map[subtitleStream]bool{}
 	}
-	a.subtitles.undrawn[itemID+"|"+id] = true
+	a.subtitles.undrawn[subtitleStream{itemID, id}] = true
 }
 
 // The drawn subtitles' look.
@@ -438,7 +457,11 @@ func (p *Playing) showSubtitle(osd OSD, lines []string) {
 		return
 	}
 	size := p.app.Cfg.SubtitleSizeValue()
+	if isSubtitleKey(p.last) && size == p.subSize && slices.Equal(lines, p.subLines) {
+		return // up already: no key to build every field
+	}
 	key := "sub|" + itoa(size) + "|" + strings.Join(lines, "\n")
+	p.subSize, p.subLines = size, lines
 	if key == p.last {
 		return
 	}

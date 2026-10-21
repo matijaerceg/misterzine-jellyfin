@@ -104,6 +104,21 @@ type Playing struct {
 	subsGen  int
 	subsDone chan subtitleFetch
 	posAt    time.Time
+	subSize  int      // the size and lines of the subtitle panel last put up
+	subLines []string // (last is its key), compared without building one
+	// panelKey's last answer and what it was made from
+	panelFor  panelState
+	panelText string
+}
+
+// panelState is what panelKey describes, kept to compare every field.
+type panelState struct {
+	item                 *jellyfin.Item
+	kind, title, series  string
+	season, index, year  int
+	pos, focus, scrubTo  int
+	paused, scrub        bool
+	bufferFrom, bufferTo int
 }
 
 type listMode struct {
@@ -1081,10 +1096,20 @@ func heading(it *jellyfin.Item) (title, sub string) {
 	return it.Title, ""
 }
 
-// panelKey describes what the panel would show, without drawing it.
+// panelKey describes what the panel would show, without drawing it. Tick
+// asks every field: the string is built again only when that changed.
 func (p *Playing) panelKey() string {
-	title, sub := heading(p.item)
-	return title + sub + "|" + itoa(int(p.pos)) + "|" + itoa(p.focus) + "|" + itoa(btoi(p.paused)) + "|" + itoa(btoi(p.scrub)) + "|" + itoa(int(p.scrubTo)) + p.bufferKey()
+	it := p.item
+	a, b := p.bufferPixels()
+	s := panelState{it, it.Type, it.Title, it.SeriesTitle, it.Season, it.Index, it.Year,
+		int(p.pos), p.focus, int(p.scrubTo), p.paused, p.scrub, a, b}
+	if s == p.panelFor && p.panelText != "" {
+		return p.panelText
+	}
+	title, sub := heading(it)
+	p.panelFor = s
+	p.panelText = title + sub + "|" + itoa(int(p.pos)) + "|" + itoa(p.focus) + "|" + itoa(btoi(p.paused)) + "|" + itoa(btoi(p.scrub)) + "|" + itoa(int(p.scrubTo)) + p.bufferKey()
+	return p.panelText
 }
 
 // skipKey describes the skip button.
