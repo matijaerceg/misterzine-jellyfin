@@ -51,6 +51,9 @@ const (
 	// the hero follows the focus only once it has rested this long, so a
 	// held key glides over the tiles without a fade (or a fetch) per item
 	HeroRest = 250 * time.Millisecond
+	// then it waits up to this long for the item's backdrop and logo, so
+	// the page changes once, with them, rather than again as each lands
+	HeroArtWait = 350 * time.Millisecond
 	// chevrons: lit when there is a row that way
 	ChevronOff = gfx.Color(0x4A5266)
 )
@@ -83,6 +86,7 @@ type Home struct {
 
 	page, pagePrev *gfx.Canvas // composed page, and the one before it for the cross-fade
 	pageKey        string      // item + row + which pictures were in
+	pageItem       string      // item + row alone
 	pageRow        int
 	fade           Fade
 	logo           logoLayer
@@ -614,26 +618,35 @@ func (h *Home) drawPage(c *gfx.Canvas, now time.Time) bool {
 		return false
 	}
 	art := heroArt(it)
-	key := it.ID + "|" + art + "|" + itoa(h.row)
-	if h.page != nil && !strings.HasPrefix(h.pageKey, key) && h.pageRow == h.row && now.Sub(h.focusAt) < HeroRest {
+	item := it.ID + "|" + art + "|" + itoa(h.row)
+	keep := h.page != nil && h.pageItem != item && h.pageRow == h.row
+	if keep && now.Sub(h.focusAt) < HeroRest {
 		// still moving along the row: keep the page, and keep drawing until it rests
 		c.BlitExcept(h.page, h.holes)
 		h.logoLayer().draw(c, h.page, now)
 		return true
 	}
-	img, _, _ := h.app.Art.get(h.backdropRequest(art, c.W, c.H))
-	if img != nil {
-		key += "|art"
-	}
+	img, _, artFailed := h.app.Art.get(h.backdropRequest(art, c.W, c.H))
 	var logo *gfx.Image
 	logoPending := false
 	if it.Logo != "" {
 		var failed bool
-		if logo, failed = h.app.Art.GetLogo(it.Logo, LogoW, LogoH); logo != nil {
-			key += "|logo"
-		} else {
-			logoPending = !failed
-		}
+		logo, failed = h.app.Art.GetLogo(it.Logo, LogoW, LogoH)
+		logoPending = logo == nil && !failed
+	}
+	if keep && (img == nil && !artFailed || logoPending) && now.Sub(h.focusAt) < HeroRest+HeroArtWait {
+		// rested, its pictures on their way: keep the page a moment longer,
+		// so the new one is composed once with them, not again as each lands
+		c.BlitExcept(h.page, h.holes)
+		h.logoLayer().draw(c, h.page, now)
+		return true
+	}
+	key := item
+	if img != nil {
+		key += "|art"
+	}
+	if logo == nil && !logoPending {
+		key += "|title" // the logo rides above the page; only its title is composed
 	}
 	if h.home && !h.app.premiumHomeLogo() {
 		key += "|nomark" // hidden in Options: compose again when it changes
@@ -646,7 +659,7 @@ func (h *Home) drawPage(c *gfx.Canvas, now time.Time) bool {
 			h.page = gfx.NewCanvas(c.W, c.H)
 		}
 		h.compose(h.page, it, img, logo, logoPending)
-		h.pageKey = key
+		h.pageKey, h.pageItem = key, item
 		h.pageRow = h.row
 		if h.pagePrev != nil {
 			h.pageFade().Start(h.pagePrev, h.page, now)
@@ -892,7 +905,8 @@ func (h *Home) prefetchPosters() {
 
 // Keep just the nearest hero candidates warm: full-screen decoded art is
 // much larger than a poster. Art reuses both its bounded memory cache and
-// the Jellyfin client's disk cache when these become visible.
+// the Jellyfin client's disk cache when these become visible. Their logos
+// come with them, so a hero the cursor rests on has both (HeroArtWait).
 func (h *Home) prefetchBackdrops(w, height int) {
 	if h.app.Art == nil || !h.home {
 		return
@@ -908,6 +922,9 @@ func (h *Home) prefetchBackdrops(w, height int) {
 				req := h.backdropRequest(heroArt(it), w, height)
 				req.prefetch = true
 				h.app.Art.get(req)
+				if it.Logo != "" {
+					h.app.Art.get(artReq{thumb: it.Logo, w: LogoW, h: LogoH, logo: true, prefetch: true})
+				}
 			}
 		}
 	}
