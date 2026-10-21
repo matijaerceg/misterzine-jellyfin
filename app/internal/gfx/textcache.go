@@ -2,13 +2,14 @@ package gfx
 
 import (
 	"sync"
+	"time"
 )
 
 // TextCache renders text lines off the render thread. A line is an opaque
 // strip (text over a known background) so drawing it is one memmove per
 // row and never reads the destination, which matters when the destination
-// is the write-combined frame ring. A line not yet rendered is queued and
-// simply absent for a frame.
+// is the write-combined frame ring. A long line not yet rendered is queued
+// and simply absent for a frame; a short one is rendered on the spot.
 //
 // Lines live in two generations: new lines go into cur, and when cur is
 // full it becomes old and the previous old is dropped. A line found in old
@@ -21,6 +22,8 @@ type TextCache struct {
 	work     chan textKey
 	wake     chan struct{}
 	gen      int // lines per generation
+	syncAt   time.Time
+	syncLeft int // characters still to render on the caller this field
 }
 
 type textKey struct {
@@ -87,15 +90,51 @@ func (tc *TextCache) worker() {
 	}
 }
 
-// Get returns the rendered line, or nil after queueing it.
+// A line of up to syncLen characters is rendered by the caller when it is
+// first asked for, so text that changes under the user (a typed address,
+// a counter) never blanks for a frame. A 30-character line takes about
+// 30 us on a desktop core and several times that on the DE10, so only
+// syncBudget characters a field are rendered this way, keeping a screenful
+// of new lines off one frame: the rest go to the workers.
+const (
+	syncLen    = 40
+	syncBudget = 240
+	syncField  = 16700 * time.Microsecond
+)
+
+// spend reports whether n more characters may be rendered on the caller
+// this field; tc.mu is held.
+func (tc *TextCache) spend(n int) bool {
+	if now := time.Now(); now.Sub(tc.syncAt) >= syncField {
+		tc.syncAt, tc.syncLeft = now, syncBudget
+	}
+	if n > tc.syncLeft {
+		return false
+	}
+	tc.syncLeft -= n
+	return true
+}
+
+// Get returns the rendered line, or nil after queueing it. Short lines
+// are rendered at once (see syncLen).
 func (tc *TextCache) Get(f *Font, s string, col, bg Color) *Image {
 	if s == "" {
 		return nil
 	}
 	k := textKey{f, s, col, bg}
 	tc.mu.Lock()
-	defer tc.mu.Unlock()
 	if img := tc.lookup(k); img != nil {
+		tc.mu.Unlock()
+		return img
+	}
+	if len(s) <= syncLen && tc.spend(len(s)) {
+		// render without the lock, so the workers and other callers go on;
+		// if one of them stores the same line meanwhile, it is identical
+		tc.mu.Unlock()
+		img := renderLine(k)
+		tc.mu.Lock()
+		tc.put(k, img)
+		tc.mu.Unlock()
 		return img
 	}
 	if !tc.busy[k] {
@@ -105,6 +144,7 @@ func (tc *TextCache) Get(f *Font, s string, col, bg Color) *Image {
 		default:
 		}
 	}
+	tc.mu.Unlock()
 	return nil
 }
 
