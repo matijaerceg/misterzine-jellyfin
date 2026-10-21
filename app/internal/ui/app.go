@@ -196,7 +196,7 @@ func New(c *jellyfin.Client, out Presenter, player *Player, lg *log.Logger) *App
 		Small: gfx.Load("reg16"), SmallBold: gfx.Load("med16"), Big: gfx.Load("bold28"), Mark: gfx.Load("condit24"),
 		MarkZ: gfx.Load("blackit26"), MarkM: gfx.Load("blackit17")}
 	a.Mark = NewWordmark()
-	warmFades(720, 480)
+	warmFades(layoutCanvasSize(a)) // 960 wide on a 16:9 display
 	return a
 }
 
@@ -1301,6 +1301,7 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 			t0 := time.Now()
 			a.Art.Frame()
 			c := a.Out.Begin()
+			warmFadesFor(c.W, c.H)
 			animating = a.drawScreen(c, t0)
 			if a.Notice != "" {
 				if time.Since(a.NoticeAt) > 6*time.Second {
