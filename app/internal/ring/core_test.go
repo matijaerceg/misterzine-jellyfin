@@ -190,6 +190,82 @@ func TestNativeRasterUsesTwoFullPagesAndWideLayoutFillsTheRaster(t *testing.T) {
 	}
 }
 
+// On a pillarboxed Native raster (a scope picture) each page gets its black
+// bars once: later frames on it write the picture only. A page another
+// writer took (the playback overlay), a mode write, or an old painting gets
+// them again.
+func TestPillarboxBarsArePaintedOncePerPage(t *testing.T) {
+	f := newFake(t, false)
+	f.set(wRaster, 1280|534<<12|1<<24, 0)
+	f.set(wAspect, 12|5<<12, 0)
+	f.fb = make([]byte, NPage*maxPageSize)
+	f.r.fb = f.fb
+	f.r.setOutput(1280, 534)
+	f.r.setPages()
+	c := gfx.NewCanvas(f.r.PlaybackCanvasSize())
+	c.Fill(0, 0, c.W, c.H, 0x123456)
+	st, _ := f.r.Status()
+	vx, vy, vw, vh := nativeViewport(st, c.W, 1280, 534)
+	if vx == 0 || vy != 0 || vh != 534 {
+		t.Fatalf("viewport %d,%d %dx%d is not a pillarbox", vx, vy, vw, vh)
+	}
+	present := func(want int) []uint32 {
+		t.Helper()
+		f.r.pending = false // no core here to read the descriptor
+		if err := f.r.Present(c); err != nil {
+			t.Fatal(err)
+		}
+		if f.r.cur != want || f.r.want.first != 0 || f.r.want.last != 533 {
+			t.Fatalf("page %d band %d..%d, want page %d, every line", f.r.cur, f.r.want.first, f.r.want.last, want)
+		}
+		return f.r.pages[want]
+	}
+	const marker = 0xFFFFFFFF
+	bar, picture := 100*1280+5, 100*1280+vx
+	page := present(0)
+	if page[bar] != 0xFF000000 || page[100*1280+1279] != 0xFF000000 || page[picture] != 0xFF123456 {
+		t.Fatalf("bars %08x %08x, picture %08x", page[bar], page[100*1280+1279], page[picture])
+	}
+	present(1)
+	page[bar] = marker // stands for a bar painted again
+	if page = present(0); page[bar] != marker || page[picture] != 0xFF123456 {
+		t.Fatalf("a page with its bars: bar %08x, picture %08x", page[bar], page[picture])
+	}
+	f.r.barsAt[0] = time.Now().Add(-barsRepaint)
+	present(1)
+	if page = present(0); page[bar] != 0xFF000000 {
+		t.Fatalf("bars painted %v ago were trusted", barsRepaint)
+	}
+	page[bar] = marker
+	f.r.mu.Lock()
+	f.r.cur = 1
+	if p := f.r.flipTarget(); p != 0 { // the playback overlay draws on page 0
+		t.Fatalf("flip target %d", p)
+	}
+	f.r.mu.Unlock()
+	if page = present(0); page[bar] != 0xFF000000 {
+		t.Fatal("bars of a page the overlay took were trusted")
+	}
+	present(1)
+	page[bar] = marker
+	f.r.mu.Lock()
+	f.r.bars = [NPage]barFrame{} // as Watch does after a framebuffer mode write
+	f.r.mu.Unlock()
+	if page = present(0); page[bar] != 0xFF000000 {
+		t.Fatal("bars were trusted after the framebuffer was cleared")
+	}
+	f.set(wAspect, 16|9<<12, 0) // the same raster filled: the picture covers the bars
+	present(1)
+	if page = present(0); page[bar] != 0xFF123456 {
+		t.Fatalf("a filled raster left %08x at the side", page[bar])
+	}
+	f.set(wAspect, 12|5<<12, 0)
+	present(1)
+	if page = present(0); page[bar] != 0xFF000000 {
+		t.Fatal("bars painted before a filled frame were trusted")
+	}
+}
+
 // The playback panel ends at the canvas's bottom edge; on a raster whose
 // height is not a whole multiple of the canvas's (964x542 from a 960x480
 // design) it must still end at the raster's last line, not two lines short.

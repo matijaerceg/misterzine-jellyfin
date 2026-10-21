@@ -73,6 +73,10 @@ type Ring struct {
 	// use a wider logical canvas and the overlay maps both into these pages.
 	ow, oh, ostride, opage int
 	scaleX                 []int // reused horizontal nearest-neighbor map for page scaling
+	// bars is the viewport each page's black bars were painted around, and
+	// barsAt when (zero frame: none known; see publishFrame).
+	bars   [NPage]barFrame
+	barsAt [NPage]time.Time
 
 	mu      sync.Mutex
 	back    *gfx.Canvas // what Begin hands out; End copies it into a page
@@ -163,6 +167,7 @@ func (r *Ring) setPages() {
 		r.setOutput(W, H)
 	}
 	r.npage = min(NPage, len(r.fb)/r.opage)
+	r.bars = [NPage]barFrame{}
 	for p := 0; p < r.npage; p++ {
 		b := r.fb[p*r.opage : (p+1)*r.opage]
 		r.pages[p] = unsafe.Slice((*uint32)(unsafe.Pointer(&b[0])), r.opage/4)
@@ -434,7 +439,7 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 		return
 	}
 	t := time.Now()
-	p := r.flipTarget()
+	p := r.nextPage()
 	acked := time.Now()
 	r.ackD = acked.Sub(t)
 	if !r.writesAllowed() { // the acknowledgment wait may span a core switch
@@ -444,6 +449,12 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 	src := unsafe.Slice((*uint32)(unsafe.Pointer(&pix[0])), sw*sh)
 	vx, vy, vw, vh := nativeViewport(st, sw, r.ow, r.oh)
 	fullViewport := vx == 0 && vy == 0 && vw == r.ow && vh == r.oh
+	now := time.Now()
+	frame := barFrame{r.ow, r.oh, r.ostride, vx, vy, vw, vh}
+	barred := !fullViewport && r.bars[p] == frame && now.Sub(r.barsAt[p]) < barsRepaint
+	if fullViewport {
+		r.bars[p] = barFrame{} // the frame covers any bars a page had
+	}
 	if fullViewport && r.ow == sw && r.oh == sh {
 		for y := first; y <= last; y++ {
 			fillOpaque(page[y*(r.ostride/4):y*(r.ostride/4)+sw], src[y*sw:(y+1)*sw], Full-r.dim)
@@ -457,7 +468,8 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 		return
 	}
 	// Preserve the design's 4:3 proportions as it is placed on a larger
-	// raster. The unused side bands are opaque black so menus remain legible.
+	// raster. The unused side bands are opaque black so menus remain legible:
+	// painted once a page and geometry (see barFrame), then only the picture.
 	xScale, yScale := float64(vw)/float64(sw), float64(vh)/float64(sh)
 	if cap(r.scaleX) < vw {
 		r.scaleX = make([]int, vw)
@@ -470,27 +482,20 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 	}
 	firstOut := max(0, vy+int(float64(first)*yScale))
 	lastOut := min(r.oh-1, vy+int(float64(last+1)*yScale)-1)
-	if first == 0 && last == sh-1 {
-		if !fullViewport {
-			for y := 0; y < r.oh; y++ {
-				row := page[y*(r.ostride/4) : y*(r.ostride/4)+r.ow]
-				for x := range row {
-					row[x] = 0xFF000000
-				}
-			}
-			firstOut, lastOut = 0, r.oh-1
+	if first == 0 && last == sh-1 && !fullViewport {
+		if !barred {
+			r.paintBars(page, frame)
+			r.bars[p], r.barsAt[p] = frame, now
+			barred = true
 		}
+		firstOut, lastOut = 0, r.oh-1
 	}
-	for py := firstOut; py <= lastOut; py++ {
+	for py := max(firstOut, vy); py <= min(lastOut, vy+vh-1); py++ {
 		row := page[py*(r.ostride/4) : py*(r.ostride/4)+r.ow]
-		if py < vy || py >= vy+vh {
-			continue
-		}
 		sy := min(sh-1, int(float64(py-vy)/yScale))
-		if !fullViewport {
-			for x := range row {
-				row[x] = 0xFF000000
-			}
+		if !fullViewport && !barred { // a band: its lines' side bars only
+			fillBlack(row[:vx])
+			fillBlack(row[vx+vw:])
 		}
 		source := src[sy*sw : (sy+1)*sw]
 		if r.dim == 0 {
@@ -511,10 +516,44 @@ func (r *Ring) publishFrame(pix []byte, first, last int) {
 	r.copyD = r.endedT.Sub(acked)
 }
 
+// barFrame is the page geometry and viewport a page's black bars frame.
+type barFrame struct{ ow, oh, ostride, vx, vy, vw, vh int }
+
+// barsRepaint is how long painted bars are trusted: anything else that
+// draws on the framebuffer (a console message) does not stay longer.
+const barsRepaint = time.Second
+
+// paintBars fills a page opaque black outside the viewport.
+func (r *Ring) paintBars(page []uint32, f barFrame) {
+	for y := 0; y < f.oh; y++ {
+		row := page[y*(f.ostride/4) : y*(f.ostride/4)+f.ow]
+		if y < f.vy || y >= f.vy+f.vh {
+			fillBlack(row)
+			continue
+		}
+		fillBlack(row[:f.vx])
+		fillBlack(row[f.vx+f.vw:])
+	}
+}
+
+func fillBlack(row []uint32) {
+	for x := range row {
+		row[x] = 0xFF000000
+	}
+}
+
 // flipTarget waits until the core has read our last descriptor, so that
 // the page it no longer names is free, and returns that page. With one
 // page (a framebuffer mode too small for two) it draws over the shown one.
+// The caller may draw anywhere on it: its bars are no longer known.
 func (r *Ring) flipTarget() int {
+	p := r.nextPage()
+	r.bars[p] = barFrame{}
+	return p
+}
+
+// nextPage is flipTarget for publishFrame, which keeps a page's bars.
+func (r *Ring) nextPage() int {
 	r.waitAck(ackWait)
 	if r.npage < 2 || r.cur < 0 {
 		return 0

@@ -111,7 +111,10 @@ func (r *Ring) Watch(logf func(string, ...any), wake func(), stop <-chan struct{
 				}
 				logf("watch: framebuffer mode changed from %q to %q", mode, m)
 				mode = keepMappedFor(logf, m, maxPageSize*NPage)
-				wake() // a mode write clears the framebuffer
+				r.mu.Lock()
+				r.bars = [NPage]barFrame{} // a mode write clears the framebuffer
+				r.mu.Unlock()
+				wake() // and the page is drawn again
 			}
 		}
 		if now.Sub(report) >= 5*time.Second {
