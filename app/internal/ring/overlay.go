@@ -375,11 +375,15 @@ func (o *Overlay) DotRun(vx, xmin, xmax int) {
 
 func (o *Overlay) run(stop chan struct{}) {
 	last := o.r.Field()
+	// one ticker for the run: a timer made every 4 ms was garbage the
+	// collector had to clear while a scrub ran
+	tick := time.NewTicker(4 * time.Millisecond)
+	defer tick.Stop()
 	for {
 		select {
 		case <-stop:
 			return
-		case <-time.After(4 * time.Millisecond):
+		case <-tick.C:
 		}
 		if f := o.r.Field(); f != last {
 			last = f
