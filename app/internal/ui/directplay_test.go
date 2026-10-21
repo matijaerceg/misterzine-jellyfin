@@ -40,7 +40,7 @@ func TestDirectEligible(t *testing.T) {
 		{"480p bitrate within SD cap", videoSource(with(ok480, func(v *jellyfin.MediaStream) { v.BitRate = 8_000_000 }), 0), true},
 		{"480p bitrate over SD cap", videoSource(with(ok480, func(v *jellyfin.MediaStream) { v.BitRate = 8_100_000 }), 0), false},
 		{"container bitrate stands in", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.BitRate = 0 }), 7_000_000), false},
-		{"user bitrate setting is irrelevant", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.BitRate = 5_900_000 }), 0), true},
+		{"720p within HD cap", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.BitRate = 5_900_000 }), 0), true},
 		{"720p60", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.RealFrameRate = 59.94 }), 0), false},
 		{"720p29.97", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.RealFrameRate = 0; v.AverageFrameRate = 29.97 }), 0), true},
 		{"480p over 60", videoSource(with(ok480, func(v *jellyfin.MediaStream) { v.RealFrameRate = 120 }), 0), false},
@@ -53,12 +53,42 @@ func TestDirectEligible(t *testing.T) {
 		{"interlaced is only a hint", videoSource(with(ok480, func(v *jellyfin.MediaStream) { v.IsInterlaced = true; v.RealFrameRate = 29.97 }), 0), true},
 	}
 	for _, c := range cases {
-		got, why := directEligible(c.src)
+		got, why := directEligible(c.src, MaxVideoKbps)
 		if got != c.want {
 			t.Errorf("%s: eligible = %v (%s), want %v", c.name, got, why, c.want)
 		}
 		if !got && why == "" {
 			t.Errorf("%s: no reason given", c.name)
+		}
+	}
+}
+
+// A source above the user's bitrate cap is transcoded to it, even one the
+// core plays: the cap is for a link that cannot carry more.
+func TestDirectEligibleRespectsUserCap(t *testing.T) {
+	sd := jellyfin.MediaStream{Codec: "h264", Profile: "Main", Level: 30, BitDepth: 8, Width: 720, Height: 480, RealFrameRate: 29.97}
+	for _, c := range []struct {
+		name         string
+		video, total int // bit/s; 0 for unknown
+		capKbps      int
+		want         bool
+	}{
+		{"within the lowest step", 380_000, 0, 400, true},
+		{"above the lowest step", 900_000, 0, 400, false},
+		{"at the 1 Mbps step", 1_000_000, 0, 1000, true},
+		{"just above the 1 Mbps step", 1_001_000, 0, 1000, false},
+		{"above 2 Mbps", 2_500_000, 0, 2000, false},
+		{"container total stands in", 0, 2_500_000, 2000, false},
+		{"no cap is the core's", 7_500_000, 0, 0, true},
+	} {
+		v := sd
+		v.BitRate = c.video
+		got, why := directEligible(videoSource(v, c.total), c.capKbps)
+		if got != c.want {
+			t.Errorf("%s: eligible = %v (%s), want %v", c.name, got, why, c.want)
+		}
+		if !got && !strings.Contains(why, "chosen") {
+			t.Errorf("%s: reason %q does not name the chosen cap", c.name, why)
 		}
 	}
 }
@@ -120,12 +150,13 @@ func newFallbackServer(t *testing.T, direct string) *fallbackServer {
 func toString(v any) string { s, _ := v.(string); return s }
 
 // player whose workers write a playing status at position, then exit with
-// the next code from codes (0 once they run out).
+// the next code from codes (0 once they run out). Its bitrate cap is 6 Mbit/s,
+// above eligibleDirect's 4.
 func (f *fallbackServer) player(t *testing.T, codes []int, position string) *Player {
 	t.Helper()
 	dir := t.TempDir()
 	status := dir + "/status"
-	p := &Player{Client: f.client, Binary: "jfplay", Fifo: dir + "/fifo", Status: status, LogTo: dir + "/log", Kbps: func() int { return 3000 }}
+	p := &Player{Client: f.client, Binary: "jfplay", Fifo: dir + "/fifo", Status: status, LogTo: dir + "/log", Kbps: func() int { return 6000 }}
 	p.exec = func(_ string, args ...string) *exec.Cmd {
 		f.mu.Lock()
 		n := len(f.launches)
@@ -179,8 +210,37 @@ func TestIneligibleDirectRequestsTranscodeAtUserBitrate(t *testing.T) {
 		t.Fatalf("PlaybackInfo calls = %d, want probe then transcode", len(f.bodies))
 	}
 	b := f.bodies[1]
-	if b["EnableDirectPlay"] != false || b["EnableDirectStream"] != false || b["MaxStreamingBitrate"] != float64(3000*1000+containerHeadroom) {
+	if b["EnableDirectPlay"] != false || b["EnableDirectStream"] != false || b["MaxStreamingBitrate"] != float64(6000*1000+containerHeadroom) {
 		t.Fatalf("transcode body = %#v", b)
+	}
+	if hasArg(f.launches[0], "--direct") {
+		t.Fatalf("transcode launch has --direct: %v", f.launches[0])
+	}
+}
+
+// A file the core plays but above the chosen bitrate is transcoded to that
+// bitrate, at the smaller picture a low cap gets.
+func TestDirectAboveUserBitrateRequestsTranscode(t *testing.T) {
+	f := newFallbackServer(t, eligibleDirect)
+	p := f.player(t, nil, "10")
+	p.Kbps = func() int { return 2000 }
+	s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitDone(t, s)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.bodies) != 2 {
+		t.Fatalf("PlaybackInfo calls = %d, want probe then transcode", len(f.bodies))
+	}
+	b := f.bodies[1]
+	if b["EnableDirectPlay"] != false || b["MaxStreamingBitrate"] != float64(2000*1000+containerHeadroom) {
+		t.Fatalf("transcode body = %#v", b)
+	}
+	profile, _ := json.Marshal(b["DeviceProfile"])
+	if !strings.Contains(string(profile), `"Property":"Height","Value":"480"`) {
+		t.Fatalf("transcode profile not capped at 480 lines: %s", profile)
 	}
 	if hasArg(f.launches[0], "--direct") {
 		t.Fatalf("transcode launch has --direct: %v", f.launches[0])

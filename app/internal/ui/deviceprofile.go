@@ -61,6 +61,20 @@ const MaxVideoKbps = 8000
 // file whose video fits is not transcoded for its audio and overhead.
 const containerHeadroom = 2_000_000
 
+// transcodeSize is the largest picture a transcode at a video cap in kbit/s
+// is made at. The output is at most 576 lines, so a low cap spends its bits
+// on fewer pixels rather than on a blocky 720p: 480p below 3 Mbit/s, 360p
+// below 1 Mbit/s. At 854 wide or less the core keeps 60 frames/s.
+func transcodeSize(videoKbps int) (w, h int) {
+	switch {
+	case videoKbps < 1000:
+		return 640, 360
+	case videoKbps < 3000:
+		return 854, 480
+	}
+	return 1280, 720
+}
+
 // playbackDeviceProfile is the profile for a video cap in kbit/s (the
 // user's bitrate setting, never above MaxVideoKbps).
 func playbackDeviceProfile(videoKbps int) deviceProfile {
@@ -68,11 +82,12 @@ func playbackDeviceProfile(videoKbps int) deviceProfile {
 		videoKbps = MaxVideoKbps
 	}
 	video := videoKbps * 1000
+	w, h := transcodeSize(videoKbps)
 	base := []codecCondition{
 		{"EqualsAny", "VideoProfile", "high|main", true},
 		{"LessThanEqual", "VideoLevel", "41", false},
-		{"LessThanEqual", "Width", "1280", true},
-		{"LessThanEqual", "Height", "720", true},
+		{"LessThanEqual", "Width", strconv.Itoa(w), true},
+		{"LessThanEqual", "Height", strconv.Itoa(h), true},
 		{"Equals", "VideoBitDepth", "8", true},
 		{"LessThanEqual", "VideoFramerate", "60", true},
 		{"LessThanEqual", "VideoBitrate", strconv.Itoa(video), true},

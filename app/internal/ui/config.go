@@ -119,21 +119,21 @@ func LoadConfig(path string) *Config {
 	return c
 }
 
-// At 480 lines a Plex server sends at most about 2 Mbps of video: every cap
-// from 2.5 Mbps up gets the same stream. Lower caps get less, as labelled
-// (measured on Plex Media Server 1.43, the video rate without the sound).
+// DefaultBitrate is the core's own limit (MaxVideoKbps): the video cap a
+// wired connection needs nothing below.
 const DefaultBitrate = 8000
 
-// Bitrates are the caps offered, in kbit/s, with what each one delivers.
+// Bitrates are the video caps offered, in kbit/s. The steps below 3 Mbps are
+// for a weak Wi-Fi link to the server; their transcodes are also made
+// smaller (transcodeSize), and a direct stream above the cap is transcoded.
 var Bitrates = []struct {
 	Kbps  int
 	Label string
-}{{3000, "3 Mbps"}, {4000, "4 Mbps"}, {6000, "6 Mbps"}, {8000, "8 Mbps (max)"}}
+}{{400, "0.4 Mbps, low res"}, {1000, "1 Mbps"}, {2000, "2 Mbps"}, {3000, "3 Mbps"}, {4000, "4 Mbps"}, {6000, "6 Mbps"}, {8000, "8 Mbps (max)"}}
 
 // BitrateKbps is the cap in force: the offered one at or below the saved
-// value, so the request is always the step Options shows. Older builds
-// offered 4.5 and 6 Mbps; the server sent those the same stream as 3 Mbps,
-// so they read as the maximum.
+// value, so the request is always the step Options shows. Every step older
+// builds offered is still offered, so a saved choice loads unchanged.
 func (c *Config) BitrateKbps() int {
 	return Bitrates[c.bitrateIndex()].Kbps
 }

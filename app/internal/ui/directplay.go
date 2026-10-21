@@ -14,8 +14,9 @@ import (
 
 // Direct-stream eligibility: whether a source the server would send as stored
 // is one the H.264 core can certainly play in real time. The decision uses the
-// probed metadata Jellyfin returns with PlaybackInfo and the core's own
-// limits, not the user's bitrate setting, which only caps transcodes.
+// probed metadata Jellyfin returns with PlaybackInfo, the core's own limits
+// and the user's bitrate setting: a source above the chosen cap is transcoded
+// to it, as the cap is there for a link that cannot carry more.
 //
 // Jellyfin's metadata cannot say CAVLC or CABAC, MBAFF or PAFF; jfplay checks
 // the SPS/PPS before the first picture (--direct) and the app falls back to a
@@ -45,9 +46,10 @@ const (
 	directProbeBitrate = 120_000_000
 )
 
-// directEligible reports whether src may be streamed untranscoded, and why
-// not when it may not.
-func directEligible(src jellyfin.MediaSource) (bool, string) {
+// directEligible reports whether src may be streamed untranscoded under a
+// video cap in kbit/s (the user's setting; 0 for none), and why not when it
+// may not.
+func directEligible(src jellyfin.MediaSource, capKbps int) (bool, string) {
 	var video *jellyfin.MediaStream
 	for i := range src.MediaStreams {
 		if strings.EqualFold(src.MediaStreams[i].Type, "Video") {
@@ -98,6 +100,9 @@ func directEligible(src jellyfin.MediaSource) (bool, string) {
 	if bitrate > maxKbps*1000 {
 		return false, fmt.Sprintf("bitrate %d kbit/s above %d", bitrate/1000, maxKbps)
 	}
+	if capKbps > 0 && bitrate > capKbps*1000 {
+		return false, fmt.Sprintf("bitrate %d kbit/s above the %d chosen", bitrate/1000, capKbps)
+	}
 	return true, ""
 }
 
@@ -116,10 +121,10 @@ const (
 // playbackInfo asks Jellyfin how to play the session's item. Unless a
 // transcode is already required (a selected subtitle, or force), the first
 // request lets the server offer the file as stored, with a bitrate cap no
-// direct-eligible file exceeds; the client then applies the core's limits
-// (directEligible). A transcode is always requested with the user's bitrate
-// setting, exactly as before, so a second request follows when the first
-// answer was a transcode at the probe's cap or an ineligible direct stream.
+// direct-eligible file exceeds; the client then applies the core's limits and
+// the user's cap (directEligible). A transcode is always requested with the
+// user's bitrate setting, so a second request follows when the first answer
+// was a transcode at the probe's cap or an ineligible direct stream.
 func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, subtitle string, force bool) (*jellyfin.PlaybackInfo, error) {
 	p := s.p
 	req := jellyfin.PlaybackRequest{StartSeconds: float64(offset), AudioStream: audio, SubtitleStream: subtitle, MediaSourceID: s.item.SourceID, AlwaysBurnInSubtitleWhenTranscoding: subtitle != "-1"}
@@ -145,7 +150,7 @@ func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, sub
 		}
 		src := info.MediaSources[0]
 		if (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == "" {
-			ok, why := directEligible(src)
+			ok, why := directEligible(src, kbps)
 			if ok {
 				if interlacedVideo(src) {
 					s.logf("direct stream is interlaced; jfplay checks for MBAFF before playing")

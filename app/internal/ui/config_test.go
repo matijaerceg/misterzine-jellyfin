@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"testing"
 )
@@ -140,8 +141,8 @@ func TestReapLeavesUnrelatedProcessRunning(t *testing.T) {
 	unrelated.Wait()
 }
 
-func TestBitrateClampsOlderSavedHighValues(t *testing.T) {
-	for _, tc := range []struct{ saved, want int }{{0, 8000}, {500, 3000}, {1000, 3000}, {3000, 3000}, {4000, 4000}, {5000, 4000}, {6000, 6000}, {7000, 6000}, {8000, 8000}, {20000, 8000}} {
+func TestBitrateClampsSavedValuesToOfferedSteps(t *testing.T) {
+	for _, tc := range []struct{ saved, want int }{{0, 8000}, {100, 400}, {400, 400}, {500, 400}, {1000, 1000}, {1500, 1000}, {2000, 2000}, {2500, 2000}, {3000, 3000}, {4000, 4000}, {5000, 4000}, {6000, 6000}, {7000, 6000}, {8000, 8000}, {20000, 8000}} {
 		c := Config{Bitrate: tc.saved}
 		if c.BitrateKbps() != tc.want {
 			t.Fatalf("saved %d: got %d, want %d", tc.saved, c.BitrateKbps(), tc.want)
@@ -153,7 +154,7 @@ func TestBitrateOptionShowsAndStepsOfferedCaps(t *testing.T) {
 	for _, tc := range []struct {
 		saved int
 		label string
-	}{{0, "8 Mbps (max)"}, {12000, "8 Mbps (max)"}, {5000, "4 Mbps"}, {4000, "4 Mbps"}, {1000, "3 Mbps"}} {
+	}{{0, "8 Mbps (max)"}, {12000, "8 Mbps (max)"}, {5000, "4 Mbps"}, {4000, "4 Mbps"}, {3000, "3 Mbps"}, {2000, "2 Mbps"}, {1000, "1 Mbps"}, {400, "0.4 Mbps, low res"}, {50, "0.4 Mbps, low res"}} {
 		c := Config{Bitrate: tc.saved}
 		if got := Bitrates[c.bitrateIndex()].Label; got != tc.label {
 			t.Fatalf("saved %d: shows %q, want %q", tc.saved, got, tc.label)
@@ -171,10 +172,27 @@ func TestBitrateOptionShowsAndStepsOfferedCaps(t *testing.T) {
 	if a.Cfg.Bitrate != 8000 || row.val() != "8 Mbps (max)" {
 		t.Fatalf("stepping up from the default: %d %q", a.Cfg.Bitrate, row.val())
 	}
-	for i := 0; i < 5; i++ {
+	row.step(-1)
+	if a.Cfg.Bitrate != 6000 || row.val() != "6 Mbps" {
+		t.Fatalf("stepping down from the default: %d %q", a.Cfg.Bitrate, row.val())
+	}
+	for i := 0; i < len(Bitrates)+1; i++ {
 		row.step(-1)
 	}
-	if a.Cfg.Bitrate != 3000 || row.val() != "3 Mbps" {
+	if a.Cfg.Bitrate != 400 || row.val() != "0.4 Mbps, low res" {
 		t.Fatalf("stepping down to the end: %d %q", a.Cfg.Bitrate, row.val())
+	}
+}
+
+// A choice saved by an older build, which offered 3 Mbps at the lowest,
+// loads as the same step.
+func TestBitrateSavedByOlderBuildLoads(t *testing.T) {
+	for _, kbps := range []int{3000, 4000, 6000, 8000} {
+		path := filepath.Join(t.TempDir(), "settings.json")
+		os.WriteFile(path, []byte(`{"client_id":"misterzine-test","bitrate":`+strconv.Itoa(kbps)+`}`), 0600)
+		c := LoadConfig(path)
+		if c.LoadError != nil || c.LoadWarning != "" || c.BitrateKbps() != kbps {
+			t.Fatalf("saved %d: loaded %d (%v %q)", kbps, c.BitrateKbps(), c.LoadError, c.LoadWarning)
+		}
 	}
 }

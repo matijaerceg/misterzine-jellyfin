@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"strconv"
 	"testing"
 )
 
@@ -58,5 +59,26 @@ func TestDeviceProfileJSON(t *testing.T) {
 		if p := playbackDeviceProfile(kbps); p.MaxStreamingBitrate != MaxVideoKbps*1000+containerHeadroom {
 			t.Fatalf("cap %d: container limit %d", kbps, p.MaxStreamingBitrate)
 		}
+	}
+}
+
+// A low cap transcodes to a smaller picture: 480p below 3 Mbit/s, 360p below
+// 1; from 3 Mbit/s up, and with no cap, the core's 720p.
+func TestDeviceProfileSizeFollowsCap(t *testing.T) {
+	for _, tc := range []struct{ kbps, w, h int }{
+		{400, 640, 360}, {999, 640, 360}, {1000, 854, 480}, {2000, 854, 480},
+		{3000, 1280, 720}, {8000, 1280, 720}, {0, 1280, 720},
+	} {
+		got := map[string]string{}
+		for _, c := range playbackDeviceProfile(tc.kbps).CodecProfiles[0].Conditions {
+			got[c.Property] = c.Value
+		}
+		if got["Width"] != strconv.Itoa(tc.w) || got["Height"] != strconv.Itoa(tc.h) {
+			t.Errorf("cap %d: %sx%s, want %dx%d", tc.kbps, got["Width"], got["Height"], tc.w, tc.h)
+		}
+	}
+	// the lowest step offered gets the smallest picture
+	if w, _ := transcodeSize(Bitrates[0].Kbps); w != 640 {
+		t.Fatalf("lowest step %d kbit/s is %d wide", Bitrates[0].Kbps, w)
 	}
 }
