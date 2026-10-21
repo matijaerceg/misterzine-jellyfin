@@ -93,20 +93,17 @@ the current playback. 14:9 uses custom geometry on cores with HPS interface
 
 **Options > Video calibration** saves the screen edges and width correction for
 the current display. Playback uses those values only when the running H.264
-core advertises the additive 1.2 geometry interface. On older cores the screen
-is labeled **Video calibration (preview only)** and playback remains unchanged;
-the saved values are retained. Applying calibration requires a custom build of
-the core with interface 1.2 or later. Fit/crop telemetry has been verified on
-Mister Pi with DeFlicker off and on;
-visual confirmation on a CRT remains pending. Geometry is separate from the
-crop setting and is limited to fitted 480- or 576-line output; Native HDMI
-output is not supported.
+core advertises the additive 1.2 geometry interface, as the core shipped with
+the app does. On older cores the screen is labeled **Video calibration
+(preview only)** and playback remains unchanged; the saved values are
+retained. Geometry is separate from the crop setting and is limited to fitted
+480- or 576-line output; Native HDMI output is not supported.
 
-**Options > De-flicker (480i)** asks the H.264 core to soften fine horizontal
-detail that can flicker between fields on a 15 kHz CRT. On enables Anti-Twitter;
-Off returns it to Auto, which leaves ordinary video sharp and still smooths
-program graphics. The setting is saved and takes effect on the next playback.
-It does not filter video recorded as interlaced fields.
+De-flicker is an option of the core's OSD, not of the app: on interlaced
+output it softens thin horizontal detail in frame-based video and in the app's
+screens so it flickers less between fields. It is On by default. Video recorded
+as interlaced fields is not filtered. The app does not pass `jfplay` an
+Anti-Twitter request, so the OSD choice stays in force during playback.
 
 ## Audio and subtitles
 
@@ -130,8 +127,8 @@ Selected subtitle tracks are burned into the video by Jellyfin. The app requests
 a video transcode with the chosen subtitle index; this requires server-side video
 transcoding permission and support for the subtitle format. Selecting Off removes
 subtitles on the replacement stream. Track changes preserve the position and
-pause state. Cropping can cut off burned-in text, and custom subtitle-size controls
-remain unavailable; the saved size preference is retained.
+pause state. Cropping can cut off burned-in text. There is no subtitle size
+setting: the server burns subtitles in at its own size.
 
 ## Worker interface
 
@@ -140,5 +137,6 @@ time and in-file seek, volume, audio stream index, control FIFO, status file,
 analog aspect, and (on capable core versions) saved video geometry. The app
 passes saved geometry only when the running core reports interface 1.2 or
 later. Its full command line and status/control contract are
-documented in [`arm/jfplay.md`](../arm/jfplay.md). A seek is a process restart:
-the app uses an in-file seek for direct streams and full-timeline HLS playlists.
+documented in [`arm/jfplay.md`](../arm/jfplay.md). Seeks go to the running
+worker as `seek` commands; when it cannot seek in place, the app restarts it
+with an in-file seek for direct streams and full-timeline HLS playlists.

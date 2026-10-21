@@ -73,8 +73,8 @@ core session starts, can be replaced live with `aspect N`, and is cleared when
 jfplay exits so it does not override the user's OSD choice in a later session.
 
 `--anti-twitter N` requests the core's Anti-Twitter setting: 0 Auto, 1 Off, or
-2 On. The Jellyfin app uses Auto when **De-flicker (480i)** is Off and On when
-it is enabled. This affects frame-based video on an interlaced CRT; field-coded
+2 On. The Jellyfin app does not pass it: De-flicker is set in the core's OSD.
+This affects frame-based video on an interlaced CRT; field-coded
 interlaced video is left alone. The setting is applied with the analog aspect
 request in one masked update, so the core's other menu choices are preserved.
 Like the aspect request, it is cleared when jfplay exits.
