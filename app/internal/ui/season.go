@@ -46,6 +46,18 @@ type Season struct {
 	actX           Anim // horizontal scroll of the action row
 	actW           []int
 	epAt           time.Time // when the season (its stills) last changed
+	text           epText    // the focused episode's lines, laid out once
+}
+
+// epText is an episode's facts, fitted title and wrapped synopsis, laid
+// out once rather than on every frame of a glide or a fade.
+type epText struct {
+	it                        *jellyfin.Item
+	index, dur, offset, views int
+	title, summary            string
+	facts                     []string
+	fitted                    string
+	lines                     []string
 }
 
 const (
@@ -615,17 +627,9 @@ func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
 	// the highlighted episode: its facts, then its title; blended over
 	// the page, which may be mid-transition
 	y := EpTitleY
-	facts := []string{"Episode " + itoa(it.Index)}
-	if it.Duration > 0 {
-		facts = append(facts, hm(it.Duration))
-	}
-	if it.ViewOffset > 0 {
-		facts = append(facts, clock(it.ViewOffset)+" of "+clock(it.Duration))
-	} else if it.ViewCount > 0 {
-		facts = append(facts, "Watched")
-	}
+	tx := s.epText(it)
 	x := SafeX
-	for i, t := range facts {
+	for i, t := range tx.facts {
 		if i > 0 {
 			c.Fill(x+8, (y+f.SmallBold.Height()/2)&^1-1, 4, 4, gfx.White)
 			x += 20
@@ -634,9 +638,9 @@ func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
 		x += f.SmallBold.Width(t)
 	}
 	y += f.SmallBold.Height() + 2
-	s.app.textOver(c, page, SafeX, y, f.Body, gfx.White, f.Body.Fit(it.Title, SafeW))
+	s.app.textOver(c, page, SafeX, y, f.Body, gfx.White, tx.fitted)
 	y += f.Body.Height() + 4
-	for _, line := range wrapped(f.SmallBold, it.Summary, SafeW, 2) {
+	for _, line := range tx.lines {
 		s.app.textOver(c, page, SafeX, y, f.SmallBold, gfx.White, line)
 		y += f.SmallBold.Height() + 2
 	}
@@ -714,6 +718,29 @@ func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
 	}
 
 	return anim
+}
+
+// epText lays out an episode's text, again only when what it shows changed.
+func (s *Season) epText(it *jellyfin.Item) *epText {
+	t := &s.text
+	if t.it == it && t.index == it.Index && t.dur == it.Duration && t.offset == it.ViewOffset &&
+		t.views == it.ViewCount && t.title == it.Title && t.summary == it.Summary {
+		return t
+	}
+	f := s.app.F
+	facts := []string{"Episode " + itoa(it.Index)}
+	if it.Duration > 0 {
+		facts = append(facts, hm(it.Duration))
+	}
+	if it.ViewOffset > 0 {
+		facts = append(facts, clock(it.ViewOffset)+" of "+clock(it.Duration))
+	} else if it.ViewCount > 0 {
+		facts = append(facts, "Watched")
+	}
+	*t = epText{it: it, index: it.Index, dur: it.Duration, offset: it.ViewOffset, views: it.ViewCount,
+		title: it.Title, summary: it.Summary, facts: facts,
+		fitted: f.Body.Fit(it.Title, SafeW), lines: wrap(f.SmallBold, it.Summary, SafeW, 2)}
+	return t
 }
 
 // dotsLine is dots for the frame: cached text lines on the background.
