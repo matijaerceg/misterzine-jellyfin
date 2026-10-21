@@ -25,6 +25,8 @@ type Art struct {
 	cond            *sync.Cond
 	have            map[string]*artEntry
 	order           []string // LRU, oldest first
+	bytes           int      // pixels held in have
+	backdrops       int      // backdrops in have
 	warm            []artReq // persistent, low-priority home-screen cache warming
 	warmed          map[string]bool
 	wants           []artReq // pending, oldest first; workers take from the end
@@ -37,10 +39,12 @@ type Art struct {
 }
 
 type artEntry struct {
-	img  *gfx.Image
-	band *gfx.Image // wall poster under the title strip, shaded off-thread
-	used uint64
-	at   time.Time // when it landed, for the fade-in
+	img      *gfx.Image
+	band     *gfx.Image // wall poster under the title strip, shaded off-thread
+	used     uint64
+	at       time.Time // when it landed, for the fade-in
+	size     int       // bytes of pixels held, the band's included
+	backdrop bool      // a full-frame backdrop, also counted against ArtBackdrops
 }
 
 type artReq struct {
@@ -57,9 +61,21 @@ type artReq struct {
 	noStore      bool // never written to the disk cache, though a cached copy is read
 }
 
-// ArtCap bounds decoded pictures across visible and nearby rows, backdrops,
-// and other screens. A wall entry also owns its pre-shaded title-strip copy.
-const ArtCap = 96
+// ArtBudget bounds the decoded pictures' pixels across visible and nearby
+// rows, backdrops and other screens, whatever their sizes: a poster is
+// 95 KB, a wall poster with its pre-shaded title-strip copy 150 KB, a
+// backdrop 1.3 MB. The heap is held to 96 MB (App) and some 35 to 40 MB of
+// it is the screens' own: the fade's 13 step pages alone are 18 MB, then
+// each screen's composed pages, the presenter's frame, fonts and listings.
+// 32 MB of pictures (some 200 wall posters) leaves the collector over 20 MB
+// to work in.
+const ArtBudget = 32 << 20
+
+// ArtBackdrops bounds the backdrops within the budget, so that browsing
+// heroes does not push the posters out: home's hero and the five around it
+// it prefetches, a show's and a film's page, and a couple the cursor has
+// just left.
+const ArtBackdrops = 10
 
 // wantTTL is how many frames a want survives without being asked again.
 const wantTTL = 3
@@ -96,6 +112,7 @@ func (a *Art) SetClient(c *jellyfin.Client) {
 	a.wants = nil
 	a.busy = map[string]bool{}
 	a.order = nil
+	a.bytes, a.backdrops = 0, 0
 	a.failed = map[string]bool{}
 	a.warm, a.warmed = nil, nil
 	a.mu.Unlock()
@@ -178,9 +195,7 @@ func (a *Art) worker(background bool) {
 		if err != nil {
 			a.failed[k] = true
 		} else if !r.diskOnly {
-			a.have[k] = &artEntry{img: img, band: band, used: a.frame, at: time.Now()}
-			a.order = append(a.order, k)
-			a.evict()
+			a.add(k, &artEntry{img: img, band: band, used: a.frame, at: time.Now(), backdrop: r.fade > 0})
 		}
 		a.mu.Unlock()
 		select {
@@ -262,15 +277,59 @@ func (a *Art) wallBand(thumb string) *gfx.Image {
 	return img
 }
 
-// evict drops the least recently used pictures beyond the cap.
+// add takes a decoded picture in, as the newest, and evicts beyond the
+// budget. Called under mu.
+func (a *Art) add(k string, e *artEntry) {
+	if old := a.have[k]; old != nil {
+		a.drop(k, old)
+	} else {
+		a.order = append(a.order, k)
+	}
+	e.size = 0
+	if e.img != nil {
+		e.size += len(e.img.Pix)
+	}
+	if e.band != nil {
+		e.size += len(e.band.Pix)
+	}
+	a.have[k] = e
+	a.bytes += e.size
+	if e.backdrop {
+		a.backdrops++
+	}
+	a.evict()
+}
+
+// drop forgets a decoded picture; its key leaves order separately.
+func (a *Art) drop(k string, e *artEntry) {
+	delete(a.have, k)
+	a.bytes -= e.size
+	if e.backdrop {
+		a.backdrops--
+	}
+}
+
+// evict drops the least recently used backdrops beyond their cap, then the
+// least recently used pictures beyond the budget.
 func (a *Art) evict() {
+	a.evictWhile(func() bool { return a.backdrops > ArtBackdrops }, true)
+	a.evictWhile(func() bool { return a.bytes > ArtBudget }, false)
+}
+
+// evictWhile drops pictures oldest first, only backdrops if asked, while
+// over holds.
+func (a *Art) evictWhile(over func() bool, backdrops bool) {
 	remaining := len(a.order)
-	for len(a.have) > ArtCap && len(a.order) > 0 {
+	for i := 0; over() && i < len(a.order); {
 		// the order list is only approximately LRU: promote entries used
 		// this frame instead of dropping them
-		k := a.order[0]
-		a.order = a.order[1:]
+		k := a.order[i]
 		e := a.have[k]
+		if e != nil && backdrops && !e.backdrop {
+			i++
+			continue
+		}
+		a.order = append(a.order[:i], a.order[i+1:]...)
 		if e == nil {
 			continue
 		}
@@ -279,7 +338,7 @@ func (a *Art) evict() {
 			a.order = append(a.order, k)
 			continue
 		}
-		delete(a.have, k)
+		a.drop(k, e)
 	}
 }
 

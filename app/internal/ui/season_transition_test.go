@@ -32,7 +32,7 @@ func drainSeason(t *testing.T, a *App, d *seasonData) {
 func TestSeasonRetainsAllThumbsBeyondSharedCache(t *testing.T) {
 	a := NewArt(nil, 0, nil)
 	s := &Season{app: &App{Art: a}}
-	for i := 0; i < ArtCap+20; i++ {
+	for i := 0; i < 116; i++ { // a long season; eviction is simulated below
 		s.eps = append(s.eps, &jellyfin.Item{Thumb: fmt.Sprintf("thumb-%d", i)})
 	}
 	for batch := 0; len(s.thumbs) < len(s.eps) && batch < 40; batch++ {

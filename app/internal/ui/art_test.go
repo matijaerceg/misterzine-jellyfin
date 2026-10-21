@@ -50,16 +50,81 @@ func TestArtPromoteAndExpirePrefetch(t *testing.T) {
 	}
 }
 
+// testPicture is a picture of n bytes; the pixels are shared, only the
+// size counts.
+func testPicture(n int) *gfx.Image {
+	return &gfx.Image{Pix: testPixels[:n]}
+}
+
+var testPixels = make([]byte, 2<<20)
+
 func TestArtEvictionWhenAllEntriesAreRecent(t *testing.T) {
 	a := NewArt(nil, 0, nil)
-	for i := 0; i <= ArtCap; i++ {
-		key := string(rune(i + 1))
-		a.have[key] = &artEntry{used: a.frame}
-		a.order = append(a.order, key)
+	for i := 0; i <= ArtBudget>>20; i++ {
+		a.add(string(rune(i+1)), &artEntry{img: testPicture(1 << 20), used: a.frame})
 	}
-	a.evict()
-	if len(a.have) != ArtCap {
-		t.Fatal("cache exceeded its memory bound")
+	if a.bytes != ArtBudget || len(a.have) != ArtBudget>>20 {
+		t.Fatalf("cache exceeded its memory bound: %d bytes in %d pictures", a.bytes, len(a.have))
+	}
+}
+
+// The budget counts bytes, not pictures: a backdrop makes room by dropping
+// several posters, the least recently used first, while a picture used this
+// frame is kept.
+func TestArtBudgetEvictsLeastRecentlyUsedBytes(t *testing.T) {
+	a := NewArt(nil, 0, nil)
+	poster := PosterW * PosterH * 4
+	n := ArtBudget / poster
+	for i := 0; i < n; i++ {
+		a.add(itoa(i), &artEntry{img: testPicture(poster)})
+	}
+	for i := 0; i <= wantTTL; i++ {
+		a.Frame()
+	}
+	a.have["0"].used = a.frame // on screen
+	backdrop := 720 * 480 * 4
+	a.add("backdrop", &artEntry{img: testPicture(backdrop), used: a.frame, backdrop: true})
+	if a.bytes > ArtBudget {
+		t.Fatalf("%d bytes held, budget %d", a.bytes, ArtBudget)
+	}
+	dropped := n + 1 - len(a.have)
+	if want := (backdrop - (ArtBudget - n*poster) + poster - 1) / poster; dropped != want {
+		t.Fatalf("dropped %d posters for a backdrop, want %d", dropped, want)
+	}
+	if a.have["0"] == nil || a.have["backdrop"] == nil {
+		t.Fatal("dropped a picture in use")
+	}
+	for i := 1; i <= dropped; i++ {
+		if a.have[itoa(i)] != nil {
+			t.Fatalf("poster %d survived a newer one", i)
+		}
+	}
+	total := 0
+	for _, e := range a.have {
+		total += e.size
+	}
+	if total != a.bytes || len(a.order) != len(a.have) {
+		t.Fatalf("accounting drifted: %d bytes counted, %d held; %d ordered, %d held", a.bytes, total, len(a.order), len(a.have))
+	}
+}
+
+// Backdrops have a cap of their own within the budget: the oldest backdrop
+// goes, not the posters around it.
+func TestArtBackdropCap(t *testing.T) {
+	a := NewArt(nil, 0, nil)
+	for i := 0; i <= ArtBackdrops; i++ {
+		a.add("poster"+itoa(i), &artEntry{img: testPicture(PosterW * PosterH * 4)})
+		a.add("backdrop"+itoa(i), &artEntry{img: testPicture(720 * 480 * 4), backdrop: true})
+		a.Frame()
+		a.Frame()
+	}
+	if a.backdrops != ArtBackdrops || a.have["backdrop0"] != nil || a.have["backdrop1"] == nil {
+		t.Fatalf("%d backdrops held, the oldest kept: %v", a.backdrops, a.have["backdrop0"] != nil)
+	}
+	for i := 0; i <= ArtBackdrops; i++ {
+		if a.have["poster"+itoa(i)] == nil {
+			t.Fatalf("poster %d made way for a backdrop", i)
+		}
 	}
 }
 
