@@ -560,7 +560,11 @@ def wrappers(card):
         pause = 'true' if label == 'Diagnostics' else '[ "$result" -ne 0 ]'
         body += 'result=$?\nif ' + pause + '; then read -r -p "Press Enter to return to MiSTer..."; fi\nexit "$result"\n'
         changed |= write_if_changed(path, body.encode(), 0o755)
-    retired = ['MisterZine-Jellyfin-Core-' + label + '.sh' for label in ('Run', 'Rollback', 'Remove', 'Diagnostics', 'Install')]
+        # The copy `remove` set aside: left behind, it keeps upkeep switched off.
+        with contextlib.suppress(FileNotFoundError):
+            Path(str(path) + '.disabled').unlink()
+            changed = True
+    retired =['MisterZine-Jellyfin-Core-' + label + '.sh' for label in ('Run', 'Rollback', 'Remove', 'Diagnostics', 'Install')]
     retired += ['MisterZine-Jellyfin-' + label + '.sh' for label in ('Run', 'Install')]
     for name in retired:
         with contextlib.suppress(FileNotFoundError):

@@ -53,6 +53,16 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(key.read_bytes(), b'patron-test-key')
         self.assertEqual(receipt.read_text(), 'unlocked\n')
 
+    def test_install_after_remove_restores_the_scripts_entries(self):
+        self.package_version('alpha-1')
+        manager.install(self.card, self.package)
+        manager.remove(self.card)
+        manager.install(self.card, self.package)
+        scripts = self.card / 'Scripts'
+        self.assertTrue((scripts / 'MisterZine-Jellyfin-Rollback.sh').is_file())
+        # A set-aside copy left behind would keep the boot check switched off.
+        self.assertEqual(list(scripts.glob('*.disabled')), [])
+
     def test_runtime_preflight_finishes_before_core_switch_and_app_launch(self):
         self.root.mkdir(parents=True)
         manager.write_json(self.root / 'active.json', {'current': 'fixture', 'previous': None})

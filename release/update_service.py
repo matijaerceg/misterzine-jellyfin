@@ -576,11 +576,19 @@ def activate(card, launch=start_and_check):
             failed(root, release, 'Could not restart MisterZine Jellyfin', exc)
             raise
         if current:
-            # Nothing to install: restart what already runs, as an install would.
+            # Nothing to install: put back the entries an install writes
+            # (`manager.py remove` says the installer restores them) and
+            # restart what already runs, as an install would.
             (root / 'updates/ready.json').unlink(missing_ok=True)
             status(root, 'activating', release, 'Restarting MisterZine Jellyfin...')
             try:
                 stop_manager(root)
+                with manager.locked(root):
+                    manager.wrappers(card)
+                    if (root / 'menu_launcher.py').is_file():
+                        manager.menu_entries(card)
+                    register(card, release)
+                    manager.start_menu_launcher(card)
                 if not launch(root):
                     raise RuntimeError('MisterZine Jellyfin did not start')
             except Exception as exc:

@@ -215,6 +215,14 @@ class UpdateTests(unittest.TestCase):
         # The install script run again for the release it already installed.
         release, archive, package = self.release('same', 'beta')
         manager.install(self.card, package)
+        # `manager.py remove` says the installer restores the entries it switched off.
+        with contextlib.redirect_stdout(io.StringIO()):
+            manager.remove(self.card)
+        dropin = self.card / 'downloader_misterzine_jellyfin.ini'
+        dropin.unlink()
+        scripts = self.card / 'Scripts'
+        self.assertFalse((scripts / 'MisterZine-Jellyfin-Rollback.sh').exists())
+        self.assertFalse((self.card / 'MisterZine Jellyfin.mgl').exists())
         request = self.fixture / 'request.json'
         request.write_text(json.dumps(release))
         self.deliver(archive)(self.card, self.root, release)
@@ -233,6 +241,12 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(manager.read_state(self.root)['current'], 'same')
         status = json.loads((self.root / 'updates/status.json').read_text())
         self.assertEqual(status['stage'], 'complete')
+        for label in manager.SCRIPTS:
+            self.assertTrue((scripts / ('MisterZine-Jellyfin-' + label + '.sh')).is_file())
+        self.assertEqual(list(scripts.glob('*.disabled')), [])
+        self.assertIn(release['db_url'], dropin.read_text())
+        self.assertTrue((self.card / 'MisterZine Jellyfin.mgl').is_file())
+        self.assertIn(manager.BOOT_START, (self.card / 'linux/user-startup.sh').read_text())
 
     def test_failed_launch_restores_runtime_registration_and_selection(self):
         _, _, package = self.release('old')
