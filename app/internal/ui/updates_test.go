@@ -293,11 +293,56 @@ func writeStatus(t *testing.T, a *App, data string) {
 		t.Fatal(err)
 	}
 }
-func readStatus(t *testing.T, a *App) {
+
+// readStatus reads the status file once, as the run loop does, and reports
+// whether the read was handed to the render thread (it changed something).
+func readStatus(t *testing.T, a *App) bool {
 	t.Helper()
 	a.updates.nextStatus = time.Time{}
 	a.pollUpdates(time.Now())
-	drain(t, a)
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		select {
+		case f := <-a.later:
+			f()
+			return true
+		default:
+		}
+		if !a.updates.reading.Load() {
+			return false
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the read did not finish")
+		}
+	}
+}
+
+// Reading a status file that says what is on screen already leaves the
+// render thread alone: it was woken, and drew a frame, every second.
+func TestUnchangedStatusDoesNotWakeTheRenderThread(t *testing.T) {
+	a := betaTestApp(t)
+	a.later = make(chan func(), 4)
+	a.Wake = make(chan struct{}, 1)
+	a.updates.nextCheck = time.Now().Add(time.Hour)
+	writeStatus(t, a, `{"stage":"ready","updated":50,"release":{"id":"next","version":"0.3.0-beta.1","channel":"beta"}}`)
+	if !readStatus(t, a) || a.updates.status.Stage != "ready" {
+		t.Fatalf("a new status was not taken: %+v", a.updates.status)
+	}
+	<-a.Wake
+	for i := 0; i < 3; i++ {
+		if readStatus(t, a) || len(a.Wake) > 0 {
+			t.Fatal("an unchanged status woke the render thread")
+		}
+	}
+	writeStatus(t, a, `{"stage":"failed","updated":60,"message":"no space"}`)
+	if !readStatus(t, a) || a.updates.status.Stage != "failed" {
+		t.Fatalf("a changed status was not taken: %+v", a.updates.status)
+	}
+	// an update launched: its updater has not written yet, and runs
+	a.updates.waiting, a.updates.before = true, 60
+	a.updates.exited = make(chan struct{})
+	if readStatus(t, a) {
+		t.Fatal("the file from before the launch woke the render thread")
+	}
 }
 
 // An updater's status counts once the file changes after the launch, whatever

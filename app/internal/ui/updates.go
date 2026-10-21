@@ -7,6 +7,8 @@ import (
 	"plexcrt/internal/gfx"
 	"plexcrt/internal/input"
 	"plexcrt/internal/updates"
+	"reflect"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,7 +18,7 @@ type updateState struct {
 	checkFailed bool      // the last check could not read the catalogue
 	nextCheck   time.Time // of the automatic check
 	nextStatus  time.Time
-	reading     bool
+	reading     atomic.Bool // a status read is out (it ends off the render thread when nothing changed)
 	status      updates.Status
 	message     string    // a choice was not saved, or the updater's lock is taken
 	messageAt   time.Time // shown for a while, as the cause passes
@@ -85,12 +87,13 @@ func (a *App) pollUpdates(now time.Time) {
 	}
 	a.checkUpdates(false, now)
 	a.checkSupporters(now)
-	if a.updates.reading || now.Before(a.updates.nextStatus) {
+	if a.updates.reading.Load() || now.Before(a.updates.nextStatus) {
 		return
 	}
-	a.updates.reading = true
+	a.updates.reading.Store(true)
 	a.updates.nextStatus = now.Add(time.Second)
 	root, launch, exited := a.betaDir(), a.updates.launch, a.updates.exited
+	shown, waiting, before := a.updates.status, a.updates.waiting, a.updates.before
 	go func() {
 		// the exit is looked at before the file: an updater writes, then exits
 		gone := false
@@ -102,8 +105,15 @@ func (a *App) pollUpdates(now time.Time) {
 			}
 		}
 		s := updates.ReadStatus(root)
+		// A read that would change nothing on screen is not handed to the
+		// render thread: that would draw and publish a frame every second.
+		// Should the state have moved meanwhile, the next read compares with it.
+		if waiting && s.Updated == before && (!gone || shown.Stage == "failed") || !waiting && reflect.DeepEqual(s, shown) {
+			a.updates.reading.Store(false)
+			return
+		}
 		a.Later(func() {
-			a.updates.reading = false
+			a.updates.reading.Store(false)
 			if launch != a.updates.launch {
 				return // begun before the latest launch
 			}
