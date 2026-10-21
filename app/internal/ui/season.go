@@ -32,6 +32,7 @@ type Season struct {
 	err      error
 	holes    []gfx.Rect
 	fetched  map[string]bool // episodes whose streams have been asked for
+	moved    time.Time       // the cursor last stepped along the filmstrip
 	loading  bool            // the episode list is on its way
 	loadID   uint64          // rejects a stale result even after A -> B -> A
 	shown    *gfx.Canvas     // the page as drawn this frame (mid-fade: a step)
@@ -61,6 +62,10 @@ const (
 	FilmY        = SafeY + 98
 	EpTitleY     = FilmY + StillH + 20
 	ActY         = SafeBottom - 34
+	// TrackRest is how long the cursor must rest on an episode, without a
+	// release, before its tracks are asked for. A release asks at once; this
+	// is longer than the pad's repeat delay, so a held key asks for none.
+	TrackRest = 450 * time.Millisecond
 )
 
 // The show's actions in an episode's row, before Remove from Continue
@@ -90,6 +95,7 @@ func (s *Season) load(at string) {
 	s.eps = nil
 	s.thumbs = nil
 	s.fetched = nil // a listing fetched again brings new items without tracks
+	s.moved = time.Time{}
 	s.err = nil
 	s.loading = true
 	s.loadID++
@@ -185,21 +191,7 @@ func (s *Season) rebuild() {
 	if it == nil {
 		return
 	}
-	// the season listing carries no streams: fetch the episode's record
-	// once, in the background, and rebuild when it lands
-	if len(it.Audio) == 0 && len(it.Subs) == 0 && !s.fetched[it.ID] {
-		if s.fetched == nil {
-			s.fetched = map[string]bool{}
-		}
-		s.fetched[it.ID] = true
-		go func(it *jellyfin.Item) {
-			fresh, err := s.app.Client.Item(bg(), it.ID)
-			if err != nil {
-				return
-			}
-			s.app.Later(func() { s.streamsArrived(it, fresh) })
-		}(it)
-	}
+	s.wantTracks(time.Now())
 	if it.ViewOffset > 0 {
 		s.actions = append(s.actions, "Resume "+clock(it.ViewOffset), "From start")
 	} else {
@@ -233,6 +225,32 @@ func (s *Season) rebuild() {
 	for _, a := range s.actions {
 		s.actW = append(s.actW, f.Width(a))
 	}
+}
+
+// wantTracks asks for the focused episode's tracks once the cursor rests
+// on it (or is on its actions). The season listing carries no streams: the
+// episode's record is fetched once, in the background, and the actions are
+// rebuilt when it lands. Each record is a full decode of its streams, so
+// holding Right along the filmstrip must not ask for every episode passed.
+func (s *Season) wantTracks(now time.Time) {
+	it := s.focused()
+	if it == nil || len(it.Audio) > 0 || len(it.Subs) > 0 || s.fetched[it.ID] {
+		return
+	}
+	if !s.acts && !s.moved.IsZero() && now.Sub(s.moved) < TrackRest {
+		return // still moving: the release, or the next poll, asks
+	}
+	if s.fetched == nil {
+		s.fetched = map[string]bool{}
+	}
+	s.fetched[it.ID] = true
+	go func(it *jellyfin.Item) {
+		fresh, err := s.app.Client.Item(bg(), it.ID)
+		if err != nil {
+			return
+		}
+		s.app.Later(func() { s.streamsArrived(it, fresh) })
+	}(it)
 }
 
 // streamsArrived fills in an episode's tracks from its full record. Audio and
@@ -301,6 +319,8 @@ func (s *Season) scrollTarget() int {
 func (s *Season) Key(ev input.Event, now time.Time) {
 	if ev.Release {
 		s.colX.Settle(now)
+		s.moved = time.Time{} // the cursor rests: the episode's tracks are wanted
+		s.wantTracks(now)
 		return
 	}
 	// A fresh navigation command can interrupt the entry animation. Its
@@ -373,10 +393,12 @@ func (s *Season) Key(ev input.Event, now time.Time) {
 	case input.Left:
 		if s.cur > 0 {
 			s.cur--
+			s.moved = now
 		}
 	case input.Right:
 		if s.cur < len(s.eps)-1 {
 			s.cur++
+			s.moved = now
 		}
 	case input.Down:
 		s.acts = true

@@ -147,6 +147,7 @@ func (s *Season) pollRefresh(now time.Time) {
 	if s.loading || s.err != nil || len(s.eps) == 0 {
 		return
 	}
+	s.wantTracks(now) // the cursor came to rest without a release
 	client, key := s.app.Client, s.season().Key
 	s.periodic.poll(s.app, now, func() ([]*jellyfin.Item, error) {
 		return client.Items(bg(), key, nil, 500)
