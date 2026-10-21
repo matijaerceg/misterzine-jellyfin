@@ -156,16 +156,15 @@ Options lists, in groups:
   missing from the filtered view or shown in it wrongly.
 - **Autoplay next episode**: the countdown into the next episode.
 - **Skip intro and credits buttons**.
-- **Video bitrate**: the most a transcode may use: 3, 4 or 6 Mbps, or 8 Mbps,
-  the default and the most the decoder handles at 720p. It does not limit
-  files played directly.
+- **Video bitrate** (see Sound and playback quality).
 - **Show** and a library's name, one row per library: off leaves it out of
   Home, the menu and search. Shown once the libraries have loaded.
 - **Video calibration** and **Video crop** (see Display setup).
 - Rows about your MiSTer INI, when it has a setting known to cause trouble:
-  forced variable refresh rate, HDMI held at a fixed refresh rate, DVI mode
-  (no sound over HDMI), or a later `[MiSTer]` section overriding the app's own
-  section. Select one for the file to change and what to add. See
+  **HDMI refresh** (HDMI held at a fixed rate the core's output does not
+  match), **HDMI sound** (DVI mode, no sound over HDMI) and **INI section** (a
+  later `[MiSTer]` section overriding the app's `[MisterZine Jellyfin]`
+  section). Select one for the file to change and what to add. See
   [HDMI setup](HDMI.md#settings-options-warn-about).
 - **Surround downmix boost**, **Theme music** (a show's theme song on its
   pages, when Jellyfin has one) and **Navigation sounds**.
@@ -220,11 +219,20 @@ transcode. A crop can cut the ends of long subtitle lines.
 Files the decoder can certainly play are streamed as stored: H.264 High or
 Main, 8-bit, level 4.1 or lower, at most 1280x720, at most 30 frames per
 second above 854 pixels wide (60 at or below), and at most 6 Mbit/s above 854
-pixels wide (8 Mbit/s at or below). Everything else, and anything with
-subtitles on, is transcoded by the server to H.264 within the same limits and
-the **Video bitrate** setting. If a direct stream turns out to be unplayable
-or falls behind, playback switches once to a transcode at the same position.
-See [playback details](PLAYBACK.md).
+pixels wide (8 Mbit/s at or below), and no more than the **Video bitrate**
+setting. Everything else, and anything with subtitles on, is transcoded by the
+server to H.264 within the same limits. If a direct stream turns out to be
+unplayable or falls behind, playback switches once to a transcode at the same
+position. See [playback details](PLAYBACK.md).
+
+**Video bitrate** caps the video Jellyfin sends: 0.4, 1, 2, 3, 4, 6 or 8 Mbps
+(the default and the most the decoder handles). The steps below 3 Mbps are for
+a slow or unreliable link to the server, such as weak Wi-Fi. At those steps a
+transcode is also made smaller, so the bits go further: 854x480 at 1 and
+2 Mbps, 640x360 at 0.4 Mbps. That costs little on a 480i or 576i screen. A file
+whose video is above the chosen bitrate is never streamed as stored; it is
+transcoded to that bitrate. Start low on Wi-Fi and raise it while playback
+stays smooth.
 
 Sound is decoded on the MiSTer and folded to stereo. A plain fold of a
 surround track comes out noticeably quieter than a stereo track, so
