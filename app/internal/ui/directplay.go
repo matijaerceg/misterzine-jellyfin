@@ -119,7 +119,7 @@ const (
 )
 
 // playbackInfo asks Jellyfin how to play the session's item. Unless a
-// transcode is already required (a selected subtitle, or force), the first
+// transcode is already required (a subtitle to burn in, or force), the first
 // request lets the server offer the file as stored, with a bitrate cap no
 // direct-eligible file exceeds; the client then applies the core's limits and
 // the user's cap (directEligible). A transcode is always requested with the

@@ -28,10 +28,15 @@ type Player struct {
 	Kbps, Boost func() int
 	Crop        func() Crop
 	Geometry    func() string
-	Hide        func()
-	exec        func(string, ...string) *exec.Cmd
-	reportOnce  sync.Once
-	reports     chan func()
+	// DrawsSubtitle reports whether the app draws a selected subtitle
+	// track of an item itself (a text track: subtitles.go); the stream is
+	// then asked for without subtitles. nil, or false, has the server burn
+	// the track into a transcode.
+	DrawsSubtitle func(itemID string, s jellyfin.Stream) bool
+	Hide          func()
+	exec          func(string, ...string) *exec.Cmd
+	reportOnce    sync.Once
+	reports       chan func()
 }
 
 type Session struct {
@@ -68,6 +73,9 @@ type Session struct {
 	// probedTranscode is the "audio|subtitle" selection for which the
 	// direct-play probe last got a transcode answer ("" for none).
 	probedTranscode string
+	// burned is the subtitle track the running stream has burned in, "-1"
+	// for none (burnedSubtitle).
+	burned string
 }
 
 func (p *Player) Started(t time.Time) bool {
@@ -229,6 +237,21 @@ func selectedStreams(item *jellyfin.Item) (audio, subtitle string) {
 	return
 }
 
+// burnedSubtitle is the subtitle track the server is to burn into the
+// stream for the selected one: "-1" for none, and for a track the app
+// draws itself, which leaves the stream free to play as stored.
+func (s *Session) burnedSubtitle(selected string) string {
+	if selected == "-1" || s.p.DrawsSubtitle == nil {
+		return selected
+	}
+	for _, st := range s.item.Subs {
+		if st.ID == selected && s.p.DrawsSubtitle(s.item.ID, st) {
+			return "-1"
+		}
+	}
+	return selected
+}
+
 func (s *Session) start(offset int, reuseDirect bool) error {
 	return s.startContext(offset, reuseDirect, context.Background())
 }
@@ -251,13 +274,14 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		s.mu.Lock()
 		force := s.forceTranscode
 		s.mu.Unlock()
-		info, err := s.playbackInfo(ctx, kbps, offset, audio, subtitle, force)
+		burn := s.burnedSubtitle(subtitle)
+		info, err := s.playbackInfo(ctx, kbps, offset, audio, burn, force)
 		if err != nil {
 			return err
 		}
 		src := info.MediaSources[0]
 		s.surroundSource = mediaSourceSurround(src, s.item, audio)
-		if subtitle != "-1" && src.TranscodingURL == "" {
+		if burn != "-1" && src.TranscodingURL == "" {
 			return fmt.Errorf("Jellyfin did not offer a subtitle transcode; check this user's transcoding permissions")
 		}
 		s.direct = (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == ""
@@ -270,7 +294,9 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 			}
 			s.url = p.Client.StreamURL(src.TranscodingURL)
 		}
+		// the report names the selected subtitle, drawn or burned in
 		s.state = jellyfin.PlayState{ItemID: s.item.ID, MediaSourceID: src.ID, PlaySessionID: info.PlaySessionID, Position: float64(offset), AudioStream: audio, SubtitleStream: subtitle, PlayMethod: "Transcode", Paused: paused}
+		s.burned = burn
 		if s.direct {
 			s.state.PlayMethod = "DirectStream"
 		}
@@ -542,16 +568,27 @@ func (s *Session) Send(line string) {
 		s.updateLocked(false)
 		s.item.Audio = setStreamID(s.item.Audio, fields[1])
 		s.item.Subs = setStreamID(s.item.Subs, fields[2])
-		s.mu.Lock()
-		s.state.Position = target
-		s.state.AudioStream = fields[1]
-		if fields[1] == "-1" {
-			s.state.AudioStream = ""
+		audio := fields[1]
+		if audio == "-1" {
+			audio = ""
 		}
+		burn := s.burnedSubtitle(fields[2])
+		s.mu.Lock()
+		// The stream as it runs serves the new choice when the sound is the
+		// same and so is what it has burned in: only a subtitle the app
+		// draws changed (or one it draws went off).
+		keep := s.cmd != nil && audio == s.state.AudioStream && burn == s.burned
+		if !keep {
+			s.state.Position = target
+		}
+		s.state.AudioStream = audio
 		s.state.SubtitleStream = fields[2]
 		ps := s.state
 		s.mu.Unlock()
 		s.reportProgress(ps)
+		if keep {
+			return
+		}
 		s.stopProcessLocked()
 		_ = os.Remove(s.p.Status)
 		s.mu.Lock()

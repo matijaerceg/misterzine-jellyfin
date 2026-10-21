@@ -109,6 +109,8 @@ func newFake(t *testing.T) (*fake, *Client) {
 			serve("latest.json")
 		case strings.HasSuffix(r.URL.Path, "/PlaybackInfo"):
 			serve("playbackinfo.json")
+		case strings.HasPrefix(r.URL.Path, "/Videos/") && strings.HasSuffix(r.URL.Path, "/Stream.srt"):
+			w.Write([]byte("1\r\n00:00:01,000 --> 00:00:02,500\r\nHello\r\n"))
 		case strings.HasPrefix(r.URL.Path, "/Sessions/Playing"), strings.HasPrefix(r.URL.Path, "/UserPlayedItems/"),
 			strings.HasPrefix(r.URL.Path, "/UserItems/") && strings.HasSuffix(r.URL.Path, "/UserData"):
 			w.WriteHeader(204)
@@ -491,6 +493,56 @@ func TestHomeRows(t *testing.T) {
 	}
 	if found, _ := c.Search(ctx, " "); found != nil {
 		t.Fatal("empty search sent")
+	}
+}
+
+// Fold keeps Central European, Baltic, Turkish and Romanian letters as
+// their base letters, as subtitles in those languages need; other scripts
+// still become spaces.
+func TestFoldLatinExtended(t *testing.T) {
+	for in, want := range map[string]string{
+		"Źdźbło łąki":       "Zdzblo laki",
+		"Příliš žluťoučký":  "Prilis zlutoucky",
+		"Árvíztűrő ığdır":   "Arvizturo igdir",
+		"Ştiinţă și țară":   "Stiinta si tara",
+		"Čađa IJsselmeer Ĳ": "Cada IJsselmeer IJ",
+		"Привет":            "      ",
+		"Œuvre – “quoted”…": "OEuvre - \"quoted\"...",
+	} {
+		if got := Fold(in); got != want {
+			t.Errorf("Fold(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// A text subtitle the server can hand over is marked Text and fetched whole
+// as SRT; a picture subtitle, or a text one the server cannot deliver on its
+// own, is not.
+func TestSubtitleTracks(t *testing.T) {
+	var x dto
+	if err := json.Unmarshal([]byte(`{"Id":"film","Type":"Movie","MediaSources":[{"Id":"src","MediaStreams":[
+		{"Type":"Subtitle","Index":2,"Codec":"subrip","IsTextSubtitleStream":true,"SupportsExternalStream":true},
+		{"Type":"Subtitle","Index":3,"Codec":"PGSSUB","IsTextSubtitleStream":false,"SupportsExternalStream":false},
+		{"Type":"Subtitle","Index":4,"Codec":"ass","IsTextSubtitleStream":true,"SupportsExternalStream":false}]}]}`), &x); err != nil {
+		t.Fatal(err)
+	}
+	it := x.item()
+	if len(it.Subs) != 3 || !it.Subs[0].Text || it.Subs[1].Text || it.Subs[2].Text {
+		t.Fatalf("subtitle kinds %+v", it.Subs)
+	}
+	f, c := newFake(t)
+	signIn(t, c)
+	item, err := c.Item(context.Background(), "358f1b71dbd1eb6238744f21a9a01f14")
+	if err != nil || len(item.Subs) == 0 || !item.Subs[0].Text {
+		t.Fatalf("fixture's SubRip track %+v %v", item, err)
+	}
+	data, err := c.SubtitleText(context.Background(), "film", "src", "2")
+	if err != nil || !strings.Contains(string(data), "Hello") {
+		t.Fatalf("subtitle text %q %v", data, err)
+	}
+	r := f.reqs[len(f.reqs)-1]
+	if r.Method != "GET" || r.URL.Path != "/Videos/film/src/Subtitles/2/Stream.srt" || r.URL.RawQuery != "" {
+		t.Fatalf("subtitle request %s %s", r.Method, r.URL)
 	}
 }
 

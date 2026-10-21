@@ -168,6 +168,7 @@ package uses the documented ones, passing `userId` as a query parameter:
 | Clear resume | `POST /UserItems/{id}/UserData?userId=` `{"PlaybackPositionTicks":0}` | |
 | Images | `GET /Items/{id}/Images/{Primary,Backdrop,Thumb,Logo}?tag=&fillWidth=&fillHeight=&quality=` (posters) or `maxWidth=&maxHeight=&format=Png` (logos) | |
 | Play decision | `POST /Items/{id}/PlaybackInfo?userId=` `{UserId, DeviceProfile, MaxStreamingBitrate, StartTimeTicks, AudioStreamIndex, SubtitleStreamIndex, MediaSourceId}` | |
+| Text subtitles | `GET /Videos/{id}/{mediaSourceId}/Subtitles/{index}/Stream.srt` (the whole track as SRT, item times) | |
 | Reports | `POST /Sessions/Playing`, `/Sessions/Playing/Progress`, `/Sessions/Playing/Stopped` with `ItemId, MediaSourceId, PlaySessionId, PositionTicks[, IsPaused, PlayMethod, AudioStreamIndex, SubtitleStreamIndex]` | |
 
 Ticks are 100 ns (`TicksPerSecond = 10_000_000`); the package converts at the
@@ -220,7 +221,12 @@ design owns it). The answer's `MediaSources[].TranscodingUrl` is a server path
 the launcher sends `AuthHeader()` instead. `DirectStreamURL` builds
 `/Videos/{id}/stream.{container}?static=true&mediaSourceId=...` for sources
 that `SupportsDirectStream`. Audio/subtitle choices are stream indexes
-(`Stream.ID`), sent per play in `PlaybackInfo` and in the reports.
+(`Stream.ID`), sent per play in `PlaybackInfo` and in the reports. A subtitle
+stream with `IsTextSubtitleStream` and `SupportsExternalStream` is a text track
+(`Stream.Text`): `SubtitleText` fetches it, and `PlaybackInfo` is then sent
+`SubtitleStreamIndex=-1` because the app draws it. A start position in the
+subtitle path would drop the cues before it and shift the rest, so the app
+never sends one.
 
 ## 4. Where Jellyfin 12.2 differed from expectations
 

@@ -384,7 +384,7 @@ func TestOptionsSteppedRowsSayWhereTheyAre(t *testing.T) {
 	for _, tc := range []struct {
 		label string
 		n     int
-	}{{"Video bitrate", len(Bitrates)}, {"Video crop", len(Crops)}} {
+	}{{"Video bitrate", len(Bitrates)}, {"Video crop", len(Crops)}, {"Subtitle size", len(SubtitleSizes)}} {
 		it := o.items()[optionRow(o, tc.label)]
 		if it.at == nil {
 			t.Fatalf("%s steps but does not say where it is", tc.label)
@@ -406,20 +406,30 @@ func TestOptionsSteppedRowsSayWhereTheyAre(t *testing.T) {
 	}
 }
 
-func TestOptionsHideUnavailableSettingsWithoutChangingSavedValues(t *testing.T) {
+// Subtitle size sits after the downmix boost, as in the Plex app, shows
+// the size saved, and steps and saves as the other stepped rows do.
+func TestOptionsSubtitleSizeShowsStepsAndSaves(t *testing.T) {
 	a := betaTestApp(t)
-	a.Cfg.AudioBoost = 175
-	a.Cfg.SubtitleSize = 200
-	items := (&Options{app: a}).items()
-	for _, unavailable := range []string{"Subtitle size"} {
-		for _, item := range items {
-			if item.label == unavailable {
-				t.Fatalf("unavailable setting %q is still shown", unavailable)
-			}
-		}
+	a.Cfg.SubtitleSize = 150
+	o := NewOptions(a)
+	row := optionRow(o, "Subtitle size")
+	if row < 0 || row != optionRow(o, "Surround downmix boost")+1 {
+		t.Fatalf("Subtitle size at %d, want right after Surround downmix boost", row)
 	}
-	if a.Cfg.AudioBoost != 175 || a.Cfg.SubtitleSize != 200 {
-		t.Fatalf("hidden settings changed: boost=%d subtitle size=%d", a.Cfg.AudioBoost, a.Cfg.SubtitleSize)
+	if got := o.items()[row].val(); got != "Large" {
+		t.Fatalf("saved 150%% shows as %q", got)
+	}
+	o.cur = row
+	o.Key(input.Event{Key: input.Right}, time.Now())
+	if a.Cfg.SubtitleSize != 200 || o.items()[row].val() != "Extra large" {
+		t.Fatalf("right from Large: %d %q", a.Cfg.SubtitleSize, o.items()[row].val())
+	}
+	if LoadConfig(a.Cfg.path).SubtitleSizeValue() != 200 {
+		t.Fatal("the size was not saved")
+	}
+	o.Key(input.Event{Key: input.Enter}, time.Now())
+	if a.Cfg.SubtitleSize != 200 {
+		t.Fatal("OK changed the size")
 	}
 }
 

@@ -9,7 +9,7 @@ play it, and Jellyfin transcodes it to HLS otherwise.
 
 When playback starts, the app requests Jellyfin `PlaybackInfo` with its device
 profile, the item's selected audio and subtitle tracks, the known media source,
-and the resume position. Unless a subtitle is selected, the first request lets
+and the resume position. Unless a subtitle must be burned in, the first request lets
 the server offer the file as stored without applying the configured bitrate
 limit. The app then checks the returned video details against the core's own
 limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280x720, at
@@ -127,12 +127,36 @@ peaks before output. Stereo sources are unchanged. Changing boost during playbac
 does not restart the stream; audio already queued may retain its previous gain
 briefly. The separate worker volume control only attenuates sound.
 
-Selected subtitle tracks are burned into the video by Jellyfin. The app requests
-a video transcode with the chosen subtitle index; this requires server-side video
-transcoding permission and support for the subtitle format. Selecting Off removes
-subtitles on the replacement stream. Track changes preserve the position and
-pause state. Cropping can cut off burned-in text. There is no subtitle size
-setting: the server burns subtitles in at its own size.
+Text subtitle tracks (SRT, ASS/SSA, WebVTT and other formats Jellyfin reports as
+text it can deliver separately) are drawn by the app. It fetches the whole track
+as SRT from `/Videos/{id}/{source}/Subtitles/{index}/Stream.srt`, keeps the cue
+text only (styling, positioning and ASS effects are dropped) and draws the cues as
+white type on a translucent box, centred along the bottom of the safe area. The
+stream is requested without subtitles, so it can still play as stored, and
+choosing another text track or Off changes the overlay without restarting the
+stream. Cue times follow the worker's reported position and run on from its
+last report while playing. The subtitles show while nothing else is on the
+overlay: the controls, a list, the seek strip, the skip button and the wait dots
+replace them while they are up. They are drawn over the picture, so cropping
+does not cut them.
+
+**Subtitle size** in Options and playback More offers Normal, Large (150%) and
+Extra large (200%) for the drawn subtitles. Normal is 22-pixel type on the
+480-line overlay; long lines wrap within the safe area, and at most six lines
+show at once. A change applies from the next subtitle painted, without a
+restart.
+
+Picture subtitles (PGS, VobSub, DVB) are burned into the video by Jellyfin. The
+app requests a video transcode with the chosen subtitle index; this requires
+server-side video transcoding permission. The overlay fonts cover ASCII and Latin
+letters with accents (Latin-1 and Latin Extended-A); a text track in which more
+than one letter in twenty falls outside them (Cyrillic, Greek, Arabic, CJK and
+other scripts) is handed back to Jellyfin to burn in as well, with one restart,
+and is burned in from the start for the rest of the app's run. Jellyfin offers
+no per-request subtitle size or style for burn-in, and its burned subtitles
+scale with the picture, so the size setting does not change them, and cropping
+can cut them. Changing to or from a burned-in track restarts the stream; track
+changes preserve the position and pause state.
 
 ## Worker interface
 

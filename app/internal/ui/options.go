@@ -105,6 +105,10 @@ func (o *Options) items() []option {
 			i := max(0, min(len(AudioBoosts)-1, cfg.audioBoostIndex()+d))
 			cfg.AudioBoost = AudioBoosts[i].Value
 		}, at: func() (int, int) { return cfg.audioBoostIndex(), len(AudioBoosts) }},
+		{label: "Subtitle size", val: func() string { return SubtitleSizes[cfg.subtitleSizeIndex()].Label }, step: func(d int) {
+			i := max(0, min(len(SubtitleSizes)-1, cfg.subtitleSizeIndex()+d))
+			cfg.SubtitleSize = SubtitleSizes[i].Value
+		}, at: func() (int, int) { return cfg.subtitleSizeIndex(), len(SubtitleSizes) }},
 		{label: "Theme music", get: func() bool { return !cfg.NoTheme }, set: func(v bool) { cfg.NoTheme = !v }, after: o.app.syncTheme},
 		{label: "Navigation sounds", get: func() bool { return !cfg.NoTaps }, set: func(v bool) { cfg.NoTaps = !v }},
 		optionGap(),

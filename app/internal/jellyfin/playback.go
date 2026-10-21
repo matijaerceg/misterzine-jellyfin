@@ -125,6 +125,21 @@ func (c *Client) DirectStreamURL(id string, src MediaSource, playSession string)
 	return c.URL("/Videos/"+url.PathEscape(id)+"/stream"+ext, q)
 }
 
+// subtitleLimit bounds a subtitle file: a feature's SRT is a few hundred
+// kilobytes.
+const subtitleLimit = 8 << 20
+
+// SubtitleText fetches a text subtitle track (a Stream with Text) of a
+// media source as SRT, whatever its format in the file: the server
+// converts it. The whole track comes, with the item's own times (a start
+// position in the path would drop the cues before it and shift the rest).
+// The first request for an embedded track can take the server a while: it
+// extracts the file's subtitles then.
+func (c *Client) SubtitleText(ctx context.Context, itemID, sourceID, index string) ([]byte, error) {
+	path := "/Videos/" + url.PathEscape(itemID) + "/" + url.PathEscape(sourceID) + "/Subtitles/" + url.PathEscape(index) + "/Stream.srt"
+	return c.do(ctx, c.slow, "GET", path, nil, nil, true, subtitleLimit)
+}
+
 // PlayState is a playback report. Position is in seconds; the reports send
 // ticks.
 type PlayState struct {

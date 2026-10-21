@@ -61,6 +61,10 @@ type Stream struct {
 	Title    string
 	Selected bool
 	Channels int // source audio channels; zero for subtitle tracks or unknown
+	// Text marks a text subtitle track (SRT, ASS, WebVTT ...) the server
+	// can hand over as a file (SubtitleText); picture subtitles (PGS,
+	// VobSub) can only be burned into a transcode.
+	Text bool
 }
 
 // Playable reports whether Enter should play rather than browse.
@@ -178,6 +182,10 @@ type MediaStream struct {
 	RealFrameRate    float64 `json:"RealFrameRate"`
 	AverageFrameRate float64 `json:"AverageFrameRate"`
 	IsInterlaced     bool    `json:"IsInterlaced"`
+	// A subtitle stream in a text format that the server can deliver on
+	// its own (Subtitles/{index}/Stream.srt).
+	IsTextSubtitleStream   bool `json:"IsTextSubtitleStream"`
+	SupportsExternalStream bool `json:"SupportsExternalStream"`
 }
 
 // listing is a QueryResult; Latest answers with a bare array instead.
@@ -298,7 +306,8 @@ func (x *dto) item() *Item {
 				it.Aspect = aspect(st.AspectRatio, st.Width, st.Height)
 			}
 		case "Audio", "Subtitle":
-			s := Stream{ID: strconv.Itoa(st.Index), Title: streamTitle(st), Selected: st.IsDefault, Channels: st.Channels}
+			s := Stream{ID: strconv.Itoa(st.Index), Title: streamTitle(st), Selected: st.IsDefault, Channels: st.Channels,
+				Text: st.Type == "Subtitle" && st.IsTextSubtitleStream && st.SupportsExternalStream}
 			if st.Type == "Audio" {
 				it.Audio = append(it.Audio, s)
 			} else {

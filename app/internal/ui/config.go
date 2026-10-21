@@ -27,7 +27,7 @@ type Config struct {
 	NoSkipButtons      bool     `json:"no_skip_buttons"`         // no Skip intro / Skip credits button over the markers
 	Bitrate            int      `json:"bitrate"`                 // transcode cap in kbit/s; 0 is the default
 	AudioBoost         int      `json:"audio_boost,omitempty"`   // surround downmix gain; 0 is the default
-	SubtitleSize       int      `json:"subtitle_size,omitempty"` // Plex burn-in size; 0 is the original size
+	SubtitleSize       int      `json:"subtitle_size,omitempty"` // drawn text subtitles, a percentage (SubtitleSizes); 0 is Normal
 	Geometry           Geometry `json:"geometry"`                // where video goes on the raster (menus ignore it)
 	Crop               Crop     `json:"crop,omitempty"`          // what each playback starts cropping; nothing saved is off
 	ShowBeta           bool     `json:"show_beta_features"`      // show (and run) the features still in beta
@@ -163,12 +163,15 @@ var AudioBoosts = []struct {
 
 const DefaultAudioBoost = 300
 
-// SubtitleSizes are Plex's percentage sizes for burned-in subtitles.
+// SubtitleSizes are the sizes of the text subtitles the app draws, as a
+// percentage of Normal (subtitles.go); the Plex app's choices.
 var SubtitleSizes = []struct {
 	Label string
 	Value int
 }{{"Normal", 100}, {"Large", 150}, {"Extra large", 200}}
 
+// SubtitleSizeValue is the size in force: Normal for nothing saved or a
+// size not offered.
 func (c *Config) SubtitleSizeValue() int {
 	if c.SubtitleSize <= 0 {
 		return 100

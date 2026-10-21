@@ -9,7 +9,8 @@ import (
 // H.264 High or Main profile, 8-bit 4:2:0, up to 1280x720 at 30 frames/s or
 // 854x480 at 60, and falls behind above about 8 Mbit/s at 720p; jfplay
 // decodes the audio and downmixes it to stereo. Everything else is an HLS
-// transcode to the same limits. Selected subtitles use Jellyfin's Encode
+// transcode to the same limits. Subtitles asked of the server (picture
+// tracks, and text the app cannot draw: subtitles.go) use Jellyfin's Encode
 // delivery method, which burns them into the transcoded video.
 type deviceProfile struct {
 	Name                string               `json:"Name"`

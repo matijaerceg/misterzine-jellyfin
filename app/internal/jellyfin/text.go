@@ -6,8 +6,8 @@ import "strings"
 // every server string to the glyph atlases' ASCII.
 
 // Fold maps text to the printable ASCII the glyph atlases hold: dashes,
-// quotes and ellipses to their plain forms, Latin letters to their base
-// letter, anything else to a space.
+// quotes and ellipses to their plain forms, Latin letters (Latin-1 and
+// Latin Extended-A) to their base letter, anything else to a space.
 func Fold(s string) string {
 	ascii := true
 	for i := 0; i < len(s); i++ {
@@ -42,24 +42,14 @@ func Fold(s string) string {
 			b.WriteString("OE")
 		case r == 0x153:
 			b.WriteString("oe")
-		case r == 0x160:
-			b.WriteByte('S')
-		case r == 0x161:
-			b.WriteByte('s')
-		case r == 0x17D:
-			b.WriteByte('Z')
-		case r == 0x17E:
-			b.WriteByte('z')
-		case r == 0x178:
-			b.WriteByte('Y')
-		case r == 0x10C || r == 0x106:
-			b.WriteByte('C')
-		case r == 0x10D || r == 0x107:
-			b.WriteByte('c')
-		case r == 0x110:
-			b.WriteByte('D')
-		case r == 0x111:
-			b.WriteByte('d')
+		case r == 0x132:
+			b.WriteString("IJ")
+		case r == 0x133:
+			b.WriteString("ij")
+		case r >= 0x100 && r <= 0x17F:
+			b.WriteByte(latinA[r-0x100])
+		case r >= 0x218 && r <= 0x21B: // Romanian S and T with a comma
+			b.WriteByte("SsTt"[r-0x218])
 		default:
 			b.WriteByte(' ')
 		}
@@ -69,6 +59,11 @@ func Fold(s string) string {
 
 // latin1 holds the base letters of U+00C0..U+00FF.
 var latin1 = []byte("AAAAAAACEEEEIIIIDNOOOOOxOUUUUYTsaaaaaaaceeeeiiiidnooooo/ouuuuyty")
+
+// latinA holds the base letters of U+0100..U+017F (Latin Extended-A: the
+// Central European, Baltic and Turkish letters), a row of 16 a line.
+var latinA = []byte("AaAaAaCcCcCcCcDd" + "DdEeEeEeEeEeGgGg" + "GgGgHhHhIiIiIiIi" + "IiIiJjKkkLlLlLlL" +
+	"lLlNnNnNnnNnOoOo" + "OoOoRrRrRrSsSsSs" + "SsTtTtTtUuUuUuUu" + "UuUuWwYyYZzZzZzs")
 
 // langNames are English names for language tags whose native names are
 // written in scripts the fonts do not cover.

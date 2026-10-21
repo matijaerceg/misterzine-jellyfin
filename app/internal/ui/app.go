@@ -102,8 +102,9 @@ type App struct {
 	later       chan func()
 	seasonData  *seasonData // one selected season, shared with its opening page
 	scr         *gfx.Canvas
-	osd         OSD  // the playback overlay: the core's plane
-	crop        Crop // the playback's crop: Options' at the start, then the playback menu's
+	osd         OSD            // the playback overlay: the core's plane
+	crop        Crop           // the playback's crop: Options' at the start, then the playback menu's
+	subtitles   subtitleMemory // text tracks found undrawable this run (subtitles.go)
 	dim         idleDim
 	playing     bool            // a playback has the screen (playLoop), paused or not
 	playReports <-chan struct{} // the latest session's stopped report, for ordered refreshes
@@ -133,6 +134,9 @@ func New(c *jellyfin.Client, out Presenter, player *Player, lg *log.Logger) *App
 	a := &App{Client: c, Out: out, Player: player, Log: lg, Wake: make(chan struct{}, 1), Connected: make(chan struct{}, 1), later: make(chan func(), 32)}
 	if player != nil && player.Access == nil {
 		player.Access = a.checkPlaybackAccess
+	}
+	if player != nil && player.DrawsSubtitle == nil {
+		player.DrawsSubtitle = a.drawsSubtitle
 	}
 	// more Ps than cores so a decoding worker can never hold the drawing
 	// loop off the scheduler; the OS then arbitrates by thread priority

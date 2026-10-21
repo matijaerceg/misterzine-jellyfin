@@ -61,8 +61,9 @@ These parts still carry Plex behaviour and have to be rewritten or retargeted:
   PlaybackInfo with the core's device profile (`ui/deviceprofile.go`), runs
   `jfplay` on the direct stream or the HLS transcode, reports progress, seeks
   in place (restarting the player when it cannot), and sets the core's Analog
-  Aspect for the crop choice. Selected subtitles are burned in by the server.
-- `ui/config.go` still keeps a Plex-era subtitle size value that nothing uses; `seasonsOf` in `ui/app.go` still skips Plex's
+  Aspect for the crop choice. Text subtitles are fetched as SRT and drawn on
+  the overlay (`ui/subtitles.go`); picture subtitles are burned in by the server.
+- `seasonsOf` in `ui/app.go` still skips Plex's
   `/allLeaves` seasons, which Jellyfin never returns.
 - The Collections tab lists every box set on the server in every film or show
   library, because Jellyfin's box sets do not belong to a library.

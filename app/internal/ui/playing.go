@@ -2,7 +2,6 @@ package ui
 
 import (
 	"math"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +22,8 @@ import (
 // unless paused. Audio and Subtitles
 // open a list in the overlay; a skip button appears over an intro or
 // credits marker; at the end a countdown runs on to the next episode.
+// With nothing else up, a text subtitle track shows along the bottom
+// (subtitles.go).
 type Playing struct {
 	app                    *App
 	item                   *jellyfin.Item
@@ -94,6 +95,15 @@ type Playing struct {
 	waitSpec   string      // PLEXCRT_WAIT_DOT, for tuning on a set
 	waitCanvas *gfx.Canvas // the dots' panel, alone or with the start strip under them
 	waitAlpha  []byte
+	// the text subtitles the app draws (subtitles.go): the cues of the
+	// selected track, the track they (or the fetch on its way) are for, the
+	// fetch's generation and its answers, and when the worker wrote the
+	// position last (the drawn time runs on from it)
+	subs     subtitleTrack
+	subsFor  string
+	subsGen  int
+	subsDone chan subtitleFetch
+	posAt    time.Time
 }
 
 type listMode struct {
@@ -255,7 +265,7 @@ func (p *Playing) peekStripH() int {
 
 // status reads the launcher's position file.
 func (p *Playing) status() {
-	data, err := os.ReadFile("/tmp/jfplay.status")
+	data, written, err := readStatusFile("/tmp/jfplay.status")
 	if err != nil {
 		p.bufferStart, p.bufferEnd = 0, 0
 		return
@@ -285,7 +295,7 @@ func (p *Playing) status() {
 		}
 		p.seekAt = time.Time{}
 	}
-	p.pos = pos
+	p.pos, p.posAt = pos, written
 	if time.Since(p.pausedAt) > 700*time.Millisecond {
 		p.paused = values["state"] == "paused"
 	}
@@ -464,7 +474,18 @@ func (p *Playing) openMore() {
 		}
 	}
 	vals = append(vals, label)
+	items = append(items, "Subtitle size")
+	vals = append(vals, SubtitleSizes[p.app.Cfg.subtitleSizeIndex()].Label)
 	p.showList(&listMode{kind: "More", items: items, vals: vals, set: -1})
+}
+
+func (p *Playing) openSubtitleSize() {
+	l := &listMode{kind: "Subtitle size", set: p.app.Cfg.subtitleSizeIndex()}
+	for _, s := range SubtitleSizes {
+		l.items = append(l.items, s.Label)
+	}
+	l.cur = l.set
+	p.showList(l)
 }
 
 func (p *Playing) openBoost() {
@@ -489,9 +510,12 @@ func (p *Playing) openCrop() {
 func (p *Playing) choose(l *listMode) {
 	switch l.kind {
 	case "More":
-		if l.items[l.cur] == "Crop" {
+		switch l.items[l.cur] {
+		case "Crop":
 			p.openCrop()
-		} else {
+		case "Subtitle size":
+			p.openSubtitleSize()
+		default:
 			p.openBoost()
 		}
 	case "Surround downmix boost":
@@ -504,25 +528,43 @@ func (p *Playing) choose(l *listMode) {
 		p.app.setCrop(crop)
 		p.send("aspect " + itoa(crop.analogAspect()))
 		p.list = nil
+	case "Subtitle size":
+		// the drawn subtitles take the size at their next paint; the
+		// stream goes on as it is
+		old := p.app.Cfg.snapshot()
+		p.app.Cfg.SubtitleSize = SubtitleSizes[l.cur].Value
+		if err := p.app.Cfg.Save(); err != nil {
+			*p.app.Cfg = old
+			l.hint = "Save failed"
+			l.loaded = false
+			return
+		}
+		p.list = nil
 	default:
 		p.app.selectStream(p.item, l.kind, l.cur-l.off)
 		p.list = nil
-		// Restart with the selected tracks. The session owns a snapshot of the
-		// item, so the IDs travel with this command instead of relying on that
-		// snapshot to have changed.
-		target := max(0, min(p.pos, p.dur-6))
-		now := time.Now()
-		p.seekAt, p.hushAt = now, now
-		p.seekTo, p.pos = target, target
-		p.send(trackRestartCommand(p.item, p.seekTo))
-		p.dirty = true
-		p.hushAt = time.Time{}
+		p.restartTracks()
 	}
+}
+
+// restartTracks asks the session for the selected tracks at the same
+// position. The session owns a snapshot of the item, so the IDs travel
+// with this command instead of relying on that snapshot to have changed.
+// The session restarts the stream unless only a subtitle the app draws
+// changed (Session.Send).
+func (p *Playing) restartTracks() {
+	target := max(0, min(p.pos, p.dur-6))
+	now := time.Now()
+	p.seekAt, p.hushAt = now, now
+	p.seekTo, p.pos = target, target
+	p.send(trackRestartCommand(p.item, p.seekTo))
+	p.dirty = true
+	p.hushAt = time.Time{}
 }
 
 // closeList returns from a track list to the controls.
 func (p *Playing) closeList() {
-	if p.list.kind == "Crop" || p.list.kind == "Surround downmix boost" {
+	if p.list.kind == "Crop" || p.list.kind == "Surround downmix boost" || p.list.kind == "Subtitle size" {
 		p.openMore()
 		return
 	}
@@ -775,6 +817,8 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		default:
 		}
 	}
+	p.syncSubtitles()
+	p.takeSubtitles()
 	if now.Sub(p.statAt) > 100*time.Millisecond {
 		p.statAt = now
 		p.status()
@@ -837,17 +881,22 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	peek := p.peeking(now)
 	skipBtn := p.skipShown(now)
 	if !p.visible && !skipBtn && !peek {
+		// nothing else up: the drawn subtitles, if any are showing now
+		lines := p.subtitleLines(now)
 		if p.dirty {
-			if p.last != "" && p.last != "wait" {
+			if p.last != "" && p.last != "wait" && !isSubtitleKey(p.last) {
 				p.closedAt = now // something just left the screen: Back rests for BackGrace
 			}
 			osd.Dot(0, 0, 0, false)
 			osd.Bar(0, 0, 0, 0, 0, false)
 			p.dirty = false
-			if p.wait == nil {
+			if p.wait == nil && len(lines) == 0 {
 				p.painter.hide(osd)
 				p.last = ""
 			}
+		}
+		if p.wait == nil {
+			p.showSubtitle(osd, lines)
 		}
 		if p.wait != nil {
 			// the dots alone, repainted as the swell moves on
