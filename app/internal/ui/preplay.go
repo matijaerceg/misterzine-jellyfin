@@ -103,8 +103,8 @@ func (p *Preplay) rebuild() {
 	if len(it.Subs) > 0 {
 		p.actions = append(p.actions, streamLabel("Subtitles", it.Subs))
 	}
-	if p.cw.has(it.ID) {
-		p.actions = append(p.actions, RemoveContinue)
+	if p.cw.has(it.ID) && it.ViewOffset > 0 {
+		p.actions = append(p.actions, ForgetProgress)
 	}
 	if p.cur >= len(p.actions) {
 		p.cur = 0
@@ -134,9 +134,9 @@ func (p *Preplay) Key(ev input.Event, now time.Time) {
 		}
 		a := p.actions[p.cur]
 		switch {
-		case a == RemoveContinue:
-			if p.app.removeContinue(p.item, &p.cw) {
-				p.rebuild() // the action goes and the cursor returns to the first
+		case a == ForgetProgress:
+			if p.app.forgetProgress(p.item, &p.cw) {
+				p.rebuild() // Play replaces Resume; the cursor returns to the first
 			}
 		case strings.HasPrefix(a, "Audio"):
 			p.periodic.reset()

@@ -44,7 +44,7 @@ and revokes the token in the background (`SignOut`).
 | `FirstChars` | `wall.go` (the alphabet jump) |
 | `ShowEpisodes` | `app.go` (shuffle) |
 | `ShowAspect`, `FirstEpisodeAspects`, `Page` | `aspects.go` (the picture shape of each title, swept in the background) |
-| `ContinueWatching`, `RemoveFromContinueWatching` | `continue_watching.go` |
+| `ContinueWatching`, `ClearResumePoint` | `continue_watching.go` |
 | `Scrobble` | `preplay.go`, `season.go` (mark watched or unwatched) |
 | `Search` | `search.go` |
 | `Art`, `Logo`, `ArtData`, `LogoData` | `art.go` (posters, backdrops and logos, cached on the SD card) |
@@ -78,7 +78,7 @@ c.Items(ctx, listing, q, max)
 jellyfin.SectionListing(sectionKey, sectionType, view) (listing, q) // view: ViewAZ, ViewAdded, ...
 c.Item(ctx, id)            // full: media sources, streams, markers (c.Markers)
 c.Seasons / ShowEpisodes / ShowAspect / FirstEpisodeAspects / FirstChars(ctx, section, sectionType)
-c.Hubs(ctx, n)  c.SectionRecent(ctx, key, n)  c.ContinueWatching(ctx)  c.RemoveFromContinueWatching(ctx, id)
+c.Hubs(ctx, n)  c.SectionRecent(ctx, key, n)  c.ContinueWatching(ctx)  c.ClearResumePoint(ctx, id)
 c.Scrobble(ctx, id, watched)  c.Search(ctx, q)
 c.Art / Logo / ArtData / LogoData (ctx, ref, w, h)  c.ImageURL(ref, ImageQuery)  c.ThemeFile(ctx, showID, songID)
 c.PlaybackInfo(ctx, id, PlaybackRequest)  c.StreamURL / DirectStreamURL
@@ -268,9 +268,10 @@ never sends one.
   `SelectAudio`/`SelectSubtitle`. The app keeps the choice itself
   (`Config.Streams`) and passes it with every play. The server's
   `RememberAudioSelections` user setting covers part of this server-side.
-* Hiding an item from Continue Watching while keeping its place:
-  `RemoveFromContinueWatching` clears the resume point, and cannot remove a
-  Next Up entry.
+* Hiding an item from Continue Watching while keeping its place (Plex's
+  `removeFromContinueWatching`): the app offers **Forget my progress**
+  instead, and `ClearResumePoint` clears the resume point. A Next Up entry
+  has none and cannot be removed.
 * Sign-in by PIN, server discovery, home users and connection probing
   (Plex's `Reach`/`LocalNameBlocked`) have no counterpart. Sign-in is the
   server address -> `HostCandidates` + `PublicInfo` (a bare name tries https,

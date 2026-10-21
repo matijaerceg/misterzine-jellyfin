@@ -397,11 +397,11 @@ func (c *Client) ContinueWatching(ctx context.Context) (map[string]bool, error) 
 	return keys, nil
 }
 
-// RemoveFromContinueWatching takes an item out of Continue Watching by
-// clearing its resume point (POST /UserItems/{id}/UserData). Unlike Plex,
-// Jellyfin has no "hide" that keeps the point: the position is lost. A
-// next-up episode cannot be removed this way.
-func (c *Client) RemoveFromContinueWatching(ctx context.Context, id string) error {
+// ClearResumePoint forgets how far an item was watched (POST
+// /UserItems/{id}/UserData), which also takes it out of Continue Watching.
+// Unlike Plex, Jellyfin has no "hide" that keeps the point. A next-up
+// episode has no point to clear and stays.
+func (c *Client) ClearResumePoint(ctx context.Context, id string) error {
 	return c.post(ctx, "/UserItems/"+url.PathEscape(id)+"/UserData", c.userQuery(),
 		map[string]any{"PlaybackPositionTicks": 0}, nil)
 }

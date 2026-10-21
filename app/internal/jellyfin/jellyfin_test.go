@@ -556,7 +556,7 @@ func TestWatchedAndPlayback(t *testing.T) {
 	if err := c.Scrobble(ctx, "abc", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.RemoveFromContinueWatching(ctx, "abc"); err != nil {
+	if err := c.ClearResumePoint(ctx, "abc"); err != nil {
 		t.Fatal(err)
 	}
 	var methods []string

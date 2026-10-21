@@ -113,8 +113,7 @@ const (
 	TrackRest = 450 * time.Millisecond
 )
 
-// The show's actions in an episode's row, before Remove from Continue
-// Watching.
+// The show's actions in an episode's row, before Forget my progress.
 const (
 	GoToShow    = "Go to show"
 	ShuffleShow = "Shuffle show"
@@ -259,8 +258,8 @@ func (s *Season) rebuild() {
 		s.actions = append(s.actions, GoToShow)
 	}
 	s.actions = append(s.actions, ShuffleShow)
-	if s.cw.has(it.ID) {
-		s.actions = append(s.actions, RemoveContinue)
+	if s.cw.has(it.ID) && it.ViewOffset > 0 {
+		s.actions = append(s.actions, ForgetProgress)
 	}
 	if s.act >= len(s.actions) {
 		s.act = 0
@@ -299,7 +298,7 @@ func (s *Season) wantTracks(now time.Time) {
 }
 
 // streamsArrived fills in an episode's tracks from its full record. Audio and
-// Subtitles go in before Remove from Continue Watching, so the cursor keeps
+// Subtitles go in before Forget my progress, so the cursor keeps
 // its action rather than its place in the row.
 func (s *Season) streamsArrived(it, fresh *jellyfin.Item) {
 	it.SourceID, it.Audio, it.Subs = fresh.SourceID, fresh.Audio, fresh.Subs
@@ -471,9 +470,9 @@ func (s *Season) toShow() {
 
 func (s *Season) do(a string) {
 	it := s.focused()
-	if a == RemoveContinue {
-		if it != nil && s.app.removeContinue(it, &s.cw) {
-			s.rebuild() // the action goes and the cursor returns to the first
+	if a == ForgetProgress {
+		if it != nil && s.app.forgetProgress(it, &s.cw) {
+			s.rebuild() // Play replaces Resume; the cursor returns to the first
 			s.keepActVisible(time.Now())
 		}
 		return

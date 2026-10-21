@@ -112,12 +112,11 @@ address stays for the next sign-in.
   lists the seasons; Down or OK opens one. An episode's actions are those of a
   movie page, then **Go to show** when the page was opened without the row of
   seasons (Home, search, a show with one season), and **Shuffle show**.
-- A movie or episode in Continue Watching has **Remove from Continue
-  Watching** as its last action. Jellyfin has no way to hide an item and keep
-  its place, so this clears the item's resume point on the server: the
-  position is lost, and the item leaves the row. On a next episode Jellyfin
-  suggests it has no lasting effect: the episode leaves the row, then comes
-  back the next time Home is shown.
+- A movie or episode you stopped partway through has **Forget my progress**
+  as its last action. It clears the resume point on the server, for every
+  Jellyfin app, so the item plays from the start and leaves Continue
+  Watching. Jellyfin has no way to hide an item and keep its place. A next
+  episode Jellyfin suggests has no progress to forget and does not offer it.
 - A show's row of seasons ends with a **Shuffle** tile; **Shuffle show** does
   the same. Both play every episode of the show, watched or not and specials
   included, in a random order and each from its start. While the episodes are

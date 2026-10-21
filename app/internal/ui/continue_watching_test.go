@@ -106,7 +106,7 @@ func continueHome(a *App, cw ...*jellyfin.Item) *Home {
 	return h
 }
 
-func TestPreplayRemovesFromContinueWatching(t *testing.T) {
+func TestPreplayForgetsProgress(t *testing.T) {
 	srv := newContinueServer(t, "m1", "m2")
 	a := continueTestApp(t, srv)
 	m1 := &jellyfin.Item{ID: "m1", Type: "movie", Title: "One", Summary: "s", SourceID: "p", ViewOffset: 600}
@@ -114,12 +114,12 @@ func TestPreplayRemovesFromContinueWatching(t *testing.T) {
 	h := continueHome(a, m1, m2)
 	p := NewPreplay(a, m1)
 	a.stack = []Screen{h, p}
-	if slices.Contains(p.actions, RemoveContinue) {
+	if slices.Contains(p.actions, ForgetProgress) {
 		t.Fatal("the action showed before the list answered")
 	}
 	settle(t, &p.cw)
 	p.pollRefresh(time.Now())
-	if p.actions[len(p.actions)-1] != RemoveContinue {
+	if p.actions[len(p.actions)-1] != ForgetProgress {
 		t.Fatalf("the action is not last: %q", p.actions)
 	}
 
@@ -128,11 +128,11 @@ func TestPreplayRemovesFromContinueWatching(t *testing.T) {
 	if got := srv.removals(); !slices.Equal(got, []string{"m1"}) {
 		t.Fatalf("removal sent for %v", got)
 	}
-	if slices.Contains(p.actions, RemoveContinue) || p.cur != 0 || !strings.HasPrefix(p.actions[0], "Resume") {
+	if slices.Contains(p.actions, ForgetProgress) || p.cur != 0 || p.actions[0] != "Play" {
 		t.Fatalf("after removal: actions %q, cursor %d", p.actions, p.cur)
 	}
-	if p.item.ViewOffset != 600 {
-		t.Fatal("the removal touched the resume point")
+	if p.item.ViewOffset != 0 {
+		t.Fatal("the page kept the resume point the server forgot")
 	}
 	// Home drops it at once and fetches the rows again when shown
 	if items := h.hubs[0].Items; len(items) != 1 || items[0] != m2 || h.Focused() != m2 {
@@ -155,7 +155,7 @@ func TestContinueRemovalRefusedKeepsTheAction(t *testing.T) {
 	p.pollRefresh(time.Now())
 	p.cur = len(p.actions) - 1
 	p.Key(input.Event{Key: input.Enter}, time.Now())
-	if p.actions[p.cur] != RemoveContinue || a.Notice == "" {
+	if p.actions[p.cur] != ForgetProgress || a.Notice == "" {
 		t.Fatalf("refused removal: actions %q, cursor %d, notice %q", p.actions, p.cur, a.Notice)
 	}
 	if len(h.hubs[0].Items) != 1 || h.refreshAt.IsZero() {
@@ -178,12 +178,12 @@ func TestContinueAnswerFromBeforeRemovalIsDropped(t *testing.T) {
 	p.Key(input.Event{Key: input.Enter}, time.Now())
 	stale <- map[string]bool{"m1": true}
 	p.pollRefresh(time.Now())
-	if slices.Contains(p.actions, RemoveContinue) {
+	if slices.Contains(p.actions, ForgetProgress) {
 		t.Fatal("an answer from before the removal brought the action back")
 	}
 }
 
-func TestSeasonRemovesEpisodeFromContinueWatching(t *testing.T) {
+func TestSeasonForgetsEpisodeProgress(t *testing.T) {
 	srv := newContinueServer(t, "e2")
 	a := continueTestApp(t, srv)
 	e1 := &jellyfin.Item{ID: "e1", Type: "episode", Title: "Ep 1", ViewCount: 1}
@@ -195,7 +195,7 @@ func TestSeasonRemovesEpisodeFromContinueWatching(t *testing.T) {
 	settle(t, &s.cw)
 	s.act = 2 // Mark watched
 	s.pollRefresh(time.Now())
-	if s.actions[len(s.actions)-1] != RemoveContinue || s.actions[s.act] != "Mark watched" {
+	if s.actions[len(s.actions)-1] != ForgetProgress || s.actions[s.act] != "Mark watched" {
 		t.Fatalf("after the answer: actions %q, cursor on %q", s.actions, s.actions[s.act])
 	}
 	if len(s.actW) != len(s.actions) {
@@ -203,7 +203,7 @@ func TestSeasonRemovesEpisodeFromContinueWatching(t *testing.T) {
 	}
 	s.cur = 0 // an episode that is not in Continue Watching
 	s.rebuild()
-	if slices.Contains(s.actions, RemoveContinue) {
+	if slices.Contains(s.actions, ForgetProgress) {
 		t.Fatal("the action showed for an episode not in Continue Watching")
 	}
 
@@ -214,8 +214,25 @@ func TestSeasonRemovesEpisodeFromContinueWatching(t *testing.T) {
 	if got := srv.removals(); !slices.Equal(got, []string{"e2"}) {
 		t.Fatalf("removal sent for %v", got)
 	}
-	if slices.Contains(s.actions, RemoveContinue) || s.act != 0 || !strings.HasPrefix(s.actions[0], "Resume") {
-		t.Fatalf("after removal: actions %q, cursor %d", s.actions, s.act)
+	if slices.Contains(s.actions, ForgetProgress) || s.act != 0 || s.actions[0] != "Play" || e2.ViewOffset != 0 {
+		t.Fatalf("after removal: actions %q, cursor %d, resume point %d", s.actions, s.act, e2.ViewOffset)
+	}
+}
+
+// A next up episode is in Continue Watching with no resume point: there is
+// nothing to forget, and clearing it would not take it off the row.
+func TestNextUpHasNothingToForget(t *testing.T) {
+	a := continueTestApp(t, newContinueServer(t))
+	ep := &jellyfin.Item{ID: "n1", Type: "episode", Summary: "s", SourceID: "p"}
+	p := &Preplay{app: a, item: ep}
+	p.cw.keys = map[string]bool{"n1": true}
+	p.rebuild()
+	s := &Season{app: a, show: &jellyfin.Item{}, seasons: []*jellyfin.Item{{}}, eps: []*jellyfin.Item{ep}, acts: true,
+		fetched: map[string]bool{"n1": true}}
+	s.cw.keys = map[string]bool{"n1": true}
+	s.rebuild()
+	if slices.Contains(p.actions, ForgetProgress) || slices.Contains(s.actions, ForgetProgress) {
+		t.Fatalf("a next up episode offers to forget: %q, %q", p.actions, s.actions)
 	}
 }
 
@@ -268,7 +285,7 @@ func TestSeasonActionRowReturnsToStart(t *testing.T) {
 	}
 }
 
-// The row scrolled to its end with the cursor on the action before Remove;
+// The row scrolled to its end with the cursor on the action before Forget;
 // the list then drops the episode. The shorter row is not left scrolled past
 // its end, and the cursor's action still shows.
 func TestSeasonShorterRowIsNotOverScrolled(t *testing.T) {
@@ -289,7 +306,7 @@ func TestSeasonShorterRowIsNotOverScrolled(t *testing.T) {
 	s.cw.pending = make(chan map[string]bool, 1)
 	s.cw.pending <- map[string]bool{} // the list no longer holds it
 	s.pollRefresh(now)
-	if slices.Contains(s.actions, RemoveContinue) || s.actions[s.act] != ShuffleShow {
+	if slices.Contains(s.actions, ForgetProgress) || s.actions[s.act] != ShuffleShow {
 		t.Fatalf("after the list changed: %q, cursor %d", s.actions, s.act)
 	}
 	off, limit := round(s.actX.Target()), max(0, s.actRowW()-SafeW)
@@ -325,9 +342,9 @@ func TestSeasonRowScrollBounds(t *testing.T) {
 }
 
 // The episode's tracks can land after the Continue Watching answer, with the
-// cursor already on Remove: Audio and Subtitles go in before it, and the
-// cursor stays on Remove rather than on whatever took its place.
-func TestSeasonStreamsKeepRemoveSelected(t *testing.T) {
+// cursor already on Forget my progress: Audio and Subtitles go in before
+// it, and the cursor stays on it rather than on whatever took its place.
+func TestSeasonStreamsKeepForgetSelected(t *testing.T) {
 	a := continueTestApp(t, newContinueServer(t))
 	ep := &jellyfin.Item{ID: "e1", Type: "episode", ViewOffset: 300}
 	s := &Season{app: a, show: &jellyfin.Item{}, seasons: []*jellyfin.Item{{}}, eps: []*jellyfin.Item{ep}, acts: true,
@@ -335,13 +352,13 @@ func TestSeasonStreamsKeepRemoveSelected(t *testing.T) {
 	s.cw.keys = map[string]bool{"e1": true}
 	s.rebuild()
 	s.act = len(s.actions) - 1
-	if s.actions[s.act] != RemoveContinue {
+	if s.actions[s.act] != ForgetProgress {
 		t.Fatalf("fixture: %q", s.actions)
 	}
 	s.streamsArrived(ep, &jellyfin.Item{SourceID: "p",
 		Audio: []jellyfin.Stream{{ID: "1", Title: "English", Selected: true}, {ID: "2", Title: "French"}},
 		Subs:  []jellyfin.Stream{{ID: "3", Title: "English (SRT)"}}})
-	if len(s.actions) != 7 || s.actions[s.act] != RemoveContinue {
+	if len(s.actions) != 7 || s.actions[s.act] != ForgetProgress {
 		t.Fatalf("after the tracks landed: %q, cursor on %q", s.actions, s.actions[s.act])
 	}
 }
@@ -356,7 +373,7 @@ func TestContinueListAsksAgain(t *testing.T) {
 	p := NewPreplay(a, m1)
 	settle(t, &p.cw)
 	p.pollRefresh(time.Now())
-	if slices.Contains(p.actions, RemoveContinue) {
+	if slices.Contains(p.actions, ForgetProgress) {
 		t.Fatal("a failed fetch showed the action")
 	}
 
@@ -365,7 +382,7 @@ func TestContinueListAsksAgain(t *testing.T) {
 	p.pollRefresh(later) // time to ask again
 	settle(t, &p.cw)
 	p.pollRefresh(later)
-	if !slices.Contains(p.actions, RemoveContinue) {
+	if !slices.Contains(p.actions, ForgetProgress) {
 		t.Fatal("the failed fetch was not retried")
 	}
 
@@ -375,15 +392,15 @@ func TestContinueListAsksAgain(t *testing.T) {
 	p.pollRefresh(later)
 	settle(t, &p.cw)
 	p.pollRefresh(later)
-	if slices.Contains(p.actions, RemoveContinue) || p.cur != 0 {
+	if slices.Contains(p.actions, ForgetProgress) || p.cur != 0 {
 		t.Fatalf("the removal elsewhere was not picked up: %q, cursor %d", p.actions, p.cur)
 	}
 }
 
 // The periodic refresh keeps the cursor on the action rather than moving it
 // to the second Play.
-func TestRefreshKeepsCursorOnRemove(t *testing.T) {
-	actions := []string{"Resume 10:00", "From start", "Mark watched", RemoveContinue}
+func TestRefreshKeepsCursorOnForget(t *testing.T) {
+	actions := []string{"Resume 10:00", "From start", "Mark watched", ForgetProgress}
 	if got := restoreAction(actions, actionKind(actions, 3)); got != 3 {
 		t.Fatalf("cursor restored to %d", got)
 	}
@@ -431,7 +448,7 @@ func TestPreplaySixActionsFit(t *testing.T) {
 	if pitch < f.Body.Height()+8 {
 		t.Fatalf("six actions pressed to %d px apart", pitch)
 	}
-	if w := f.Body.Width(RemoveContinue); PreTextX+w > SafeX+SafeW {
-		t.Fatalf("%q is %d px wide, past the safe area", RemoveContinue, w)
+	if w := f.Body.Width(ForgetProgress); PreTextX+w > SafeX+SafeW {
+		t.Fatalf("%q is %d px wide, past the safe area", ForgetProgress, w)
 	}
 }

@@ -7,9 +7,12 @@ import (
 	"plexcrt/internal/jellyfin"
 )
 
-// RemoveContinue is the last action on a movie's page and in an episode's
-// actions while the item is in Continue Watching.
-const RemoveContinue = "Remove from Continue Watching"
+// ForgetProgress is the last action on a movie's page and in an episode's
+// actions while the item is in Continue Watching with a resume point.
+// Jellyfin cannot hide an item and keep its place, so the action says what
+// it does: the resume point is cleared and the item leaves the row. A next
+// up episode has no point to clear and does not get it.
+const ForgetProgress = "Forget my progress"
 
 // continueList is the server's Continue Watching list as rating keys, held
 // by a movie or season page. The page fetches it off-thread when it opens,
@@ -70,16 +73,18 @@ func (l *continueList) poll(a *App, now time.Time) bool {
 
 func (l *continueList) has(key string) bool { return l.keys[key] }
 
-// removeContinue takes an item out of Continue Watching on the server, then
-// out of the page's list and the Home row at once, not at their next
-// fetch. False when the server refused; the notice line says so.
-func (a *App) removeContinue(it *jellyfin.Item, l *continueList) bool {
-	if err := a.Client.RemoveFromContinueWatching(bg(), it.ID); err != nil {
-		a.Log.Printf("remove from continue watching %s: %v", it.ID, err)
-		a.Notice, a.NoticeAt = "Could not remove it from Continue Watching.", time.Now()
+// forgetProgress clears an item's resume point on the server, which takes
+// it out of Continue Watching, then out of the page's list and the Home row
+// at once, not at their next fetch. False when the server refused; the
+// notice line says so.
+func (a *App) forgetProgress(it *jellyfin.Item, l *continueList) bool {
+	if err := a.Client.ClearResumePoint(bg(), it.ID); err != nil {
+		a.Log.Printf("forget progress %s: %v", it.ID, err)
+		a.Notice, a.NoticeAt = "Could not forget your progress.", time.Now()
 		a.dirty = true
 		return false
 	}
+	it.ViewOffset = 0
 	l.pending = nil // an answer from before the removal would still hold it
 	delete(l.keys, it.ID)
 	for _, screen := range a.stack {
