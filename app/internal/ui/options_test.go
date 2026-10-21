@@ -340,7 +340,7 @@ func TestOptionsStepOnlyWithLeftAndRight(t *testing.T) {
 	a := betaTestApp(t)
 	o := NewOptions(a)
 	a.Push(o)
-	saved := func() bool { _, err := os.Stat(a.Cfg.path); return err == nil }
+	saved := func() bool { a.Cfg.Flush(); _, err := os.Stat(a.Cfg.path); return err == nil }
 	value := func(label string) string { return o.items()[optionRow(o, label)].val() }
 	for _, label := range []string{"Video bitrate", "Video crop"} {
 		was := value(label)
@@ -424,6 +424,7 @@ func TestOptionsSubtitleSizeShowsStepsAndSaves(t *testing.T) {
 	if a.Cfg.SubtitleSize != 200 || o.items()[row].val() != "Extra large" {
 		t.Fatalf("right from Large: %d %q", a.Cfg.SubtitleSize, o.items()[row].val())
 	}
+	a.Cfg.Flush()
 	if LoadConfig(a.Cfg.path).SubtitleSizeValue() != 200 {
 		t.Fatal("the size was not saved")
 	}
@@ -463,7 +464,7 @@ func TestOptionsOKRunsASteppedRowsAction(t *testing.T) {
 	})
 	o := NewOptions(a)
 	a.Push(o)
-	saved := func() bool { _, err := os.Stat(a.Cfg.path); return err == nil }
+	saved := func() bool { a.Cfg.Flush(); _, err := os.Stat(a.Cfg.path); return err == nil }
 	pressOption(t, o, "Stepper", input.Enter)
 	if ran != 1 || value != 1 || saved() {
 		t.Fatalf("OK on a stepped row with an action: ran %d, value %d, saved %v", ran, value, saved())

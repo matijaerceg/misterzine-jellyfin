@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"plexcrt/internal/jellyfin"
@@ -57,6 +58,7 @@ type Config struct {
 	LoadWarning string                  `json:"-"`
 	LoadError   error                   `json:"-"`
 	path        string
+	saver       *saver // shared by the copies (snapshot): one writer for the file
 }
 
 // StreamChoice is a chosen audio track and subtitle track, as Jellyfin
@@ -238,11 +240,14 @@ func (c *Config) SignOut() error {
 	next.Streams = nil         // so do the item ids
 	next.ServerToken, next.UserID, next.UserName = "", "", ""
 	data, _ := json.MarshalIndent(&next, "", "  ")
-	// Clear recovery credentials first so a later corrupt primary cannot undo sign-out.
-	if err := atomicConfig(c.path+".bak", data); err != nil {
-		return err
-	}
-	if err := atomicConfig(c.path, data); err != nil {
+	err := c.saves().now(func() error {
+		// Clear recovery credentials first so a later corrupt primary cannot undo sign-out.
+		if err := atomicConfig(c.path+".bak", data); err != nil {
+			return err
+		}
+		return atomicConfig(c.path, data)
+	})
+	if err != nil {
 		return err
 	}
 	*c = next
@@ -273,15 +278,154 @@ func atomicConfig(path string, data []byte) error {
 }
 
 // Save atomically replaces settings and retains the last valid configuration.
+// What SaveLater holds is written with it: these settings include it.
 func (c *Config) Save() error {
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return err
 	}
-	if old, e := os.ReadFile(c.path); e == nil && json.Valid(old) {
-		if e = atomicConfig(c.path+".bak", old); e != nil {
+	path := c.path
+	return c.saves().now(func() error { return writeConfig(path, data) })
+}
+
+func writeConfig(path string, data []byte) error {
+	if old, e := os.ReadFile(path); e == nil && json.Valid(old) {
+		if e = atomicConfig(path+".bak", old); e != nil {
 			return e
 		}
 	}
-	return atomicConfig(c.path, data)
+	return atomicConfig(path, data)
+}
+
+// saveDelay is how long SaveLater waits for the changes to stop: a held
+// left or right on Options steps every RepeatDur, and each write syncs
+// the SD card.
+var saveDelay = 500 * time.Millisecond
+
+// SaveLater saves the settings as they are now, in the background once
+// they have stopped changing for saveDelay, as Save would. Only the UI
+// thread calls it (it reads the settings here); failed hears of a failed
+// write from the writing goroutine. Flush writes what is held at once.
+func (c *Config) SaveLater(failed func(error)) {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		failed(err)
+		return
+	}
+	s := c.saves()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.data, s.path, s.failed = data, c.path, failed
+	if s.timer == nil {
+		s.timer = time.AfterFunc(saveDelay, s.deferred)
+	} else {
+		s.timer.Reset(saveDelay)
+	}
+}
+
+// Flush writes what SaveLater holds now, after any write under way: before
+// playback, on leaving Options and on the way out. When it fails the
+// settings stay held for the next save.
+func (c *Config) Flush() error {
+	return c.saves().flush()
+}
+
+const saveFailed = "Could not save settings. Check free space and retry."
+
+// saveSettings saves the settings the UI thread just changed without
+// waiting for the SD card (SaveLater); a failure shows on the notice line.
+func (a *App) saveSettings() {
+	a.Cfg.SaveLater(func(err error) {
+		a.Log.Printf("config: %v", err)
+		a.Later(func() { a.Notice, a.NoticeAt = saveFailed, time.Now() })
+	})
+}
+
+// flushSettings writes what saveSettings has yet to, at once.
+func (a *App) flushSettings() {
+	if a.Cfg == nil {
+		return
+	}
+	if err := a.Cfg.Flush(); err != nil {
+		a.Log.Printf("config: %v", err)
+		a.Notice, a.NoticeAt = saveFailed, time.Now()
+	}
+}
+
+// saves is the file's writer, made with the first save.
+func (c *Config) saves() *saver {
+	if c.saver == nil {
+		c.saver = &saver{}
+	}
+	return c.saver
+}
+
+// saver writes one settings file, one write at a time, and holds the
+// settings SaveLater has yet to write.
+type saver struct {
+	write  sync.Mutex // held through each write
+	mu     sync.Mutex // guards the rest
+	data   []byte     // held for writing; nil for nothing
+	path   string
+	timer  *time.Timer
+	failed func(error)
+}
+
+// take is what is held, no longer held.
+func (s *saver) take() (data []byte, path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, path, s.data = s.data, s.path, nil
+	if s.timer != nil {
+		s.timer.Stop()
+	}
+	return data, path
+}
+
+// hold puts back settings a write failed to keep, unless newer ones came.
+func (s *saver) hold(data []byte, path string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.data == nil {
+		s.data, s.path = data, path
+	}
+}
+
+// now runs write, which saves settings at least as new as those held, in
+// their place.
+func (s *saver) now(write func() error) error {
+	s.write.Lock()
+	defer s.write.Unlock()
+	data, path := s.take()
+	err := write()
+	if err != nil && data != nil {
+		s.hold(data, path)
+	}
+	return err
+}
+
+func (s *saver) flush() error {
+	s.write.Lock()
+	defer s.write.Unlock()
+	data, path := s.take()
+	if data == nil {
+		return nil
+	}
+	err := writeConfig(path, data)
+	if err != nil {
+		s.hold(data, path)
+	}
+	return err
+}
+
+// deferred is the timer's write.
+func (s *saver) deferred() {
+	if err := s.flush(); err != nil {
+		s.mu.Lock()
+		failed := s.failed
+		s.mu.Unlock()
+		if failed != nil {
+			failed(err)
+		}
+	}
 }

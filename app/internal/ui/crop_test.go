@@ -53,6 +53,7 @@ func TestOptionsCropStepsAndSaves(t *testing.T) {
 		t.Fatalf("crop = %q", got)
 	}
 	o.Key(input.Event{Key: input.Enter}, time.Now())
+	a.Cfg.Flush()
 	if saved := LoadConfig(a.Cfg.path); saved.Crop != Crop14x9 {
 		t.Fatalf("saved %q", saved.Crop)
 	}

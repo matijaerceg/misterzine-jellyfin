@@ -145,6 +145,7 @@ func TestSkipButtonsOptionDefaultsOnAndSaves(t *testing.T) {
 	if !a.Cfg.NoSkipButtons || o.items()[row].get() {
 		t.Fatal("OK did not turn the skip buttons off")
 	}
+	a.Cfg.Flush()
 	data, err := os.ReadFile(a.Cfg.path)
 	if err != nil {
 		t.Fatal(err)

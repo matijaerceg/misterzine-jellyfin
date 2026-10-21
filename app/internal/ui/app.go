@@ -225,6 +225,9 @@ func (a *App) Pop() bool {
 	if l, ok := gone.(leaver); ok {
 		l.left()
 	}
+	if _, ok := gone.(*Options); ok {
+		a.flushSettings() // its changes are written as they stop (saveSettings)
+	}
 	a.syncTheme()
 	a.dirty = true
 	return true
@@ -476,7 +479,8 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 			a.osd = r.Overlay()
 		}
 	}
-	a.theme.Stop() // ALSA is single-client: wait for aplay before the launcher
+	a.flushSettings() // a track just chosen, say: on the card before the play
+	a.theme.Stop()    // ALSA is single-client: wait for aplay before the launcher
 	defer a.syncTheme()
 	a.Player.Reap()
 	a.crop = a.Cfg.Crop.valid()
@@ -1117,15 +1121,11 @@ func (a *App) selectStream(it *jellyfin.Item, kind string, i int) {
 	} else {
 		ch.Audio = id
 	}
-	before := a.Cfg.snapshot()
 	if a.Cfg.Streams == nil {
 		a.Cfg.Streams = map[string]StreamChoice{}
 	}
 	a.Cfg.Streams[key] = ch
-	if err := a.Cfg.Save(); err != nil {
-		a.Log.Printf("select %s: %v", kind, err)
-		*a.Cfg = before
-	}
+	a.saveSettings() // written before the play starts at the latest
 }
 
 // chooseStream opens the chooser for an item's audio or subtitle tracks
@@ -1198,6 +1198,7 @@ func (a *App) homeUpdating() bool {
 // menu's Exit sets ToMenu.
 func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 	defer a.theme.Stop()
+	defer a.flushSettings()
 	if r, ok := a.Out.(*ring.Ring); ok {
 		mode := uint32(0)
 		if a.Cfg.Progressive {

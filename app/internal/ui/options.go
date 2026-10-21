@@ -29,7 +29,7 @@ type option struct {
 	// show as live.
 	at func() (i, n int)
 	do func() // an action: OK runs it, on a stepped row too
-	// after runs once a change is saved: Home refetched, the theme player
+	// after runs once a change is made: Home refetched, the theme player
 	// told, or nothing. Bitrate and the sound toggles change nothing on
 	// screen, so stepping them must not refetch Home.
 	after func()
@@ -238,7 +238,6 @@ func (o *Options) Key(ev input.Event, now time.Time) {
 			}
 			return
 		}
-		before := o.app.Cfg.snapshot()
 		switch {
 		case toggle:
 			it.set(!it.get())
@@ -247,12 +246,9 @@ func (o *Options) Key(ev input.Event, now time.Time) {
 		default:
 			it.step(1)
 		}
-		if err := o.app.Cfg.Save(); err != nil {
-			o.app.Log.Printf("config: %v", err)
-			*o.app.Cfg = before
-			o.app.Notice, o.app.NoticeAt = "Could not save settings. Check free space and retry.", now
-			return
-		}
+		// written once the steps stop, and at the latest on leaving
+		// Options: a sync to the SD card per step held the key up
+		o.app.saveSettings()
 		if it.after != nil {
 			it.after()
 		}

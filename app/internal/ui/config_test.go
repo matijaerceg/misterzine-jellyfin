@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"syscall"
 	"testing"
+	"time"
+
+	"plexcrt/internal/input"
 )
 
 func TestConfigRecoveryAndSignOut(t *testing.T) {
@@ -96,6 +99,121 @@ func TestConfigFailedSavePreservesPrimary(t *testing.T) {
 		t.Fatal("failed save changed primary")
 	}
 }
+
+// savedBitrate is the bitrate in the settings file at path, 0 for none.
+func savedBitrate(path string) int {
+	var s Config
+	b, err := os.ReadFile(path)
+	if err != nil || json.Unmarshal(b, &s) != nil {
+		return 0
+	}
+	return s.Bitrate
+}
+
+// shortSaveDelay makes SaveLater wait d for the length of the test.
+func shortSaveDelay(t *testing.T, d time.Duration) {
+	was := saveDelay
+	t.Cleanup(func() { saveDelay = was })
+	saveDelay = d
+}
+
+// SaveLater writes once the changes stop, and only the last settings;
+// Flush writes what is held at once and leaves the timer nothing.
+func TestSaveLaterWaitsForTheChangesToStop(t *testing.T) {
+	shortSaveDelay(t, 300*time.Millisecond)
+	path := filepath.Join(t.TempDir(), "settings.json")
+	c := &Config{path: path}
+	failed := func(err error) { t.Error("deferred save:", err) }
+	for _, kbps := range []int{1000, 2000, 3000, 4000} {
+		c.Bitrate = kbps
+		c.SaveLater(failed)
+		time.Sleep(30 * time.Millisecond)
+	}
+	if got := savedBitrate(path); got != 0 {
+		t.Fatalf("written while the steps came: %d", got)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for savedBitrate(path) == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := savedBitrate(path); got != 4000 {
+		t.Fatalf("after the steps stopped: %d, want the last, 4000", got)
+	}
+	c.Bitrate = 6000
+	c.SaveLater(failed)
+	if err := c.Flush(); err != nil || savedBitrate(path) != 6000 {
+		t.Fatalf("flush: %v, saved %d", err, savedBitrate(path))
+	}
+	os.Remove(path)
+	time.Sleep(saveDelay + 100*time.Millisecond)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatal("the timer wrote again after the flush")
+	}
+	if err := c.Flush(); err != nil {
+		t.Fatal("flush with nothing held:", err)
+	}
+}
+
+// Save writes the newest settings: what SaveLater held, older, never lands
+// after it.
+func TestSaveTakesWhatSaveLaterHolds(t *testing.T) {
+	shortSaveDelay(t, 100*time.Millisecond)
+	path := filepath.Join(t.TempDir(), "settings.json")
+	c := &Config{path: path, Bitrate: 1000}
+	c.SaveLater(func(err error) { t.Error("deferred save:", err) })
+	c.Bitrate = 2000
+	if err := c.Save(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(saveDelay + 100*time.Millisecond)
+	if got := savedBitrate(path); got != 2000 {
+		t.Fatalf("saved %d, want 2000", got)
+	}
+}
+
+// A deferred write that fails is reported, and its settings stay held for
+// the next flush.
+func TestSaveLaterFailureIsReportedAndKept(t *testing.T) {
+	shortSaveDelay(t, 50*time.Millisecond)
+	path := filepath.Join(t.TempDir(), "settings.json")
+	c := &Config{path: path, Bitrate: 1000}
+	if err := c.Save(); err != nil {
+		t.Fatal(err)
+	}
+	os.Mkdir(path+".bak", 0700) // the backup cannot be replaced
+	failures := make(chan error, 4)
+	c.Bitrate = 2000
+	c.SaveLater(func(err error) { failures <- err })
+	select {
+	case <-failures:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the failed write was not reported")
+	}
+	if got := savedBitrate(path); got != 1000 {
+		t.Fatalf("a failed save changed the file: %d", got)
+	}
+	os.Remove(path + ".bak")
+	if err := c.Flush(); err != nil || savedBitrate(path) != 2000 {
+		t.Fatalf("flush after the failure: %v, saved %d", err, savedBitrate(path))
+	}
+}
+
+// Options saves its steps in the background; leaving it writes them at once.
+func TestLeavingOptionsWritesItsChanges(t *testing.T) {
+	a := betaTestApp(t)
+	o := NewOptions(a)
+	a.Push(o)
+	pressOption(t, o, "Video bitrate", input.Left)
+	want := a.Cfg.Bitrate
+	if want == 0 || savedBitrate(a.Cfg.path) != 0 {
+		t.Fatalf("the step: bitrate %d, written %d before leaving", want, savedBitrate(a.Cfg.path))
+	}
+	a.Pop()
+	if got := savedBitrate(a.Cfg.path); got != want {
+		t.Fatalf("after leaving Options: saved %d, want %d", got, want)
+	}
+}
+
 func TestConfigMalformedWithoutBackup(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "settings.json")
 	os.WriteFile(path, []byte(`{"server_token":"partial",`), 0600)
