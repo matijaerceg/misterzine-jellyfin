@@ -201,29 +201,7 @@ func (o *Overlay) Show(x, y int, c *gfx.Canvas, alpha []byte) {
 		o.update()
 		return
 	}
-	if cap(o.mapX) < w {
-		o.mapX = make([]int, w)
-	} else {
-		o.mapX = o.mapX[:w]
-	}
-	for xx := range o.mapX {
-		o.mapX[xx] = min(c.W-1, xx*c.W/w)
-	}
-	for yy := 0; yy < h; yy++ {
-		row := o.own[yy*w*4 : (yy+1)*w*4]
-		sourceY := min(c.H-1, yy*c.H/h)
-		for xx := 0; xx < w; xx++ {
-			sourceX := o.mapX[xx]
-			src := (sourceY*c.W + sourceX) * 4
-			dst := xx * 4
-			copy(row[dst:dst+4], c.Pix[src:src+4])
-			a := byte(255)
-			if alpha != nil {
-				a = alpha[sourceY*c.W+sourceX]
-			}
-			row[dst+3] = a
-		}
-	}
+	o.mapX = scaleCanvas(o.own, w, h, c, alpha, o.mapX)
 	o.on, o.x, o.y, o.w, o.h = true, x, y, w, h
 	o.src, o.srcStride = o.own, w*4
 	o.regionSrc = false
@@ -274,26 +252,84 @@ func (o *Overlay) ShowAt(x, y, w, h, off int) {
 	if len(o.own) < w*h*4 {
 		o.own = make([]byte, w*h*4)
 	}
-	if cap(o.mapX) < w {
-		o.mapX = make([]int, w)
-	} else {
-		o.mapX = o.mapX[:w]
-	}
-	for xx := range o.mapX {
-		o.mapX[xx] = min(lw-1, xx*lw/w)
-	}
-	for yy := 0; yy < h; yy++ {
-		sourceY := min(lh-1, yy*lh/h)
-		for xx := 0; xx < w; xx++ {
-			src := off + (sourceY*lw+o.mapX[xx])*4
-			dst := (yy*w + xx) * 4
-			copy(o.own[dst:dst+4], o.region[src:src+4])
-		}
-	}
+	o.mapX = scaleRegion(o.own, w, h, o.region[off:off+lw*lh*4], lw, lh, o.mapX)
 	o.on, o.x, o.y, o.w, o.h = true, x, y, w, h
 	o.src, o.srcStride = o.own, w*4
 	o.regionSrc, o.regionOff = true, off
 	o.update()
+}
+
+// columnMap is the nearest source column of sw for each of w output
+// columns, in m's storage when it is large enough.
+func columnMap(m []int, w, sw int) []int {
+	if cap(m) < w {
+		m = make([]int, w)
+	} else {
+		m = m[:w]
+	}
+	for x := range m {
+		m[x] = min(sw-1, x*sw/w)
+	}
+	return m
+}
+
+// scaleCanvas scales c nearest-neighbour into dst, w x h pixels, its
+// alpha from the plane (nil for opaque). It works a word a pixel, and an
+// output row whose source row is the one above's (scaling up) is a copy
+// of that row. It returns mapX, the column map's storage.
+func scaleCanvas(dst []byte, w, h int, c *gfx.Canvas, alpha []byte, mapX []int) []int {
+	mapX = columnMap(mapX, w, c.W)
+	out := unsafe.Slice((*uint32)(unsafe.Pointer(&dst[0])), len(dst)/4)[:w*h]
+	src := unsafe.Slice((*uint32)(unsafe.Pointer(&c.Pix[0])), len(c.Pix)/4)
+	last := -1
+	for yy := 0; yy < h; yy++ {
+		row := out[yy*w : (yy+1)*w]
+		sy := min(c.H-1, yy*c.H/h)
+		if sy == last {
+			copy(row, out[(yy-1)*w:yy*w])
+			continue
+		}
+		last = sy
+		in := src[sy*c.W : (sy+1)*c.W]
+		if alpha == nil {
+			for x, sx := range mapX {
+				row[x] = in[sx] | 0xFF000000
+			}
+			continue
+		}
+		a := alpha[sy*c.W : (sy+1)*c.W]
+		for x, sx := range mapX {
+			row[x] = in[sx]&0xFFFFFF | uint32(a[sx])<<24
+		}
+	}
+	return mapX
+}
+
+// scaleRegion is scaleCanvas for uploaded pixels, lw x lh with their alpha
+// in place: at 1:1 (a list on a 480-line raster) one copy.
+func scaleRegion(dst []byte, w, h int, region []byte, lw, lh int, mapX []int) []int {
+	if w == lw && h == lh {
+		copy(dst[:w*h*4], region[:w*h*4])
+		return mapX
+	}
+	mapX = columnMap(mapX, w, lw)
+	out := unsafe.Slice((*uint32)(unsafe.Pointer(&dst[0])), len(dst)/4)[:w*h]
+	src := unsafe.Slice((*uint32)(unsafe.Pointer(&region[0])), len(region)/4)[:lw*lh]
+	last := -1
+	for yy := 0; yy < h; yy++ {
+		row := out[yy*w : (yy+1)*w]
+		sy := min(lh-1, yy*lh/h)
+		if sy == last {
+			copy(row, out[(yy-1)*w:yy*w])
+			continue
+		}
+		last = sy
+		in := src[sy*lw : (sy+1)*lw]
+		for x, sx := range mapX {
+			row[x] = in[sx]
+		}
+	}
+	return mapX
 }
 
 // Dot places the dot (a disc of radius 7 rows centred on x,y, frame
