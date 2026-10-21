@@ -19,16 +19,18 @@ You'll need a networked MiSTer running current MiSTer Linux with
 Python 3.9 or newer, some free space on the SD card (each installed release
 takes about 14 MB, and two are kept), and a Jellyfin server you can sign in to.
 The server must be allowed to transcode for your account: anything the decoder
-cannot play directly, and every video with subtitles on, is converted by the
-server. Run **Update All** or **Downloader** first so MiSTer Linux is current.
+cannot play directly, and every video with subtitles the server burns in
+(picture subtitles such as PGS), is converted by the server. Run **Update All**
+or **Downloader** first so MiSTer Linux is current.
 
 1. Download `MisterZine-Jellyfin-Install-Beta.sh` from
    [Releases](https://github.com/matijaerceg/misterzine-jellyfin/releases) and
    put it in the SD card's `Scripts` folder
 2. Run it from **Scripts**
 3. Open **MisterZine Jellyfin** from the MiSTer main menu
-4. Enter your server's address, then sign in with Quick Connect or your user
-   name and password
+4. Choose your server from those found on your network, or enter its address,
+   then choose your user or sign in with Quick Connect or your user name and
+   password
 
 Enter the supporter code when you first press Play. It is saved for next time.
 
@@ -53,7 +55,9 @@ what it does to your library or your MiSTer.
 
 ## What it does
 
-- Jellyfin sign-in using Quick Connect or a user name and password.
+- Jellyfin sign-in to a server found on the local network or typed in, as a
+  user the server lists, with Quick Connect or with a user name and password;
+  switching user from Options.
 - Home rows, library browsing by name, date added, release date, folders and
   collections, search, and resume positions and watched marks kept in step
   with Jellyfin.
@@ -63,7 +67,8 @@ what it does to your library or your MiSTer.
   limited to lower widths; see [playback details](docs/PLAYBACK.md).
 - Pause, seeking, audio and subtitle track choice, skip intro and credits,
   autoplay and shuffle.
-- Subtitles burned into the picture by the server, and a surround downmix
+- Text subtitles drawn by the app in three sizes, without a transcode;
+  picture subtitles burned into the picture by the server. A surround downmix
   boost with peak limiting.
 - Display modes and refresh matching are selected in the core's OSD, including
   240p/288p playback and 23.976/24-to-25 film speed-up on PAL output. Film

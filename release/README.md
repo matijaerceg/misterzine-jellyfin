@@ -21,9 +21,10 @@ required.
 
 The installer uses `misterzine-jellyfin` on the SD card and adds **MisterZine
 Jellyfin** to the MiSTer menu. Its settings and updates are separate from
-MisterZine Plex. Open that menu entry to launch the app. Sign in using Jellyfin
-Quick Connect or your server address, username and password. Your server needs
-transcoding support for unsupported video formats and burned-in subtitles.
+MisterZine Plex. Open that menu entry to launch the app. Choose your server from
+those found on your network, or type its address, then choose your user or
+sign in with Jellyfin Quick Connect or your username and password. Your server
+needs transcoding support for unsupported video formats and picture subtitles.
 
 Browse freely; official beta builds ask for the shared MisterZine supporter code
 when you start playback. See [beta access](BETA_ACCESS.md) and the
@@ -72,9 +73,14 @@ playback after changing settings that affect playback speed.
 Start with a low video bitrate on Wi-Fi and raise it if playback remains smooth.
 A high bitrate needs adequate sustained throughput, not just a strong signal.
 The buffered section of the playback bar shows the available seek range;
-seeks outside it may require a fresh server request. Subtitles are burned into
-the video by Jellyfin and require server-side transcoding. Turning them on
-restarts the stream, and the server can take tens of seconds to resume.
+seeks outside it may require a fresh server request.
+
+Text subtitles (SRT, ASS/SSA, WebVTT) are drawn by the app, so the video needs
+no transcode for them and changing them does not restart it. **Subtitle size**
+in Options, or under **More** during playback, makes them larger. Picture
+subtitles (PGS, VobSub) are burned into the video by Jellyfin and require
+server-side transcoding. Turning them on restarts the stream, and the server
+can take tens of seconds to resume.
 
 Files the decoder supports play directly. Others are transcoded from the
 start. If a direct stream falls behind, playback switches to a transcode once
@@ -92,7 +98,13 @@ Check the network connection, SD card space and that MiSTer Linux is current
 (Python 3.9 or newer). Running the installer again repairs the installed
 release's files, or installs a newer release; settings are kept.
 
-At sign-in, type the server's address as you would in a web browser. A bare
+Sign-in lists the Jellyfin servers that answer on your local network. If yours
+is missing, check that auto discovery is on in the server's settings (it is by
+default) and that nothing blocks UDP port 7359 to it. A server on another
+network, or in a container without host networking, may not answer either way.
+Choose **Enter address** and type the address instead.
+
+To type it, enter the server's address as you would in a web browser. A bare
 name such as `jellyfin.example.com` is tried over HTTPS first and then as
 `http://jellyfin.example.com:8096`; type `http://` in front for any other
 plain HTTP port. What the screen says next:
@@ -105,7 +117,10 @@ plain HTTP port. What the screen says next:
   running and that the MiSTer is on a network that can reach it.
 - **Quick Connect** is missing from the list: it is turned off on the server.
   Turn it on in the server's dashboard, or use your user name and password.
-- **Wrong user name or password**: try again, or use Quick Connect.
+- Your user is not listed: many servers hide their users. Choose **Other
+  user** (or **User name and password**), or use Quick Connect.
+- **Wrong user name or password**, or **Wrong password** for a user chosen
+  from the list: try again, or use Quick Connect.
 
 Right after power-on the app may show **Connecting** for up to a minute while
 the network comes up or, on a MiSTer without a clock chip, while the clock is
@@ -129,6 +144,19 @@ or Refresh Rate Match does not keep to, **HDMI sound** means DVI mode (no sound
 over HDMI), and **INI section** means a later `[MiSTer]` section overrides the
 app's `[MisterZine Jellyfin]` section. Select a row for the lines to add. See
 [HDMI setup](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/docs/HDMI.md).
+
+### Subtitles are missing or slow to appear
+
+The first time a subtitle track embedded in a large file is asked for, the
+server extracts it from the file, which can take a while; the video plays
+without subtitles meanwhile. The app waits 30 seconds for an answer and tries
+twice more, then gives up and shows none. Turn subtitles off and on again to ask
+once more. The server's **Allow subtitle extraction on the fly** setting, under
+Dashboard > Playback > Transcoding, decides how it handles embedded subtitles,
+and so affects how long they take to start.
+
+Picture subtitles need a transcode. If choosing one fails, check that the
+server allows your account to transcode.
 
 ### Updates or downloads fail
 

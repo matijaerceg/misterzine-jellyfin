@@ -7,9 +7,17 @@ Detailed behavior and display settings. For everyday help, see the
 
 ### Signing in
 
-The first screen asks for your Jellyfin server's address, typed on the
-on-screen keyboard or a USB keyboard. The app checks that a Jellyfin server
-answers there before going on.
+When the sign-in opens, the app spends a moment looking for Jellyfin servers on
+your local network. Any that answer are listed by name, with their address,
+under **Servers on your network**, the server you last signed in to selected.
+Choose one, or choose **Enter address** to type an address. If none answer,
+the address keyboard opens straight away. OK during the search, or typing on a
+USB keyboard, goes to the address without waiting. Discovery needs the server's
+auto discovery setting (on by default) and UDP port 7359 open on the server.
+
+The address is typed on the on-screen keyboard or a USB keyboard. The app
+checks that a Jellyfin server answers there before going on; a server chosen
+from the list is checked the same way, at the address it gave.
 
 - An address with `http://` or `https://` is used as typed, including any path
   after the name (a server behind a reverse proxy at
@@ -26,24 +34,36 @@ answers there before going on.
 
 The server's name then shows with the ways to sign in:
 
+- The users the server shows on its own login screen, if any, by name.
+  Choose yourself: a user with a password types it, and one without is
+  signed in at once. Servers often hide their users; the list then starts with
+  Quick Connect.
 - **Quick Connect** is listed when the server has it turned on. The screen
   shows a code; in a Jellyfin app where you are already signed in, open
   **Settings > Quick Connect** and enter it. The app checks every two seconds
   and signs in once the code is approved. An expired code asks for OK to get a
   new one.
-- **User name and password** asks for both on the keyboard.
-- **Change server** returns to the address.
+- **User name and password** asks for both on the keyboard. Below a list of
+  users it is called **Other user**.
+- **Change server** returns to the servers found, or to the address.
 
-Back steps back one screen; from the address, it opens Options, which holds
+Back steps back one screen. From the list of servers (or the search for them),
+or from the address when no server was found, it opens Options, which holds
 **Exit to MiSTer menu** until you have signed in. The session and the server's
 address are saved in the settings file on the SD card. The password is not
 saved.
 
 Signing in to a different server forgets the hidden libraries and the audio and
-subtitle choices kept for the old one. Signing in as a different user also
-clears the recent searches. If the server refuses the saved session (it was
-revoked, or the user removed), the app returns to sign-in with the address kept
-and says so.
+subtitle choices kept for the old one. Signing in as a different user forgets
+them too, and clears the recent searches. If the server refuses the saved
+session (it was revoked, or the user removed), the app returns to sign-in with
+the address kept and says so.
+
+**Options > Switch user** lists the users of the server you are signed in to,
+with the other ways to sign in, without typing its address again. Back returns
+to Options, still signed in as before. Signing in replaces the saved sign-in,
+so the app starts as the new user next time, and ends the previous session on
+the server. If the server does not answer, OK tries again.
 
 **Options > Sign out** ends the session on the server and forgets it, the
 recent searches, the hidden libraries and the track choices. The server's
@@ -94,8 +114,10 @@ address stays for the next sign-in.
   seasons (Home, search, a show with one season), and **Shuffle show**.
 - A movie or episode in Continue Watching has **Remove from Continue
   Watching** as its last action. Jellyfin has no way to hide an item and keep
-  its place, so this clears its resume point. A next episode Jellyfin suggests
-  cannot be removed this way.
+  its place, so this clears the item's resume point on the server: the
+  position is lost, and the item leaves the row. On a next episode Jellyfin
+  suggests it has no lasting effect: the episode leaves the row, then comes
+  back the next time Home is shown.
 - A show's row of seasons ends with a **Shuffle** tile; **Shuffle show** does
   the same. Both play every episode of the show, watched or not and specials
   included, in a random order and each from its start. While the episodes are
@@ -131,10 +153,12 @@ address stays for the next sign-in.
   one seek. The last picture stays on screen until the new position plays.
 - The progress bar shows how far is downloaded in pale purple. A seek inside
   that range can reuse what is already downloaded.
-- **Audio** and **Subs** open a list of tracks. A change restarts the stream
-  at the same position and is kept for the movie or show (see Subtitles).
-- **More** holds **Crop**, for a picture wider than 4:3, and **Surround
-  downmix boost** (see Display setup and Sound).
+- **Audio** and **Subs** open a list of tracks. A change is kept for the movie
+  or show. Another audio track, or a subtitle track the server burns in,
+  restarts the stream at the same position; a subtitle track the app draws
+  changes without a restart (see Subtitles).
+- **More** holds **Crop**, for a picture wider than 4:3, **Surround downmix
+  boost** and **Subtitle size** (see Display setup, Sound and Subtitles).
 - Over an intro or credits Jellyfin has marked (its media segments),
   **Skip intro** or **Skip credits** shows for 20 seconds once playback reaches
   them, also after a resume or a seek into them. OK skips to their end; Back
@@ -166,9 +190,11 @@ Options lists, in groups:
   later `[MiSTer]` section overriding the app's `[MisterZine Jellyfin]`
   section). Select one for the file to change and what to add. See
   [HDMI setup](HDMI.md#settings-options-warn-about).
-- **Surround downmix boost**, **Theme music** (a show's theme song on its
-  pages, when Jellyfin has one) and **Navigation sounds**.
-- **Sign out**, with the user's name.
+- **Surround downmix boost**, **Subtitle size** (see Subtitles), **Theme
+  music** (a show's theme song on its pages, when Jellyfin has one) and
+  **Navigation sounds**.
+- **Switch user** (see Signing in), once signed in, and **Sign out**, with the
+  user's name.
 - **Updates**, which says when an update is downloading, ready or available,
   or when one failed.
 - **Send a report**.
@@ -176,9 +202,10 @@ Options lists, in groups:
 - **Version**. The foot of the screen shows the build.
 
 Up and Down wrap between the first and last rows. OK, Left or Right turns a
-setting on or off; a setting with more choices (bitrate, crop, downmix boost)
-changes with Left and Right only, shown by the arrows either side of its value
-when it is selected. A scrollbar on the right shows where the list is.
+setting on or off; a setting with more choices (bitrate, crop, downmix boost,
+subtitle size) changes with Left and Right only, shown by the arrows either
+side of its value when it is selected. A scrollbar on the right shows where the
+list is.
 
 An update waiting under Options is marked with a purple UPDATE mark at the top
 of Home and a purple dot in the menu.
@@ -207,12 +234,37 @@ subtitle tracks chosen on a page or during playback are saved for that movie,
 or for the whole show, and passed with every play. Until you choose, the
 server's defaults are used.
 
-Selected subtitles are burned into the picture by Jellyfin. The server must
-transcode the video for that, so it needs permission to transcode for your
-account, and a file that would otherwise play directly is transcoded while
-subtitles are on. Turning subtitles on or off during playback restarts the
+Text subtitle tracks (SRT, ASS/SSA, WebVTT) are drawn by the app over the
+picture, as white type on a translucent box, centred along the bottom of the
+screen. The video is sent without them, so a film with text subtitles can still
+play untranscoded, and turning text subtitles on or off, choosing another text
+track or changing their size does not restart the video. Only the words are
+shown: styling, positioning and effects in ASS/SSA tracks are left out, and
+accented letters lose their accents. Long lines wrap; up to six lines show at a
+time.
+Subtitles step aside while the controls, a list, the seek strip or a skip
+button are on screen.
+
+The first time a track embedded in the file is asked for, the server extracts
+it, which can take a while in a large file. The video plays meanwhile, without
+subtitles until they arrive. The app waits 30 seconds for an answer and tries
+twice more, then gives up and shows none; turning subtitles off and on again
+asks once more.
+
+**Options > Subtitle size** chooses Normal, Large (150%) or Extra large (200%)
+and is saved for future playback. During playback, **More > Subtitle size**
+changes the same setting at once.
+
+Picture subtitles (PGS, VobSub, DVB) are burned into the picture by Jellyfin.
+The server must transcode the video for that, so it needs permission to
+transcode for your account. Choosing one, or changing from one, restarts the
 stream at the same position; the server can take a while to start the new
-transcode. A crop can cut the ends of long subtitle lines.
+transcode. A text track in a script the app's fonts lack (Cyrillic, Greek,
+Arabic, Chinese, Japanese, Korean and others) is handed to the server the same
+way: the stream restarts once the app has fetched it, and the server burns it in
+from then on until the app exits. Jellyfin cannot resize subtitles it burns in,
+so Subtitle size does not change them, and a crop can cut their ends.
+Subtitles the app draws are never cut by a crop.
 
 ### Sound and playback quality
 
@@ -220,10 +272,10 @@ Files the decoder can certainly play are streamed as stored: H.264 High or
 Main, 8-bit, level 4.1 or lower, at most 1280x720, at most 30 frames per
 second above 854 pixels wide (60 at or below), and at most 6 Mbit/s above 854
 pixels wide (8 Mbit/s at or below), and no more than the **Video bitrate**
-setting. Everything else, and anything with subtitles on, is transcoded by the
-server to H.264 within the same limits. If a direct stream turns out to be
-unplayable or falls behind, playback switches once to a transcode at the same
-position. See [playback details](PLAYBACK.md).
+setting. Everything else, and anything with subtitles the server burns in (see
+Subtitles), is transcoded by the server to H.264 within the same limits. If a
+direct stream turns out to be unplayable or falls behind, playback switches
+once to a transcode at the same position. See [playback details](PLAYBACK.md).
 
 **Video bitrate** caps the video Jellyfin sends: 0.4, 1, 2, 3, 4, 6 or 8 Mbps
 (the default and the most the decoder handles). The steps below 3 Mbps are for
@@ -367,9 +419,10 @@ sides of anything wider than 14:9, the compromise broadcasters used for
 widescreen on 4:3 sets: thin bars remain and little is lost. **Fill** cuts
 whatever overhangs the screen, so there are no bars: a 16:9 picture on a 4:3
 screen loses a quarter of its width. A crop can cut the ends of long subtitle
-lines. Each playback starts with this setting; **More > Crop** in the playback
-controls changes it for that playback, including the episodes that follow it,
-and the change shows at once.
+lines burned in by the server, but not subtitles the app draws. Each playback
+starts with this setting; **More > Crop** in the playback controls changes it
+for that playback, including the episodes that follow it, and the change shows
+at once.
 
 For HDMI scaling, MiSTer INI sections and refresh rates, see
 [HDMI setup](HDMI.md).
