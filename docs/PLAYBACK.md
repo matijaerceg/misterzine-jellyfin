@@ -148,9 +148,9 @@ restart.
 
 Picture subtitles (PGS, VobSub, DVB) are burned into the video by Jellyfin. The
 app requests a video transcode with the chosen subtitle index; this requires
-server-side video transcoding permission. The overlay fonts cover ASCII and Latin
-letters with accents (Latin-1 and Latin Extended-A); a text track in which more
-than one letter in twenty falls outside them (Cyrillic, Greek, Arabic, CJK and
+server-side video transcoding permission. The overlay fonts cover ASCII; Latin
+letters with accents (Latin-1 and Latin Extended-A) are drawn as their base
+letters. A text track in which more than one letter in twenty falls outside them (Cyrillic, Greek, Arabic, CJK and
 other scripts) is handed back to Jellyfin to burn in as well, with one restart,
 and is burned in from the start for the rest of the app's run. Jellyfin offers
 no per-request subtitle size or style for burn-in, and its burned subtitles
