@@ -142,7 +142,7 @@ func (r *Report) Draw(c *gfx.Canvas, now time.Time) bool {
 }
 
 // cardRelative shortens a path under the card root to what a player sees in
-// a file browser: /media/fat/misterzine-plex/report.txt -> misterzine-plex/report.txt.
+// a file browser: /media/fat/misterzine-jellyfin/report.txt -> misterzine-jellyfin/report.txt.
 func cardRelative(path string) string {
 	parts := strings.Split(filepath.ToSlash(path), "/")
 	if len(parts) >= 2 {

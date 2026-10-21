@@ -275,7 +275,7 @@ func (a *App) startUpdate(action string, r *updates.Release) {
 		a.note("Another update is already running. Try again when it has finished.")
 		return
 	case updates.Maintenance:
-		a.note("Plex is checking its files. Try again in a moment.")
+		a.note("MisterZine Jellyfin is checking its files. Try again in a moment.")
 		return
 	}
 	a.updates.launch++
@@ -432,7 +432,7 @@ func stageText(stage string) string {
 	case "install":
 		return "Getting it ready..."
 	case "activating":
-		return "Restarting Plex..."
+		return "Restarting the app..."
 	}
 	return "Downloading..."
 }
@@ -472,7 +472,7 @@ func (u *Updates) Draw(c *gfx.Canvas, now time.Time) bool {
 		}
 	case viewReady:
 		head(a.prepared().Version+" is ready", gfx.Purple)
-		line(f.Body, gfx.GreyHi, "Plex will restart to finish updating.")
+		line(f.Body, gfx.GreyHi, "MisterZine Jellyfin will restart to finish updating.")
 	case viewFailed:
 		head("Update failed", gfx.Grey)
 		if s.Release != nil {

@@ -1,6 +1,6 @@
-// plexcrt is the PlexCRT front end for MiSTer: draws into the core's frame
-// ring, reads the pad through the core's status words, plays through the
-// existing launcher.
+// plexcrt is the MisterZine Jellyfin app for MiSTer: draws into the H.264
+// core's overlay pages, reads the pad through the core's input region, plays
+// through jfplay.
 //
 //	plexcrt                      run on the device (core must be loaded)
 //	plexcrt -dump out.ppm        render the home screen once to a file, no ring

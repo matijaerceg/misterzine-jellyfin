@@ -892,7 +892,7 @@ func (h *Home) prefetchPosters() {
 
 // Keep just the nearest hero candidates warm: full-screen decoded art is
 // much larger than a poster. Art reuses both its bounded memory cache and
-// the Plex client's disk cache when these become visible.
+// the Jellyfin client's disk cache when these become visible.
 func (h *Home) prefetchBackdrops(w, height int) {
 	if h.app.Art == nil || !h.home {
 		return

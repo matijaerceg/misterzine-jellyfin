@@ -31,8 +31,8 @@ const (
 	// StallDelay is how long a playing picture may stand still before the
 	// dots come up, so a quick seek never flashes them.
 	StallDelay = 500 * time.Millisecond
-	// EndSlack is how near the end a stall is the stream finishing, as the
-	// launcher counts it (END_SLACK in plexplay.py).
+	// EndSlack is how near the end, in seconds, a stall is taken for the
+	// stream finishing.
 	EndSlack = 5
 	// RestartGap is a gap between frames that only a new stream makes: the
 	// frame after it ends a seek's hush. SeekHush ends one that never

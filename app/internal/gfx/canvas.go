@@ -1,6 +1,6 @@
 // Package gfx is the software renderer for the 720x480 CRT frame: a BGRx
-// canvas in the exact byte order the PlexCRT core scans out (xRGB8888 little
-// endian), so presenting is one copy; fills, blits, alpha-blended glyphs from
+// canvas in the exact byte order of the H.264 core's overlay pages (xRGB8888
+// little endian), so presenting is one copy; fills, blits, alpha-blended glyphs from
 // the prerendered Roboto atlases, and images converted to the same layout.
 package gfx
 

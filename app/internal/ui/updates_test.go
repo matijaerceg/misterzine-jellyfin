@@ -98,7 +98,7 @@ func TestUpdateFailureOutlivesTheCatalogue(t *testing.T) {
 	a := betaTestApp(t)
 	u := &Updates{app: a}
 	failed := updates.Release{ID: "a", Version: "0.3.0-beta.1", Channel: "beta"}
-	a.updates.status = updates.Status{Stage: "failed", Message: "Could not restart Plex. The previous release was restored.", Release: &failed}
+	a.updates.status = updates.Status{Stage: "failed", Message: "Could not restart MisterZine Jellyfin: The new release did not start. The previous release was restored.", Release: &failed}
 	a.updates.catalogue = updates.Catalogue{Schema: 1, Releases: map[string]updates.Release{"beta": {ID: "b", Version: "0.3.0-beta.2", Channel: "beta"}}}
 	if v, rows := u.shows(); v != viewFailed || rows[0].label != "Update to 0.3.0-beta.2" {
 		t.Fatalf("replaced: %v, %q", v, rows[0].label)

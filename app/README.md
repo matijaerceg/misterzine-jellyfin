@@ -1,6 +1,6 @@
 # Application
 
-The Go browser and playback interface for MisterZine Plex Core.
+The Go browser and playback interface for MisterZine Jellyfin.
 See [build instructions](../docs/BUILD.md), [architecture](../docs/ARCHITECTURE.md)
 and [user guide](../release/README.md).
 

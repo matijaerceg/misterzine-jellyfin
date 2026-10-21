@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// libraryLabel changes presentation only; Plex keys and stored names stay intact.
+// libraryLabel changes presentation only; library ids and stored names stay intact.
 func (a *App) libraryLabel(s jellyfin.Section) string {
 	if !a.Showcase {
 		return s.Title
