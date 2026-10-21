@@ -1014,7 +1014,7 @@ func (h *Home) drawTile(c *gfx.Canvas, it *jellyfin.Item, x, y int, focus bool, 
 		c.Fill(x, y, w, ht, gfx.Bar)
 		if whole {
 			f := h.app.F.SmallBold
-			lines := wrap(f, it.Title, w-16, 4)
+			lines := wrapped(f, it.Title, w-16, 4)
 			ty := y + ht/2 - len(lines)*f.Height()/2
 			for _, l := range lines {
 				h.app.textCenterOn(c, x+w/2, ty, f, gfx.GreyLo, gfx.Bar, l)
@@ -1109,29 +1109,34 @@ func hm(sec int) string {
 	return fmt.Sprintf("%dm", sec/60)
 }
 
-// wrap breaks s into at most n lines that fit maxW, on spaces.
+// wrap breaks s into at most n lines that fit maxW, on spaces. A line is
+// built only once it is complete; until then it is words[i:j] and its
+// width, which adds up glyph by glyph.
 func wrap(f *gfx.Font, s string, maxW, n int) []string {
 	var out []string
-	line := ""
-	for _, w := range splitWords(s) {
-		t := w
-		if line != "" {
-			t = line + " " + w
+	words := splitWords(s)
+	sp := f.Width(" ")
+	i, lw := 0, 0
+	for j, w := range words {
+		ww := f.Width(w)
+		if j == i {
+			lw = ww // a line's first word goes in however wide it is
+			continue
 		}
-		if f.Width(t) <= maxW || line == "" {
-			line = t
+		if lw+sp+ww <= maxW {
+			lw += sp + ww
 			continue
 		}
 		if len(out) == n-1 {
 			// more follows than fits: the last line is cut with an ellipsis
-			out = append(out, f.Fit(t+" "+strings.Repeat(".", 3), maxW))
+			out = append(out, f.Fit(strings.Join(words[i:j+1], " ")+" ...", maxW))
 			return out
 		}
-		out = append(out, line)
-		line = w
+		out = append(out, strings.Join(words[i:j], " "))
+		i, lw = j, ww
 	}
-	if line != "" {
-		out = append(out, f.Fit(line, maxW))
+	if i < len(words) {
+		out = append(out, f.Fit(strings.Join(words[i:], " "), maxW))
 	}
 	return out
 }
@@ -1141,21 +1146,31 @@ func wrapAll(f *gfx.Font, s string, maxW int) []string {
 	return wrap(f, s, maxW, 1<<20)
 }
 
+// splitWords splits s on spaces (only spaces: Fold has already turned the
+// server's tabs and newlines into spaces). The words are slices of s.
 func splitWords(s string) []string {
-	var out []string
-	w := ""
+	n := 0
 	for i := 0; i < len(s); i++ {
-		if s[i] == ' ' {
-			if w != "" {
-				out = append(out, w)
-			}
-			w = ""
-			continue
+		if s[i] != ' ' && (i == 0 || s[i-1] == ' ') {
+			n++
 		}
-		w += string(s[i])
 	}
-	if w != "" {
-		out = append(out, w)
+	if n == 0 {
+		return nil
+	}
+	out := make([]string, 0, n)
+	start := -1
+	for i := 0; i < len(s); i++ {
+		switch {
+		case s[i] != ' ' && start < 0:
+			start = i
+		case s[i] == ' ' && start >= 0:
+			out = append(out, s[start:i])
+			start = -1
+		}
+	}
+	if start >= 0 {
+		out = append(out, s[start:])
 	}
 	return out
 }

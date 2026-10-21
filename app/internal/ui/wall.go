@@ -1011,7 +1011,7 @@ func (w *Wall) drawPoster(c *gfx.Canvas, it *jellyfin.Item, x, y int, focus bool
 				c.Fill(x+FolderTabX, y+FolderTabY, FolderTabW, FolderTabH, gfx.GreyLo)
 				c.Fill(x+FolderTabX, y+FolderTabY+FolderTabH, WallPW-2*FolderTabX, FolderLineH, gfx.GreyLo)
 			}
-			lines := wrap(f, it.Title, WallPW-16, 4)
+			lines := wrapped(f, it.Title, WallPW-16, 4)
 			ty := y + WallPH/2 - len(lines)*f.Height()/2
 			for _, l := range lines {
 				w.app.textCenterOn(c, x+WallPW/2, ty, f, col, gfx.Bar, l)

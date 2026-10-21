@@ -614,7 +614,7 @@ func (s *Season) drawDetails(c, page *gfx.Canvas, now time.Time) bool {
 	y += f.SmallBold.Height() + 2
 	s.app.textOver(c, page, SafeX, y, f.Body, gfx.White, f.Body.Fit(it.Title, SafeW))
 	y += f.Body.Height() + 4
-	for _, line := range wrap(f.SmallBold, it.Summary, SafeW, 2) {
+	for _, line := range wrapped(f.SmallBold, it.Summary, SafeW, 2) {
 		s.app.textOver(c, page, SafeX, y, f.SmallBold, gfx.White, line)
 		y += f.SmallBold.Height() + 2
 	}
