@@ -4,7 +4,7 @@ On each unit: install from Scripts and launch from the main menu; sign in with
 a server address, once with Quick Connect and once with a user name and
 password; browse; play, pause, seek and stop one item; leave a menu and a paused
 item alone for three minutes and check the screen dims and the next press only
-restores it; check theme/taps; leave to MiSTer Menu and relaunch. Check normal
+restores it; check theme music; leave to MiSTer Menu and relaunch. Check normal
 startup has no test card.
 
 Check each Output Mode the unit's display accepts, from the core OSD: 480i60 and

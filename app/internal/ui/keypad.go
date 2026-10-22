@@ -21,9 +21,8 @@ type keyPad struct {
 }
 
 const (
-	padCols   = 6
-	padKeys   = 30 // the grid; the wide key under it is padKeys
-	padLetter = 26
+	padCols = 6
+	padKeys = 30 // the grid; the wide key under it is padKeys
 )
 
 var padPages = [3]string{

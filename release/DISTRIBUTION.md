@@ -70,7 +70,12 @@ release while only a beta exists.
 ## Validation
 
 Run the Go suite, ARM vet/build, release Python tests and public-content check.
-Use synthetic codes and fixtures in tests. Verify locked Play and Resume,
+Use synthetic codes and fixtures in tests. Before a release that changes the
+updater or its Downloader catalogue, run
+`python3 tools/check_downloader_integration.py /path/to/downloader_latest.zip`
+on Linux: it runs the official Downloader against a synthetic card under
+`/media` and checks staging, filters, repair and that other files stay
+untouched. Verify locked Play and Resume,
 incorrect-code rejection, successful unlock, saved access after restart,
 upgrade and rollback, and ungated public builds.
 

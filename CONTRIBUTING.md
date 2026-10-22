@@ -13,33 +13,28 @@ Keep changes focused and retain the applicable
 [application terms](release/TERMS.md). No additional license grant
 is implied by source availability.
 
-On Linux with Go 1.27 and Python 3:
+On Linux with Go 1.27, Python 3 and a host C compiler (the race detector
+needs cgo):
 
 ```sh
 cd app
-go test ./...
+go test -race ./...
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go vet ./...
 GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -o ../build/arm/plexcrt ./cmd/plexcrt
 cd ..
-python3 arm/test_jfplay_contract.py
-make -C arm audio-boost-test seek-cache-test seek-protocol-test h264-idr-test direct-check-test
-make -C arm film-speed-test
+make -C arm test
+python3 -m unittest discover -s release -p 'test*.py'
+python3 -m unittest discover -s tools -p 'test*.py'
 python3 tools/check_public_content.py
 ```
 
-Run the standalone geometry test from the repository root as well; it compares
-the C helper with the shared fit fixtures and checks calibrated crop/fit,
-480/576-line alignment, and invalid inputs:
+`make -C arm test` runs the worker's contract check and every C host test,
+including the geometry test, which compares the C helper with the shared fit
+fixtures in `tools/testdata/fit_cases.txt`. None needs the ARM toolchain.
 
-```sh
-cc -std=c99 -Wall -Wextra -Werror -Iarm arm/test_video_geometry.c -o /tmp/test_video_geometry
-/tmp/test_video_geometry
-```
-
-Playback calibration is capability-gated on HPS interface 1.2. Older cores
-retain the preview-only calibration screen. A custom interface 1.2 core build
-is required to apply saved geometry. Fit/crop telemetry has been verified on
-Mister Pi with DeFlicker off and on; visual CRT confirmation remains pending.
+Playback calibration is capability-gated on HPS interface 1.2; see
+[Build from source](docs/BUILD.md#dependencies-and-playback-worker) for which
+cores apply saved geometry.
 
 The core's display controls and `jfplay` film-speed selection use HPS interface
 1.3; interface 1.4 exposes the selected Off/50-60 refresh-match mode in status

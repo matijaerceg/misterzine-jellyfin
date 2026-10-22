@@ -82,16 +82,7 @@ const PageRetry = 5 * time.Second
 // come.
 const OrderedRewalks = 2
 
-// NewPager starts loading the first page; wake is signalled as pages land.
-// A filter, if given, hides items it rejects; prepare, if given, completes
-// each page's items before the filter sees them.
-func NewPager(c *jellyfin.Client, path string, q url.Values, wake chan struct{}, filter func(*jellyfin.Item) bool, prepare func([]*jellyfin.Item)) *Pager {
-	p := newPager(c, path, q, wake, filter, prepare)
-	p.Want(0)
-	return p
-}
-
-// newPager is NewPager before its first page is asked for.
+// newPager makes a pager; nothing is fetched until Want.
 func newPager(c *jellyfin.Client, path string, q url.Values, wake chan struct{}, filter func(*jellyfin.Item) bool, prepare func([]*jellyfin.Item)) *Pager {
 	return &Pager{client: c, path: path, query: q, items: map[int]*jellyfin.Item{}, inFlt: map[int]bool{},
 		failed: map[int]time.Time{}, seen: map[int]int{}, Wake: wake, total: -1, filter: filter, Prepare: prepare}
@@ -539,24 +530,4 @@ func (p *Pager) Letters() []jellyfin.Letter {
 		}
 	}
 	return out
-}
-
-// Replace swaps one item (after playback refreshed it).
-func (p *Pager) Replace(i int, it *jellyfin.Item) {
-	p.mu.Lock()
-	if p.base != nil {
-		if i >= 0 && i < len(p.list) {
-			p.list[i] = it
-		}
-		p.mu.Unlock()
-		return
-	}
-	if p.filter != nil {
-		if i >= 0 && i < len(p.list) {
-			p.list[i] = it
-		}
-	} else {
-		p.items[i] = it
-	}
-	p.mu.Unlock()
 }

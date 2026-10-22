@@ -89,9 +89,9 @@ func newFake(t *testing.T) (*fake, *Client) {
 			serve("movies_p1.json")
 		case r.URL.Path == "/Items":
 			serve("movies_p0.json")
-		case r.URL.Path == "/Items/358f1b71dbd1eb6238744f21a9a01f14":
+		case r.URL.Path == "/Items/f17e0000000000000000000000000002":
 			serve("item.json")
-		case r.URL.Path == "/MediaSegments/358f1b71dbd1eb6238744f21a9a01f14":
+		case r.URL.Path == "/MediaSegments/f17e0000000000000000000000000002":
 			w.Write([]byte(`{"Items":[{"Type":"Intro","StartTicks":0,"EndTicks":600000000},{"Type":"Recap","StartTicks":1,"EndTicks":2},{"Type":"Outro","StartTicks":9000000000,"EndTicks":9538240000}]}`))
 		case strings.HasSuffix(r.URL.Path, "/Seasons"):
 			serve("seasons.json")
@@ -237,7 +237,7 @@ func TestLibraries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Section{{"f137a2dd21bbc1b99aa5c0f6bf02a805", "Movies", "movie"}, {"767bffe4f11c93ef34b805451a696a4e", "TV Shows", "show"}}
+	want := []Section{{"f17e0000000000000000000000000003", "Movies", "movie"}, {"f17e0000000000000000000000000004", "TV Shows", "show"}}
 	if len(secs) != 2 || secs[0] != want[0] || secs[1] != want[1] {
 		t.Fatalf("sections %+v", secs)
 	}
@@ -251,10 +251,10 @@ func TestLibraries(t *testing.T) {
 	}
 	s := shows[0]
 	if s.Type != "show" || s.Title != "3 Body Problem" || s.Year != 2024 || s.Leaves != 8 || s.Viewed != 0 ||
-		s.Key != "/Shows/e8597adb9c3c4567dc82aac5981b22ac/Seasons" || s.SortLabel() != "3 body problem" {
+		s.Key != "/Shows/f17e0000000000000000000000000005/Seasons" || s.SortLabel() != "3 body problem" {
 		t.Fatalf("show %+v", s)
 	}
-	if s.Thumb != "e8597adb9c3c4567dc82aac5981b22ac/Primary/c98cfdc0a2362738e4cce2a624c99e03" ||
+	if s.Thumb != "f17e0000000000000000000000000005/Primary/f17e0000000000000000000000000006" ||
 		!strings.Contains(s.Logo, "/Logo/") || !strings.Contains(s.Art, "/Backdrop/") || s.Colors == [4]uint32{} {
 		t.Fatalf("show art %q %q %q %x", s.Thumb, s.Logo, s.Art, s.Colors)
 	}
@@ -287,7 +287,7 @@ func TestLibraries(t *testing.T) {
 func TestItemAndMarkers(t *testing.T) {
 	_, c := newFake(t)
 	signIn(t, c)
-	it, err := c.Item(context.Background(), "358f1b71dbd1eb6238744f21a9a01f14")
+	it, err := c.Item(context.Background(), "f17e0000000000000000000000000002")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -418,12 +418,27 @@ func TestErrors(t *testing.T) {
 	}
 }
 
+// A PlaybackInfo answer with no source and an ErrorCode is the server's
+// refusal, and the error names it.
+func TestPlaybackInfoErrorCode(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"MediaSources":[],"ErrorCode":"NotAllowed"}`))
+	}))
+	defer srv.Close()
+	c := New(srv.URL, t.TempDir(), "dev-1", nil)
+	c.Store.SetCredentials(Credentials{UserID: testUser, Token: "t"})
+	_, err := c.PlaybackInfo(context.Background(), "1", PlaybackRequest{})
+	if err == nil || !strings.Contains(err.Error(), "NotAllowed") {
+		t.Fatalf("refused playback: %v", err)
+	}
+}
+
 func TestImageURL(t *testing.T) {
-	ref := "e8597adb9c3c4567dc82aac5981b22ac/Primary/c98cfdc0a2362738e4cce2a624c99e03"
+	ref := "f17e0000000000000000000000000005/Primary/f17e0000000000000000000000000006"
 	c := New("https://jf.example/base/", t.TempDir(), "dev-1", nil)
 	c.Store.SetCredentials(Credentials{Token: "secret"})
 	got, err := c.ImageURL(ref, ImageQuery{FillWidth: 240, FillHeight: 360, Quality: 90})
-	want := "https://jf.example/base/Items/e8597adb9c3c4567dc82aac5981b22ac/Images/Primary?fillHeight=360&fillWidth=240&quality=90&tag=c98cfdc0a2362738e4cce2a624c99e03"
+	want := "https://jf.example/base/Items/f17e0000000000000000000000000005/Images/Primary?fillHeight=360&fillWidth=240&quality=90&tag=f17e0000000000000000000000000006"
 	if err != nil || got != want {
 		t.Fatalf("got %q %v\nwant %q", got, err, want)
 	}
@@ -455,7 +470,7 @@ func TestImageURL(t *testing.T) {
 		t.Fatalf("cache: %s %s %s, %d requests", p1, p2, p3, len(f.reqs)-n)
 	}
 	last := f.reqs[len(f.reqs)-1].URL.Query()
-	if last.Get("maxWidth") != "120" || last.Get("format") != "Png" || last.Get("tag") != "c98cfdc0a2362738e4cce2a624c99e03" {
+	if last.Get("maxWidth") != "120" || last.Get("format") != "Png" || last.Get("tag") != "f17e0000000000000000000000000006" {
 		t.Fatalf("logo query %v", last)
 	}
 	if data, err := c.ArtData(ctx, ref, 135, 203); err != nil || string(data) != "\xff\xd8jpeg" {
@@ -483,7 +498,7 @@ func TestHomeRows(t *testing.T) {
 	if err != nil || len(keys) != 3 || !keys[items[0].ID] {
 		t.Fatalf("continue watching keys %v %v", keys, err)
 	}
-	hub, err := c.SectionRecent(ctx, "f137a2dd21bbc1b99aa5c0f6bf02a805", 30)
+	hub, err := c.SectionRecent(ctx, "f17e0000000000000000000000000003", 30)
 	if err != nil || hub == nil || len(hub.Items) != 3 || hub.Items[0].Title != "The Last First: Winter K2" {
 		t.Fatalf("recent %+v %v", hub, err)
 	}
@@ -532,7 +547,7 @@ func TestSubtitleTracks(t *testing.T) {
 	}
 	f, c := newFake(t)
 	signIn(t, c)
-	item, err := c.Item(context.Background(), "358f1b71dbd1eb6238744f21a9a01f14")
+	item, err := c.Item(context.Background(), "f17e0000000000000000000000000002")
 	if err != nil || len(item.Subs) == 0 || !item.Subs[0].Text {
 		t.Fatalf("fixture's SubRip track %+v %v", item, err)
 	}
@@ -569,12 +584,12 @@ func TestWatchedAndPlayback(t *testing.T) {
 	}
 
 	profile := json.RawMessage(`{"MaxStreamingBitrate":3000000,"TranscodingProfiles":[{"Container":"ts","Type":"Video","VideoCodec":"h264"}]}`)
-	info, err := c.PlaybackInfo(ctx, "358f1b71dbd1eb6238744f21a9a01f14", PlaybackRequest{DeviceProfile: profile, StartSeconds: 90, AudioStream: "1", SubtitleStream: "-1"})
+	info, err := c.PlaybackInfo(ctx, "f17e0000000000000000000000000002", PlaybackRequest{DeviceProfile: profile, StartSeconds: 90, AudioStream: "1", SubtitleStream: "-1"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var sent map[string]any
-	json.Unmarshal(f.body["POST /Items/358f1b71dbd1eb6238744f21a9a01f14/PlaybackInfo"], &sent)
+	json.Unmarshal(f.body["POST /Items/f17e0000000000000000000000000002/PlaybackInfo"], &sent)
 	if sent["UserId"] != testUser || sent["StartTimeTicks"] != float64(900000000) || sent["AudioStreamIndex"] != float64(1) ||
 		sent["SubtitleStreamIndex"] != float64(-1) || sent["AlwaysBurnInSubtitleWhenTranscoding"] != nil ||
 		sent["EnableDirectPlay"] != nil || sent["EnableDirectStream"] != nil ||
@@ -598,26 +613,26 @@ func TestWatchedAndPlayback(t *testing.T) {
 	if u.Query().Get("SubtitleMethod") != "Encode" || u.Query().Get("SubtitleStreamIndex") != "2" {
 		t.Fatalf("selected subtitle transcode URL lacks burn-in: %s", stream)
 	}
-	_, err = c.PlaybackInfo(ctx, "358f1b71dbd1eb6238744f21a9a01f14", PlaybackRequest{
+	_, err = c.PlaybackInfo(ctx, "f17e0000000000000000000000000002", PlaybackRequest{
 		SubtitleStream: "2", AlwaysBurnInSubtitleWhenTranscoding: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var selected map[string]any
-	json.Unmarshal(f.body["POST /Items/358f1b71dbd1eb6238744f21a9a01f14/PlaybackInfo"], &selected)
+	json.Unmarshal(f.body["POST /Items/f17e0000000000000000000000000002/PlaybackInfo"], &selected)
 	if selected["SubtitleStreamIndex"] != float64(2) || selected["AlwaysBurnInSubtitleWhenTranscoding"] != true ||
 		selected["EnableDirectPlay"] != false || selected["EnableDirectStream"] != false {
 		t.Fatalf("selected subtitle request %v", selected)
 	}
-	_, err = c.PlaybackInfo(ctx, "358f1b71dbd1eb6238744f21a9a01f14", PlaybackRequest{
+	_, err = c.PlaybackInfo(ctx, "f17e0000000000000000000000000002", PlaybackRequest{
 		SubtitleStream: "-1", MaxStreamingBitrate: 5000000, ForceTranscode: true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	var forced map[string]any
-	json.Unmarshal(f.body["POST /Items/358f1b71dbd1eb6238744f21a9a01f14/PlaybackInfo"], &forced)
+	json.Unmarshal(f.body["POST /Items/f17e0000000000000000000000000002/PlaybackInfo"], &forced)
 	if forced["EnableDirectPlay"] != false || forced["EnableDirectStream"] != false ||
 		forced["AlwaysBurnInSubtitleWhenTranscoding"] != nil || forced["MaxStreamingBitrate"] != float64(5000000) {
 		t.Fatalf("forced transcode request %v", forced)

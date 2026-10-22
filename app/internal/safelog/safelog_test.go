@@ -22,6 +22,24 @@ func TestSplitCredentialRedaction(t *testing.T) {
 		t.Fatal("lost useful error context")
 	}
 }
+
+func TestJellyfinCredentialNamesRedacted(t *testing.T) {
+	for _, line := range []string{
+		"GET https://server/Videos/1/stream?api_key=stale123&Static=true",
+		"GET https://server/socket?access_token=stale123",
+		"X-Emby-Token: stale123",
+		`X-MediaBrowser-Token="stale123"`,
+	} {
+		got := Redact(line)
+		if strings.Contains(got, "stale123") {
+			t.Errorf("Redact(%q) = %q", line, got)
+		}
+	}
+	if got := Redact("api_key=stale123&Static=true"); got != "api_key=[redacted]&Static=true" {
+		t.Errorf("api_key: %q", got)
+	}
+}
+
 func TestOversizedLineDropped(t *testing.T) {
 	var b bytes.Buffer
 	w := &Writer{Out: &b}

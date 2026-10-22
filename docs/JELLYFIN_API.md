@@ -18,9 +18,11 @@ hands the same client to the artwork loader (`Art`), the poster-wall pagers
 and the player. `cmd/plexcrt/main.go` makes it at start when a session is on
 record; otherwise the app opens on the sign-in screen.
 
-**Signing in** (`login.go`). The typed address goes through `HostCandidates`
-and each candidate is probed with `PublicInfo` (a bare name tries https, then
-http on port 8096). Then Quick Connect (`QuickConnectEnabled`, `Start`,
+**Signing in** (`login.go`). Servers on the local network are found by
+`Discover` (Jellyfin's UDP discovery). A found or typed address goes through
+`HostCandidates` and each candidate is probed with `PublicInfo` (a bare name
+tries https, then http on port 8096). The server's listed users come from
+`PublicUsers`. Then Quick Connect (`QuickConnectEnabled`, `Start`,
 `Check`, `Finish`) or a user name and password (`SignIn`). The resulting
 `Credentials` are saved in the settings (`Config.SetCredentials`), which is
 the `TokenStore` that outlives the client; `Connect` then makes a new client.
@@ -69,19 +71,20 @@ Every method that does I/O takes a `context.Context` first.
 c := jellyfin.New(host, cacheDir, deviceID, store) // store: TokenStore (nil = memory)
 c.SignIn(ctx, user, pw)            // -> Credentials{UserID, UserName, Token, ServerID}
 c.QuickConnectEnabled / QuickConnectStart / QuickConnectCheck / QuickConnectFinish
-c.PublicInfo(ctx)  c.Me(ctx)  c.SignOut(ctx)  c.SignedIn()  c.UserID()
-jellyfin.NormalizeHost(typed)  jellyfin.HostCandidates(typed)
+c.PublicInfo(ctx)  c.PublicUsers(ctx)  c.Me(ctx)  c.SignOut(ctx)  c.SignedIn()  c.UserID()
+jellyfin.Discover(ctx, wait)  jellyfin.NormalizeHost(typed)  jellyfin.HostCandidates(typed)
 
 c.Sections(ctx) []Section
 c.Page(ctx, listing, q, start, size) ([]*Item, total, error)
 c.Items(ctx, listing, q, max)
 jellyfin.SectionListing(sectionKey, sectionType, view) (listing, q) // view: ViewAZ, ViewAdded, ...
-c.Item(ctx, id)            // full: media sources, streams, markers (c.Markers)
-c.Seasons / ShowEpisodes / ShowAspect / FirstEpisodeAspects / FirstChars(ctx, section, sectionType)
+c.Item(ctx, id)            // full: media sources, streams, markers (c.Markers(ctx, id))
+c.ShowEpisodes / ShowAspect / FirstEpisodeAspects / FirstChars(ctx, section, sectionType)
 c.Hubs(ctx, n)  c.SectionRecent(ctx, key, n)  c.ContinueWatching(ctx)  c.ClearResumePoint(ctx, id)
 c.Scrobble(ctx, id, watched)  c.Search(ctx, q)
 c.Art / Logo / ArtData / LogoData (ctx, ref, w, h)  c.ImageURL(ref, ImageQuery)  c.ThemeFile(ctx, showID, songID)
 c.PlaybackInfo(ctx, id, PlaybackRequest)  c.StreamURL / DirectStreamURL
+c.SubtitleText(ctx, itemID, sourceID, index)  // a text subtitle track as SRT
 c.ReportStart / ReportProgress / ReportStopped(ctx, PlayState)
 c.AuthHeader()  // for the player: same header on the stream request
 jellyfin.ErrUnauthorized, *jellyfin.HTTPError, Fold, LangName, Ticks, Seconds
@@ -272,7 +275,8 @@ never sends one.
   `removeFromContinueWatching`): the app offers **Forget my progress**
   instead, and `ClearResumePoint` clears the resume point. A Next Up entry
   has none and cannot be removed.
-* Sign-in by PIN, server discovery, home users and connection probing
-  (Plex's `Reach`/`LocalNameBlocked`) have no counterpart. Sign-in is the
-  server address -> `HostCandidates` + `PublicInfo` (a bare name tries https,
-  then http on port 8096); user/password -> `SignIn` or Quick Connect.
+* Sign-in by PIN, home users and connection probing (Plex's
+  `Reach`/`LocalNameBlocked`) have no counterpart; servers are found by
+  Jellyfin's UDP discovery (`Discover`, port 7359). Sign-in is the server
+  address -> `HostCandidates` + `PublicInfo` (a bare name tries https, then
+  http on port 8096); user/password -> `SignIn` or Quick Connect.

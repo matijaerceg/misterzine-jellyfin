@@ -57,7 +57,7 @@ server for a transcode. The full list: [compatibility](site/content/reference/co
 
 ## Write your own program
 
-The interface is a ring of records and a control block in shared DDR3 memory -- **version 1.2,
+The interface is a ring of records and a control block in shared DDR3 memory -- **version 1.4,
 the layout frozen at 1.0**: a program built for 1.0 keeps working on every later 1.x core. The C client library in
 [`hps/`](hps/) (MIT-licensed, libc only) does the work:
 

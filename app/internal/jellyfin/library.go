@@ -210,11 +210,6 @@ func (c *Client) Markers(ctx context.Context, id string) ([]Marker, error) {
 	return out, nil
 }
 
-// Seasons lists a show's seasons (GET /Shows/{id}/Seasons).
-func (c *Client) Seasons(ctx context.Context, showID string) ([]*Item, error) {
-	return c.Items(ctx, "/Shows/"+url.PathEscape(showID)+"/Seasons", nil, 500)
-}
-
 // ShowEpisodes lists every episode of a show, all its seasons and specials
 // in the server's order, a page at a time.
 func (c *Client) ShowEpisodes(ctx context.Context, showID string) ([]*Item, error) {

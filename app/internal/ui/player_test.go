@@ -54,11 +54,13 @@ func TestPlayerLaunchesAndReports(t *testing.T) {
 			status := dir + "/status"
 			logPath := dir + "/log"
 			var args []string
+			var cmd *exec.Cmd
 			p := &Player{Client: client, Binary: "jfplay", Fifo: dir + "/fifo", Status: status, LogTo: logPath, Kbps: func() int { return 3000 }, Crop: func() Crop { return Crop14x9 }, Geometry: func() string { return "12,8,10,6,940" }}
 			p.exec = func(_ string, a ...string) *exec.Cmd {
 				args = append([]string(nil), a...)
 				script := "printf 'state=playing\\nposition=121\\nduration=300\\n' > '" + status + "'; echo synthetic-token >&2; sleep 1"
-				return exec.Command("sh", "-c", script)
+				cmd = exec.Command("sh", "-c", script)
+				return cmd
 			}
 			s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 120)
 			if err != nil {
@@ -70,6 +72,18 @@ func TestPlayerLaunchesAndReports(t *testing.T) {
 				t.Fatal("player did not exit")
 			}
 			joined := strings.Join(args, " ")
+			if strings.Contains(joined, "synthetic-token") || strings.Contains(joined, "--headers") {
+				t.Fatalf("the token is on the command line: %s", joined)
+			}
+			headers := ""
+			for _, kv := range cmd.Env {
+				if v, ok := strings.CutPrefix(kv, "JFPLAY_HEADERS="); ok {
+					headers = v
+				}
+			}
+			if !strings.HasPrefix(headers, "Authorization: ") || !strings.Contains(headers, "synthetic-token") || !strings.HasSuffix(headers, "\r\n") {
+				t.Fatalf("JFPLAY_HEADERS = %q, want the Authorization header with the token", headers)
+			}
 			if !strings.Contains(joined, "--analog-aspect 4") {
 				t.Fatalf("missing crop argument: %s", joined)
 			}
@@ -367,25 +381,17 @@ func TestPlayerSeekCoalescingKeepsTrackChangeOrder(t *testing.T) {
 	}
 }
 
+// TestPlayerChildWait is a helper process, not a test: lifecyclePlayer's
+// first worker, which ignores stop until it is killed.
 func TestPlayerChildWait(t *testing.T) {
-	if testingValue("run") == "^TestPlayerChildWait$" {
+	if os.Getenv("PLEXCRT_PLAYER_HELPER") == "wait" {
 		time.Sleep(time.Minute)
 	}
 }
 
+// TestPlayerChildExit is a helper process, not a test: a worker that exits
+// at once.
 func TestPlayerChildExit(t *testing.T) {}
-
-func testingValue(name string) string {
-	for i, arg := range os.Args {
-		if arg == "-test."+name && i+1 < len(os.Args) {
-			return os.Args[i+1]
-		}
-		if strings.HasPrefix(arg, "-test."+name+"=") {
-			return strings.TrimPrefix(arg, "-test."+name+"=")
-		}
-	}
-	return ""
-}
 
 func lifecyclePlayer(t *testing.T) (*Player, *atomic.Int32, *atomic.Int32, *atomic.Bool) {
 	t.Helper()
@@ -407,8 +413,13 @@ func lifecyclePlayer(t *testing.T) (*Player, *atomic.Int32, *atomic.Int32, *atom
 	client := jellyfin.New(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
-	p := &Player{Client: client, Binary: "jfplay", Fifo: dir + "/fifo", Status: dir + "/status", LogTo: dir + "/log"}
+	// the first worker never answers stop: a short grace keeps the tests quick
+	p := &Player{Client: client, Binary: "jfplay", Fifo: dir + "/fifo", Status: dir + "/status", LogTo: dir + "/log",
+		stopGrace: 100 * time.Millisecond}
 	var launches atomic.Int32
+	// the player sets the worker's environment from its own: the helper
+	// reads this one (only TestPlayerChildWait acts on it)
+	t.Setenv("PLEXCRT_PLAYER_HELPER", "wait")
 	var firstMu sync.Mutex
 	var first *exec.Cmd
 	var replacementAfterReap atomic.Bool

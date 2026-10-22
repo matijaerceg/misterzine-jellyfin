@@ -14,14 +14,13 @@ class ContentTests(unittest.TestCase):
             self.assertTrue(issues(name, b''), name)
 
     def test_safe_examples_and_source_allowed(self):
-        self.assertEqual(issues('.env.example', b'PLEX_TOKEN=example'), [])
+        self.assertEqual(issues('.env.example', b'JELLYFIN_TOKEN=example'), [])
         self.assertEqual(issues('app/player.go', b'// frame ownership'), [])
-        self.assertEqual(issues('app/home.go', b'/api/home/users/123/switch'), [])
         for address in (b'http://127.0.0.1:8096', b'http://192.0.2.5:8096',
                         b'http://198.51.100.5:8096', b'http://203.0.113.5:8096'):
             self.assertEqual(issues('docs/example.md', address), [], address)
 
-    def test_home_api_exception_keeps_filesystem_paths_private(self):
+    def test_home_directories_stay_private(self):
         for path in (b'/home/' + b'example/project', b'/home/' + b'users/private'):
             self.assertIn('personal machine path or device address', issues('notes.txt', path))
 
@@ -30,7 +29,7 @@ class ContentTests(unittest.TestCase):
         self.assertIn('personal machine path or device address', issues('README.md', path))
         token = b'ghp_' + b'a' * 36
         self.assertIn('possible credential', issues('settings.txt', token))
-        server = b'http://' + b'8.8.8.8:32400'
+        server = b'http://' + b'8.8.8.8:8096'
         self.assertIn('literal server address; use configuration', issues('client.py', server))
         self.assertIn('personal machine path or device address',
                       issues('settings.ini', b'192.168.' + b'1.10'))

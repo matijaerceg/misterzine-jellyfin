@@ -51,6 +51,12 @@ class ProcessTests(unittest.TestCase):
 
     def test_start_check_counts_exit_to_the_menu_as_a_start(self):
         real_sleep = time.sleep
+        real_start = service.start_manager
+        children = []
+
+        def start_manager(root, env=None):
+            children.append(real_start(root, env))
+            return children[-1]
         for status, runs, started in ((manager.EXIT_TO_MENU, .3, True), (None, 1.5, True), (0, .3, False), (1, .3, False)):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
@@ -60,8 +66,11 @@ class ProcessTests(unittest.TestCase):
                     'import os, sys, time\n'
                     'open(os.environ["MISTERZINE_PLEX_READY_FILE"], "w").write("ready")\n'
                     'time.sleep(%s)\nsys.exit(%d)\n' % (runs, status or 0))
-                with patch.object(service.time, 'sleep', lambda s: real_sleep(min(s, .6))):
+                with patch.object(service.time, 'sleep', lambda s: real_sleep(min(s, .6))), \
+                        patch.object(service, 'start_manager', start_manager):
                     self.assertEqual(service.start_and_check(root, timeout=10), started)
+                # A start counted good leaves the app running; it ends by itself.
+                children.pop().wait(timeout=10)
 
     def test_an_update_launch_writes_a_log_of_its_own(self):
         name = Path(service.LAUNCH_LOG).name
@@ -465,7 +474,6 @@ class UpdateTests(unittest.TestCase):
         r, z, _ = self.release()
         (self.card / 'Scripts').mkdir(); (self.card / 'Scripts/downloader.sh').touch()
         (self.root / 'updates').mkdir()
-        e = service.urllib.error
         # A library error message, such as a malformed redirect that urlsplit
         # rejects, may carry an address or credentials: it is named only.
         self.assertEqual(service.network_reason(ValueError('Invalid IPv6 URL https://user:hunter2@evil.example/')), 'failed with ValueError')
@@ -640,6 +648,7 @@ class UpdateTests(unittest.TestCase):
 
     def test_a_failed_launch_still_resumes_holders_and_the_console(self):
         sleeper = subprocess.Popen(['sleep', '30'])
+        self.addCleanup(sleeper.wait)          # cleanups run last first: kill, then reap
         self.addCleanup(sleeper.kill)
         released = []
         class Console:
@@ -688,26 +697,26 @@ class UpdateTests(unittest.TestCase):
         (self.card / 'linux').mkdir()
         (self.card / 'linux/user-startup.sh').write_text('#!/bin/bash\n/media/fat/Scripts/zaparoo.sh -service $1\n')
         self.root.mkdir(parents=True, exist_ok=True)
-        (self.root / 'plexcrt.json').write_text(json.dumps({'server_url': 'https://192-168-1-9.abcdef.plex.direct:32400',
-                                                            'token': 'TEST-ONLY-token', 'bitrate': 3000}))
+        (self.root / 'plexcrt.json').write_text(json.dumps({'server_url': 'https://jellyfin.home.example:8096',
+                                                            'server_token': 'TEST-ONLY-token', 'bitrate': 3000}))
         facts = manager.system_facts(self.root, ['TEST-ONLY-token'], proc_root=self.card / 'no-proc')
         self.assertEqual(facts['video_settings'], {'MiSTer': {'vga_scaler': '0', 'ypbpr': '1'}, 'Menu': {'direct_video': '1'},
                                                    'MisterZine Jellyfin': {'vsync_adjust': '2'}})
         self.assertEqual(facts['startup_hooks'], ['zaparoo'])
-        self.assertEqual(facts['server'], {'scheme': 'https', 'port': 32400, 'kind': 'plex.direct', 'private_lan': True,
+        self.assertEqual(facts['server'], {'scheme': 'https', 'port': 8096, 'kind': 'name', 'private_lan': None,
                                            'bitrate': 3000, 'progressive': None})
-        self.assertNotIn('192-168', json.dumps(facts))
+        self.assertNotIn('jellyfin.home', json.dumps(facts))
         self.assertNotIn('TEST-ONLY', json.dumps(facts))
 
     def test_diagnostics_describe_a_plain_http_server(self):
         self.root.mkdir(parents=True, exist_ok=True)
         lan = '10.0.0.2'
-        (self.root / 'plexcrt.json').write_text(json.dumps({'server_url': 'http://%s:32400' % lan, 'bitrate': 3000}))
+        (self.root / 'plexcrt.json').write_text(json.dumps({'server_url': 'http://%s:8096' % lan, 'bitrate': 3000}))
         facts = manager.system_facts(self.root, [], proc_root=self.card / 'no-proc')
-        self.assertEqual(facts['server'], {'scheme': 'http', 'port': 32400, 'kind': 'address', 'private_lan': True,
+        self.assertEqual(facts['server'], {'scheme': 'http', 'port': 8096, 'kind': 'address', 'private_lan': True,
                                            'bitrate': 3000, 'progressive': None})
         self.assertNotIn(lan, json.dumps(facts))
-        (self.root / 'plexcrt.json').write_text(json.dumps({'server_url': 'http://%s:32400' % '1.1.1.1'}))
+        (self.root / 'plexcrt.json').write_text(json.dumps({'server_url': 'http://%s:8096' % '1.1.1.1'}))
         self.assertIs(manager.system_facts(self.root, [], proc_root=self.card / 'no-proc')['server']['private_lan'], False)
 
     def test_publishing_database_owns_only_staging_and_installer_is_standalone(self):

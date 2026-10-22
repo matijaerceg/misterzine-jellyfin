@@ -172,7 +172,7 @@ func expectSignedIn(t *testing.T, a *App, s *signInServer) {
 	}
 	if !a.Cfg.SignedIn() || a.Cfg.ServerToken != "TESTTOKEN" || a.Cfg.UserID != "0123456789abcdef0123456789abcdef" ||
 		a.Cfg.UserName != "testuser" || a.Cfg.ServerURL != s.URL || a.Cfg.ServerName != "test-server" ||
-		a.Cfg.ServerID != "ab2fcab83d844492a4ecc65a0fca36cd" {
+		a.Cfg.ServerID != "f17e0000000000000000000000000001" {
 		t.Fatalf("session not recorded: %+v", a.Cfg.Credentials())
 	}
 	saved := LoadConfig(a.Cfg.path)
@@ -421,7 +421,7 @@ func signedInApp(t *testing.T, s *signInServer) *App {
 	a := signInApp(t)
 	a.Cfg.ServerURL, a.Cfg.ServerName = s.URL, "test-server"
 	a.Cfg.SetCredentials(jellyfin.Credentials{UserID: "0123456789abcdef0123456789abcdef", UserName: "testuser",
-		Token: "TESTTOKEN", ServerID: "ab2fcab83d844492a4ecc65a0fca36cd"})
+		Token: "TESTTOKEN", ServerID: "f17e0000000000000000000000000001"})
 	a.Cfg.HiddenLibraries = []string{"2"}
 	if err := a.Cfg.Save(); err != nil {
 		t.Fatal(err)
@@ -536,9 +536,9 @@ func discovering(t *testing.T, release chan struct{}, servers ...jellyfin.FoundS
 func TestSignInServersFound(t *testing.T) {
 	s := newSignInServer(t)
 	discovering(t, nil, jellyfin.FoundServer{Address: "http://192.0.2.10:8096", ID: "other", Name: "Attic"},
-		jellyfin.FoundServer{Address: s.URL, ID: "ab2fcab83d844492a4ecc65a0fca36cd", Name: "test-server"})
+		jellyfin.FoundServer{Address: s.URL, ID: "f17e0000000000000000000000000001", Name: "test-server"})
 	a := signInApp(t)
-	a.Cfg.ServerID = "ab2fcab83d844492a4ecc65a0fca36cd"
+	a.Cfg.ServerID = "f17e0000000000000000000000000001"
 	l := openLogin(a)
 	if l.step != stepFind || !l.busy {
 		t.Fatalf("the sign-in opens at step %d, not the search", l.step)

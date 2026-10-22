@@ -29,7 +29,7 @@ class Fixture(io.BytesIO):
         return str(len(self.getvalue())) if name.lower() == 'content-length' else default
 @contextlib.contextmanager
 def transport(self, url, *args, **kwargs):
-    prefix = 'https://example.org/plex-fixture/'
+    prefix = 'https://example.org/jellyfin-fixture/'
     if not url.startswith(prefix) or Path(url[len(prefix):]).name != url[len(prefix):]:
         raise RuntimeError('Unexpected fixture request')
     with Fixture((Path(assets) / url[len(prefix):]).read_bytes()) as response:
@@ -43,11 +43,11 @@ runpy.run_path(archive, run_name='__main__')
 def exercise(archive):
     archive = Path(archive).resolve()
     # Downloader intentionally rejects card roots outside /media.
-    with tempfile.TemporaryDirectory(prefix='plex-downloader-', dir='/media') as tmp:
+    with tempfile.TemporaryDirectory(prefix='jellyfin-downloader-', dir='/media') as tmp:
         base = Path(tmp)
         card, server = base / 'card', base / 'server'
         card.mkdir(); server.mkdir()
-        root = card / 'misterzine-plex'
+        root = card / 'misterzine-jellyfin'
         (root / 'updates').mkdir(parents=True)
         (root / 'active.json').write_bytes(b'unchanged selection')
         (root / 'plexcrt.json').write_bytes(b'synthetic settings')
@@ -56,7 +56,7 @@ def exercise(archive):
         original = '[MiSTer]\nfilter=arcade console\n[unrelated]\ndb_url=https://example.org/unrelated\n'
         (card / 'downloader.ini').write_text(original)
         runner = base / 'runner.py'; runner.write_text(RUNNER)
-        url = 'https://example.org/plex-fixture/'
+        url = 'https://example.org/jellyfin-fixture/'
         release = {'db_url': url + 'db.json.zip'}
         ini = root / 'updates/downloader.ini'
 
@@ -67,7 +67,7 @@ def exercise(archive):
                   catalogue.STAGING+'/package.zip':{'url':url+'package.zip','size':len(payload),
                                                     'hash':hashlib.md5(payload).hexdigest()}}}
             with zipfile.ZipFile(server/'db.json.zip','w') as z:
-                z.writestr('misterzine_plex.json', json.dumps(db))
+                z.writestr('misterzine_jellyfin.json', json.dumps(db))
 
         def run(command, env, **kwargs):
             env.update(SKIP_FREE_SPACE_CHECKS='true', SSL_CERT_FILE='', CURL_SSL='')

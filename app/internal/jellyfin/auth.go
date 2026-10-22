@@ -19,9 +19,6 @@ type PublicInfo struct {
 	ServerName string `json:"ServerName"`
 	Version    string `json:"Version"`
 	ID         string `json:"Id"`
-	Product    string `json:"ProductName"`
-	Address    string `json:"LocalAddress"`
-	SetupDone  bool   `json:"StartupWizardCompleted"`
 }
 
 // PublicInfo probes the server (GET /System/Info/Public, no token needed).

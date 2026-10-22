@@ -3,6 +3,7 @@ package jellyfin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -33,25 +34,25 @@ type MediaSource struct {
 	MediaStreams         []MediaStream `json:"MediaStreams"`
 	Container            string        `json:"Container"`
 	Bitrate              int           `json:"Bitrate"`
-	RunTimeTicks         int64         `json:"RunTimeTicks"`
 	SupportsDirectPlay   bool          `json:"SupportsDirectPlay"`
 	SupportsDirectStream bool          `json:"SupportsDirectStream"`
 	SupportsTranscoding  bool          `json:"SupportsTranscoding"`
 	ETag                 string        `json:"ETag"`
 	// TranscodingURL is a server path with its query. Jellyfin puts the
 	// session token in it (ApiKey=); never log it. StreamURL strips it.
-	TranscodingURL       string `json:"TranscodingUrl"`
-	TranscodingContainer string `json:"TranscodingContainer"`
-	TranscodingProtocol  string `json:"TranscodingSubProtocol"`
-	DefaultAudioStream   *int   `json:"DefaultAudioStreamIndex"`
-	DefaultSubtitle      *int   `json:"DefaultSubtitleStreamIndex"`
+	TranscodingURL      string `json:"TranscodingUrl"`
+	TranscodingProtocol string `json:"TranscodingSubProtocol"`
+	DefaultAudioStream  *int   `json:"DefaultAudioStreamIndex"`
 }
 
 // PlaybackInfo is the server's answer.
 type PlaybackInfo struct {
 	PlaySessionID string        `json:"PlaySessionId"`
 	MediaSources  []MediaSource `json:"MediaSources"`
-	ErrorCode     string        `json:"ErrorCode"`
+	// ErrorCode is why the server offers nothing to play (NotAllowed,
+	// NoCompatibleStream, RateLimitExceeded); PlaybackInfo turns it into
+	// its error.
+	ErrorCode string `json:"ErrorCode"`
 }
 
 // PlaybackInfo asks how to play an item (POST /Items/{id}/PlaybackInfo).
@@ -91,6 +92,9 @@ func (c *Client) PlaybackInfo(ctx context.Context, id string, r PlaybackRequest)
 	var info PlaybackInfo
 	if err := c.post(ctx, "/Items/"+url.PathEscape(id)+"/PlaybackInfo", c.userQuery(), body, &info); err != nil {
 		return nil, err
+	}
+	if len(info.MediaSources) == 0 && info.ErrorCode != "" {
+		return nil, fmt.Errorf("Jellyfin refused playback: %s", info.ErrorCode)
 	}
 	return &info, nil
 }

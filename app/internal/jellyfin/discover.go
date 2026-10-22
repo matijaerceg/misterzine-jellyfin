@@ -20,10 +20,9 @@ const discoveryAsk = "Who is JellyfinServer?"
 
 // FoundServer is a server that answered discovery.
 type FoundServer struct {
-	Address  string `json:"Address"` // its base URL, as HostCandidates takes it
-	ID       string `json:"Id"`
-	Name     string `json:"Name"`
-	Endpoint string `json:"EndpointAddress"`
+	Address string `json:"Address"` // its base URL, as HostCandidates takes it
+	ID      string `json:"Id"`
+	Name    string `json:"Name"`
 }
 
 // ParseDiscovery reads a server's answer to discovery. One without an id

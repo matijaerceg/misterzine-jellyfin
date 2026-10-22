@@ -201,7 +201,7 @@ Options lists, in groups:
   [HDMI setup](HDMI.md#settings-options-warn-about).
 - **Surround downmix boost**, **Subtitle size** (see Subtitles), **Theme
   music** (a show's theme song on its pages, when Jellyfin has one) and
-  **Navigation sounds**.
+  **Navigation sounds** (no sound plays with the H.264 core).
 - **Switch user** (see Signing in), once signed in, and **Sign out**, with the
   user's name.
 - **Updates**, which says when an update is downloading, ready or available,
@@ -211,8 +211,8 @@ Options lists, in groups:
 - **Version**. The foot of the screen shows the build.
 
 Up and Down wrap between the first and last rows. OK, Left or Right turns a
-setting on or off; a setting with more choices (bitrate, crop, downmix boost,
-subtitle size) changes with Left and Right only, shown by the arrows either
+setting on or off; a setting with more choices (playback controls, bitrate,
+crop, downmix boost, subtitle size) changes with Left and Right only, shown by the arrows either
 side of its value when it is selected. A scrollbar on the right shows where the
 list is.
 

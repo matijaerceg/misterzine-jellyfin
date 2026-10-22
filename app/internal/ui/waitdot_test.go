@@ -16,6 +16,7 @@ import (
 // bit only for a new x, as ring.Overlay does. It also keeps the overlay
 // rectangle last shown (one at a time, as the core has it).
 type coreOSD struct {
+	nopOSD
 	x, y           int
 	rgb            uint32
 	on             bool
@@ -38,9 +39,7 @@ func (c *coreOSD) Show(x, y int, cv *gfx.Canvas, alpha []byte) {
 	c.showAlpha = append(c.showAlpha[:0], alpha[:cv.W*cv.H]...)
 	c.shows++
 }
-func (c *coreOSD) Hide()                          { c.shown = false }
-func (c *coreOSD) Upload(int, *gfx.Canvas, byte)  {}
-func (c *coreOSD) ShowAt(int, int, int, int, int) {}
+func (c *coreOSD) Hide() { c.shown = false }
 func (c *coreOSD) Dot(x, y int, rgb uint32, on bool) {
 	c.x, c.y, c.rgb, c.on = x, y, rgb, on
 	if x != c.asked || !c.askedSet {

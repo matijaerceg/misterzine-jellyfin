@@ -11,7 +11,7 @@ launch) and the C interface is `hps/include/h264ring.h`.
 ## Target layout
 
 ```
- Jellyfin server ──HTTP──► Go app (plexcrt) ──draws 720x480 frames──► /dev/fb0 overlay page ─┐
+ Jellyfin server ──HTTP──► Go app (plexcrt) ─draws 480-line frames──► /dev/fb0 overlay page ─┐
                               ▲                                                               │
                               │ input region (pads, keys, OSD open)                           ▼
                               └──────────────────────────── H.264 core (FPGA) ◄── ring ── C player
@@ -25,7 +25,7 @@ launch) and the C interface is `hps/include/h264ring.h`.
   playing it shows that overlay over black, so the browse UI needs no video.
   It is loaded through an MGL and `/dev/MiSTer_cmd` (`h264ring_launch_core`).
 - **The Go app** (`app/`) keeps the Plex app's UI, rendering, input handling,
-  art cache, updater and installer. It is retargeted so its 720x480 frames go
+  art cache, updater and installer. It is retargeted so its frames go
   into an overlay page in `/dev/fb0` described to the core
   (`h264ring_overlay_show`), sized to the core's raster (word 80), and its
   input comes from the core's input region (MiSTer main holds the real input
@@ -44,38 +44,41 @@ with `-X plexcrt/internal/updates.Channel=...`. Builds from this repository
 have no access gating; official beta builds add the supporter code from a
 private repository ([supporter builds](SUPPORTER_BUILDS.md)).
 
-## What is still Plex
+## Plex leftovers
 
-These parts still carry Plex behaviour and have to be rewritten or retargeted:
+`app/internal/jellyfin` replaced the Plex client ([JELLYFIN_API.md](JELLYFIN_API.md)).
+`ui/login.go` is the sign-in flow (a server found on the local network or an
+address typed on an on-screen keyboard, then Quick Connect or user name and
+password); `ui/connect.go` retries a server that cannot be reached yet after
+power-on; `ui/config.go` holds the server, user, token and the chosen
+audio/subtitle tracks. An unauthorized answer drops the app back to sign-in
+with the address kept. `app/internal/ring` and `app/internal/input` speak the
+H.264 core (next section). The playback launcher (`ui/player.go`,
+[PLAYBACK.md](PLAYBACK.md)) asks PlaybackInfo with the core's device profile
+(`ui/deviceprofile.go`), runs `jfplay` on the direct stream or the HLS
+transcode, reports progress, seeks in place (restarting the player when it
+cannot), and sets the core's Analog Aspect for the crop choice. Text subtitles
+are fetched as SRT and drawn on the overlay (`ui/subtitles.go`); picture
+subtitles are burned in by the server.
 
-- Done: `app/internal/plex` is replaced by `app/internal/jellyfin` (header
-  token auth, Quick Connect, views, items, resume, search, images, PlaybackInfo,
-  play reports). `ui/login.go` is the new sign-in flow (server address on an
-  on-screen keyboard, then Quick Connect or user name and password);
-  `ui/connect.go` checks one server; `ui/config.go` holds the server, user,
-  token and the chosen audio/subtitle tracks; Plex Home user switching is gone.
-  An unauthorized answer drops the app back to sign-in with the address kept.
-- Done: `app/internal/ring` and `app/internal/input` speak the H.264 core (next
-  section).
-- Done: the playback launcher (`ui/player.go`, `docs/PLAYBACK.md`) asks
-  PlaybackInfo with the core's device profile (`ui/deviceprofile.go`), runs
-  `jfplay` on the direct stream or the HLS transcode, reports progress, seeks
-  in place (restarting the player when it cannot), and sets the core's Analog
-  Aspect for the crop choice. Text subtitles are fetched as SRT and drawn on
-  the overlay (`ui/subtitles.go`); picture subtitles are burned in by the server.
-- `seasonsOf` in `ui/app.go` still skips Plex's
-  `/allLeaves` seasons, which Jellyfin never returns.
+What still carries the Plex app's shape:
+
 - The Collections tab lists every box set on the server in every film or show
   library, because Jellyfin's box sets do not belong to a library.
-- Internal names (the `plexcrt` executable and module, `MISTERZINE_PLEX_*`
-  and `PLEXCRT_*` environment variables) still carry the Plex name.
+- Internal names (the `plexcrt` executable and module, and the
+  `MISTERZINE_PLEX_*`, `PLEXCRT_*` and `PLEX_*` environment variables) still
+  carry the Plex name. `MISTERZINE_PLEX_OWNER`, `MISTERZINE_PLEX_READY_FILE`
+  and `MISTERZINE_PLEX_DISPLAY` are kept on purpose: they are a compatibility
+  contract between the app and `release/manager.py` and `update_service.py`,
+  including managers already installed. Renaming one means changing the Go and
+  Python sides together and accepting both names for at least one release.
 
-## The ring and input packages on the H.264 core (as built, 2026-10-15)
+## The ring and input packages on the H.264 core
 
 `app/internal/ring` and `app/internal/input` now speak the H.264 core's
 interface 1.x (`third_party/MiSTer_h264_decoder/hps/include/h264ring_layout.h`),
-reimplemented in Go without cgo. Their exported API is the old one, so the UI
-builds unchanged.
+reimplemented in Go without cgo. The UI-facing API keeps the old names where
+the meaning carried over (`compat.go`).
 
 - **Memory.** The control block (`0x3140_0000`, 4 KB of 64-bit words) is mapped
   through `/dev/mem` `O_RDWR|O_SYNC` after checking `/proc/iomem` (the library's
@@ -83,8 +86,10 @@ builds unchanged.
   `atomic.Store` is `DMB; STR; DMB`, `atomic.Load` is `LDR; DMB`, never
   LDREX/STREX). The 8 MB ring is not mapped: only the player writes it.
   `/dev/fb0` is mapped whole (its `smem_start` from `FBIOGET_FSCREENINFO` must lie
-  in `0x2200_0000`+8 MB); two 720x480 ARGB8888 pages sit at its start
-  (1,382,400 bytes each, stride 2,880). A framebuffer mode that maps less than
+  in `0x2200_0000`+8 MB); two overlay pages sit at its start, sized to the
+  core's raster (word 80), at most 1280x720 ARGB8888 each. The app draws a
+  480-line canvas, 720 wide (960 for a 16:9 Display Shape), which is scaled
+  onto the page, centred on the raster. A framebuffer mode that maps less than
   two pages (a 480p HDMI mode) is set to 1920x1080 after the core is up, and
   Watch puts it back when MiSTer main shrinks it.
 - **Frames.** `Begin` hands out an ordinary-memory canvas; `End`/`Present` wait
@@ -119,7 +124,7 @@ builds unchanged.
   we wrote) and writes ours again. If the player ever draws its own overlay the
   two would fight: a contract between them is needed then.
 - **The playback overlay** (`ring.Overlay`: a rectangle with alpha, the dot, the
-  bar, formerly the PlexCRT plane and sprites) is composed in software into the
+  bar) is composed in software into the
   same pages, transparent outside its lines, band = the lines it covers. The
   core-driven dot run is emulated by a goroutine redrawing each heartbeat.
   Unchanged overlay calls skip redraws only while the published descriptor still
@@ -134,8 +139,9 @@ builds unchanged.
   word 3): heartbeat, state, live flags (OSD open, session), shown-picture count,
   overlay generation/state/error, raster (word 80), aspect (word 47).
   `Field()` is the heartbeat; `Foreign`/`Published` follow the display's
-  `fetch_changes` (word 13) while a picture is shown. The CRT video lease,
-  hardware brightness and audio tap of the PlexCRT core are stubs.
+  `fetch_changes` (word 13) while a picture is shown. The PlexCRT core's video
+  lease and audio tap are no-ops (`compat.go`); brightness is applied in
+  software as frames are copied into a page.
 - **Launch.** `ring.Open` calls `LaunchCore` (MGL in `/tmp/h264ring.mgl`,
   `load_core` written once to `/dev/MiSTer_cmd`, only when `/tmp/CORENAME` is
   not `H264`; rbf `_Other/H264`, or `$MISTERZINE_H264_RBF`) and waits for the

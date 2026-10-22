@@ -121,7 +121,6 @@ type dto struct {
 	IndexNumber       int                          `json:"IndexNumber"`
 	ParentIndexNumber int                          `json:"ParentIndexNumber"`
 	IsFolder          bool                         `json:"IsFolder"`
-	ParentID          string                       `json:"ParentId"`
 	SeriesName        string                       `json:"SeriesName"`
 	SeriesID          string                       `json:"SeriesId"`
 	SeasonID          string                       `json:"SeasonId"`
@@ -136,15 +135,12 @@ type dto struct {
 	ParentBackdropImageTags []string `json:"ParentBackdropImageTags"`
 	ParentLogoItemID        string   `json:"ParentLogoItemId"`
 	ParentLogoImageTag      string   `json:"ParentLogoImageTag"`
-	ParentThumbItemID       string   `json:"ParentThumbItemId"`
-	ParentThumbImageTag     string   `json:"ParentThumbImageTag"`
 
 	UserData *struct {
-		PlaybackPositionTicks int64   `json:"PlaybackPositionTicks"`
-		PlayCount             int     `json:"PlayCount"`
-		Played                bool    `json:"Played"`
-		UnplayedItemCount     *int    `json:"UnplayedItemCount"`
-		PlayedPercentage      float64 `json:"PlayedPercentage"`
+		PlaybackPositionTicks int64 `json:"PlaybackPositionTicks"`
+		PlayCount             int   `json:"PlayCount"`
+		Played                bool  `json:"Played"`
+		UnplayedItemCount     *int  `json:"UnplayedItemCount"`
 	} `json:"UserData"`
 	MediaSources []mediaSource `json:"MediaSources"`
 	MediaStreams []MediaStream `json:"MediaStreams"`
@@ -153,10 +149,8 @@ type dto struct {
 }
 
 type mediaSource struct {
-	ID                         string        `json:"Id"`
-	MediaStreams               []MediaStream `json:"MediaStreams"`
-	DefaultAudioStreamIndex    *int          `json:"DefaultAudioStreamIndex"`
-	DefaultSubtitleStreamIndex *int          `json:"DefaultSubtitleStreamIndex"`
+	ID           string        `json:"Id"`
+	MediaStreams []MediaStream `json:"MediaStreams"`
 }
 
 // MediaStream is a source stream as Jellyfin describes it in item and
@@ -166,7 +160,6 @@ type MediaStream struct {
 	Type         string `json:"Type"` // Video, Audio, Subtitle
 	Index        int    `json:"Index"`
 	DisplayTitle string `json:"DisplayTitle"`
-	Title        string `json:"Title"`
 	Language     string `json:"Language"`
 	Codec        string `json:"Codec"`
 	IsDefault    bool   `json:"IsDefault"`
@@ -192,7 +185,6 @@ type MediaStream struct {
 type listing struct {
 	Items []dto `json:"Items"`
 	Total int   `json:"TotalRecordCount"`
-	Start int   `json:"StartIndex"`
 }
 
 func decodeListing(data []byte) (*listing, error) {
@@ -246,18 +238,18 @@ func (x *dto) item() *Item {
 		}
 	}
 	tags := x.ImageTags
-	it.Thumb = imageRef(x.ID, "Primary", tags["Primary"])
-	it.Logo = imageRef(x.ID, "Logo", tags["Logo"])
+	it.Thumb = imageRef(x.ID, ImagePrimary, tags[ImagePrimary])
+	it.Logo = imageRef(x.ID, ImageLogo, tags[ImageLogo])
 	if len(x.BackdropImageTags) > 0 {
-		it.Art = imageRef(x.ID, "Backdrop", x.BackdropImageTags[0])
+		it.Art = imageRef(x.ID, ImageBackdrop, x.BackdropImageTags[0])
 	} else if len(x.ParentBackdropImageTags) > 0 {
-		it.Art = imageRef(x.ParentBackdropItemID, "Backdrop", x.ParentBackdropImageTags[0])
+		it.Art = imageRef(x.ParentBackdropItemID, ImageBackdrop, x.ParentBackdropImageTags[0])
 	}
 	if it.Logo == "" {
-		it.Logo = imageRef(x.ParentLogoItemID, "Logo", x.ParentLogoImageTag)
+		it.Logo = imageRef(x.ParentLogoItemID, ImageLogo, x.ParentLogoImageTag)
 	}
-	if hashes := x.ImageBlurHashes["Primary"]; hashes != nil {
-		if h := hashes[tags["Primary"]]; h != "" {
+	if hashes := x.ImageBlurHashes[ImagePrimary]; hashes != nil {
+		if h := hashes[tags[ImagePrimary]]; h != "" {
 			it.Colors = blurCorners(h)
 		}
 	}
@@ -276,7 +268,7 @@ func (x *dto) item() *Item {
 			it.Leaves = x.RecursiveCount
 		}
 		if it.Thumb == "" {
-			it.Thumb = imageRef(x.SeriesID, "Primary", x.SeriesPrimaryImageTag)
+			it.Thumb = imageRef(x.SeriesID, ImagePrimary, x.SeriesPrimaryImageTag)
 		}
 	case "episode":
 		it.Season = x.ParentIndexNumber
@@ -284,7 +276,7 @@ func (x *dto) item() *Item {
 		// the poster wall wants the show's poster; the episode's own
 		// picture is its still
 		it.Still = it.Thumb
-		if s := imageRef(x.SeriesID, "Primary", x.SeriesPrimaryImageTag); s != "" {
+		if s := imageRef(x.SeriesID, ImagePrimary, x.SeriesPrimaryImageTag); s != "" {
 			it.Thumb = s
 		}
 	case "collection", "folder":

@@ -2,7 +2,7 @@
  "Items": [
   {
    "Name": "Movies",
-   "Id": "f137a2dd21bbc1b99aa5c0f6bf02a805",
+   "Id": "f17e0000000000000000000000000003",
    "DateCreated": "2026-10-16T01:48:45.0714853Z",
    "DateLastMediaAdded": "0001-01-01T00:00:00.0000000Z",
    "CanDelete": false,
@@ -14,7 +14,7 @@
    "Genres": [],
    "PlayAccess": "Full",
    "IsFolder": true,
-   "ParentId": "e9d5075a555c1cbc394eec4cef295274",
+   "ParentId": "f17e0000000000000000000000000050",
    "Type": "CollectionFolder",
    "LocalTrailerCount": 0,
    "UserData": {
@@ -22,8 +22,8 @@
     "PlayCount": 0,
     "IsFavorite": false,
     "Played": false,
-    "Key": "f137a2dd-21bb-c1b9-9aa5-c0f6bf02a805",
-    "ItemId": "f137a2dd21bbc1b99aa5c0f6bf02a805"
+    "Key": "f17e0000-0000-0000-0000-000000000003",
+    "ItemId": "f17e0000000000000000000000000003"
    },
    "ChildCount": 6347,
    "SpecialFeatureCount": 0,
@@ -39,7 +39,7 @@
   },
   {
    "Name": "TV Shows",
-   "Id": "767bffe4f11c93ef34b805451a696a4e",
+   "Id": "f17e0000000000000000000000000004",
    "DateCreated": "2026-10-16T01:48:51.2974242Z",
    "DateLastMediaAdded": "0001-01-01T00:00:00.0000000Z",
    "CanDelete": false,
@@ -51,7 +51,7 @@
    "Genres": [],
    "PlayAccess": "Full",
    "IsFolder": true,
-   "ParentId": "e9d5075a555c1cbc394eec4cef295274",
+   "ParentId": "f17e0000000000000000000000000050",
    "Type": "CollectionFolder",
    "LocalTrailerCount": 0,
    "UserData": {
@@ -59,8 +59,8 @@
     "PlayCount": 0,
     "IsFavorite": false,
     "Played": false,
-    "Key": "767bffe4-f11c-93ef-34b8-05451a696a4e",
-    "ItemId": "767bffe4f11c93ef34b805451a696a4e"
+    "Key": "f17e0000-0000-0000-0000-000000000004",
+    "ItemId": "f17e0000000000000000000000000004"
    },
    "ChildCount": 1259,
    "SpecialFeatureCount": 0,

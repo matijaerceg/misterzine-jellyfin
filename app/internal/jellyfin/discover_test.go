@@ -8,8 +8,8 @@ import (
 )
 
 func TestParseDiscovery(t *testing.T) {
-	s, ok := ParseDiscovery([]byte(`{"Address":"http://192.0.2.10:8096/","Id":"ab2fcab83d844492a4ecc65a0fca36cd","Name":"Café","EndpointAddress":null}`))
-	if !ok || s.Address != "http://192.0.2.10:8096" || s.ID != "ab2fcab83d844492a4ecc65a0fca36cd" || s.Name != "Cafe" {
+	s, ok := ParseDiscovery([]byte(`{"Address":"http://192.0.2.10:8096/","Id":"f17e0000000000000000000000000001","Name":"Café","EndpointAddress":null}`))
+	if !ok || s.Address != "http://192.0.2.10:8096" || s.ID != "f17e0000000000000000000000000001" || s.Name != "Cafe" {
 		t.Fatalf("parsed %+v %v", s, ok)
 	}
 	for _, bad := range []string{

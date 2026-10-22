@@ -23,10 +23,10 @@ by these scripts. Consult the [component notices](../release/THIRD_PARTY_NOTICES
 before distributing binaries.
 
 Saved video geometry is sent only to a core advertising HPS interface 1.2 or
-later. Applying it therefore requires a custom build of the H.264 core with
-that interface; older cores keep calibration in preview-only mode. Fit/crop
-telemetry has been verified on Mister Pi with DeFlicker off and on; visual CRT
-confirmation remains pending.
+later. The core shipped with the app (interface 1.4) applies saved geometry;
+older H.264 cores keep calibration preview-only. Fit/crop telemetry has been
+verified on Mister Pi with DeFlicker off and on; visual CRT confirmation
+remains pending.
 
 The app's 14:9 crop uses the same custom geometry interface. On older cores it
 falls back to Off, while the core receives its valid Letterbox setting.
@@ -81,6 +81,12 @@ cd ..
 The executable retains its historical `plexcrt` name. It runs on MiSTer Linux;
 it is not a desktop media player. Unit tests can run on a Linux desktop.
 
+The font atlases in `app/internal/gfx/fonts` are committed and embedded in the
+build. `app/tools/genatlas.ps1` generates them on Windows from the installed
+Roboto, Roboto Medium, Roboto Black and Roboto Condensed fonts
+(`powershell -File app\tools\genatlas.ps1`); run it only to change a face or
+size, and keep every atlas the app loads by name.
+
 ## Official beta builds
 
 Official supporter builds combine this source with a private companion
@@ -99,8 +105,8 @@ in [distribution](../release/DISTRIBUTION.md).
 ## Development install
 
 Use a separate directory on the MiSTer's SD card. Copy `plexcrt`, `jfplay`, and
-`ffmpeg` into it and make them executable. The current application preflight
-still requires the `ffmpeg` executable alongside the app.
+`ffmpeg` into it and make them executable. `ffmpeg` decodes show theme music, so
+the preflight requires it alongside the app.
 
 Install an H.264 core built from this repository's fork in
 `third_party/MiSTer_h264_decoder` (see [distribution](../release/DISTRIBUTION.md))
@@ -121,7 +127,6 @@ These checks reduce the changeover window; they are not an atomic handoff with
 MiSTer Main. Test switches from both browsing and active or paused playback,
 and verify that neither process remains in the next core.
 
-The `release/` tools package and install Jellyfin separately from Plex.
 Official supporter packages are built with the private companion repository.
 
 ## Validation
@@ -131,13 +136,13 @@ and public-content scan. Playback changes also need real hardware tests covering
 both direct streams and transcodes, pause/resume, repeated seeks, stop, saved
 resume position, and the absence of leftover player processes.
 
-The pure-C video geometry helper can be tested on a native Linux or WSL host
-without the ARM toolchain or device:
+The worker's C helpers, the pure-C video geometry helper among them, are
+tested on a native Linux or WSL host without the ARM toolchain or device:
 
 ```sh
-cc -std=c99 -Wall -Wextra -Werror -Iarm arm/test_video_geometry.c -o /tmp/test_video_geometry
-/tmp/test_video_geometry
+make -C arm test
 ```
 
-The test reads the shared expected rectangles in `tools/testdata/fit_cases.txt`
-and checks NTSC/PAL alignment, crop and fit behavior, and invalid inputs.
+The geometry test reads the shared expected rectangles in
+`tools/testdata/fit_cases.txt` and checks NTSC/PAL alignment, crop and fit
+behavior, and invalid inputs.

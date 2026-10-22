@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parent.parent
 HASH = re.compile(r'[0-9a-f]{64}')
 IDENT = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,95}')
 VERSION = re.compile(r'v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?')
-PAYLOAD_NAMES = ('plexcrt', 'jfplay', 'ffmpeg', 'H264.rbf')
 
 
 def sha(path):

@@ -107,8 +107,8 @@ type Client struct {
 }
 
 // New makes a client for host. The device id should be stable across runs
-// (the plex client id serves); the token comes from the store, or is set
-// by a sign-in.
+// (Config.ClientID); the token comes from the store, or is set by a
+// sign-in.
 func New(host, cacheDir, deviceID string, store TokenStore) *Client {
 	if cacheDir != "" {
 		os.MkdirAll(cacheDir, 0o755)
@@ -267,11 +267,6 @@ func (c *Client) once(ctx context.Context, cl *http.Client, method, path string,
 		return nil, fmt.Errorf("%s %s: answer larger than %d bytes", method, pathOnly(path), limit), false
 	}
 	return data, nil, false
-}
-
-// Get fetches a path and returns the body.
-func (c *Client) Get(ctx context.Context, path string, q url.Values) ([]byte, error) {
-	return c.do(ctx, c.http, "GET", path, q, nil, true, 0)
 }
 
 func (c *Client) getJSON(ctx context.Context, cl *http.Client, path string, q url.Values, v any) error {

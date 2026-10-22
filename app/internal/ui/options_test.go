@@ -436,7 +436,6 @@ func TestOptionsSubtitleSizeShowsStepsAndSaves(t *testing.T) {
 
 func TestPictureOptionsLeaveLegacyVideoPreferencesAlone(t *testing.T) {
 	a := betaTestApp(t)
-	a.Cfg.DeFlicker = true
 	a.Cfg.Progressive = true
 	o := NewOptions(a)
 	for _, it := range o.items() {
@@ -444,7 +443,7 @@ func TestPictureOptionsLeaveLegacyVideoPreferencesAlone(t *testing.T) {
 			t.Fatalf("removed picture control %q is still shown", it.label)
 		}
 	}
-	if !a.Cfg.DeFlicker || !a.Cfg.Progressive {
+	if !a.Cfg.Progressive {
 		t.Fatal("building the picture options changed a legacy preference")
 	}
 }

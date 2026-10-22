@@ -339,6 +339,7 @@ func (l *Login) pick(u jellyfin.PublicUser) {
 func (l *Login) startQuick() {
 	l.to(stepQuick)
 	gen, client := l.gen.Load(), l.client
+	poll := QuickPoll // read here: the goroutine may outlive a test that changes it
 	l.busy, l.stat, l.code = true, "Getting a code...", ""
 	go func() {
 		qc, err := client.QuickConnectStart(bg())
@@ -351,7 +352,7 @@ func (l *Login) startQuick() {
 		}
 		l.later(gen, func() { l.code, l.stat = qc.Code, "Waiting for approval..." })
 		for {
-			time.Sleep(QuickPoll)
+			time.Sleep(poll)
 			if !l.current(gen) {
 				return
 			}

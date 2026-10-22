@@ -19,7 +19,6 @@ import (
 const (
 	ImagePrimary  = "Primary"
 	ImageBackdrop = "Backdrop"
-	ImageThumb    = "Thumb"
 	ImageLogo     = "Logo"
 )
 

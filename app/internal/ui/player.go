@@ -36,6 +36,7 @@ type Player struct {
 	DrawsSubtitle func(itemID string, s jellyfin.Stream) bool
 	Hide          func()
 	exec          func(string, ...string) *exec.Cmd
+	stopGrace     time.Duration // how long a worker asked to stop has before it is killed; 0 is 3 s
 	reportOnce    sync.Once
 	reports       chan func()
 }
@@ -253,10 +254,6 @@ func (s *Session) burnedSubtitle(selected string) string {
 	return selected
 }
 
-func (s *Session) start(offset int, reuseDirect bool) error {
-	return s.startContext(offset, reuseDirect, context.Background())
-}
-
 func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context) error {
 	p := s.p
 	// A replacement worker should inherit the session's pause state. A newly
@@ -326,7 +323,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		// the core keeps up; it exits 7 when a transcode is needed.
 		args = append(args, "--direct")
 	}
-	args = append(args, "--headers", "Authorization: "+p.Client.AuthHeader()+"\r\n", "--fifo", p.Fifo, "--status", p.Status)
+	args = append(args, "--fifo", p.Fifo, "--status", p.Status)
 	if p.Boost != nil {
 		if v := p.Boost(); v >= 100 && v <= 300 {
 			args = append(args, "--audio-boost", strconv.Itoa(v))
@@ -352,7 +349,10 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	cmd := run(p.Binary, args...)
 	output := &safelog.Writer{Out: s.lf, Secrets: []string{p.Client.Store.Credentials().Token}}
 	cmd.Stdout, cmd.Stderr = output, output
-	cmd.Env = append(os.Environ(), "MISTERZINE_JFPLAY_OWNER="+filepath.Clean(p.Binary))
+	// The headers carry the token, so they go in the environment (readable by
+	// this user only), not on the command line (readable by every process).
+	cmd.Env = append(os.Environ(), "MISTERZINE_JFPLAY_OWNER="+filepath.Clean(p.Binary),
+		"JFPLAY_HEADERS=Authorization: "+p.Client.AuthHeader()+"\r\n")
 	s.mu.Lock()
 	if ctx.Err() != nil || s.closing || s.stopRequested {
 		s.mu.Unlock()
@@ -904,7 +904,11 @@ func (s *Session) stopProcessLocked() {
 	if done == nil {
 		return
 	}
-	timer := time.NewTimer(3 * time.Second)
+	grace := s.p.stopGrace
+	if grace <= 0 {
+		grace = 3 * time.Second
+	}
+	timer := time.NewTimer(grace)
 	defer timer.Stop()
 	select {
 	case <-done:

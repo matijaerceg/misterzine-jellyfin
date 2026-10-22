@@ -102,8 +102,8 @@ retained. Geometry is separate from the crop setting and is limited to fitted
 480- or 576-line output; Native HDMI output is not supported.
 
 De-flicker is an option of the core's OSD, not of the app: on interlaced
-output it softens thin horizontal detail in frame-based video and in the app's
-screens so it flickers less between fields. It is On by default. Video recorded
+output it softens thin horizontal lines in frame-based video and in the app's
+screens so they flicker less between fields. It is On by default. Video recorded
 as interlaced fields is not filtered. The app does not pass `jfplay` an
 Anti-Twitter request, so the OSD choice stays in force during playback.
 

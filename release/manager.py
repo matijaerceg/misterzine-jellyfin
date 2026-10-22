@@ -15,7 +15,6 @@ import re
 import shutil
 import shlex
 import signal
-import struct
 import subprocess
 import sys
 import tempfile
@@ -35,9 +34,9 @@ def installer_script(channel):
     return 'MisterZine-Jellyfin-Install-' + ('Public' if channel == 'public' else 'Beta')
 BOOT_START = '# BEGIN MISTERZINE JELLYFIN LAUNCHER'
 BOOT_END = '# END MISTERZINE JELLYFIN LAUNCHER'
-# Reports go to the same service the MisterZine Frontend uses: a plain-text
-# upload answered with a short code, kept 30 days, nothing stored about the
-# sender. '' switches sending off.
+# Online report upload is off for MisterZine Jellyfin: reports are saved
+# locally, beside the app. send_report stays for a service set here, which
+# takes the plain-text report and answers with a short code. '' is off.
 REPORT_SERVICE = ''
 REPORT_MAGIC = 'MisterZine report v1'
 REPORT_MAX_BYTES = 256 * 1024
@@ -223,7 +222,7 @@ def startup_text(card, text, enable):
         command = 'setsid python3 ' + shlex.quote(str(root / 'menu_launcher.py')) + ' --card ' + shlex.quote(str(card))
         block = BOOT_START + '\n' + command + ' >/tmp/misterzine-jellyfin-menu.log 2>&1 </dev/null &\n' + BOOT_END + '\n'
         # Put the hook ahead of any existing early exit in user-startup.sh.
-        first, sep, rest = text.partition('\n')
+        first, _, rest = text.partition('\n')
         text = first + '\n' + block + rest if first.startswith('#!') else '#!/bin/bash\n' + block + text
     return text
 
@@ -545,11 +544,7 @@ def locked(root, patience=0):
         yield
 
 
-class DecoderFetchError(RuntimeError):
-    """Retained for readable errors from legacy installs lacking bundled FFmpeg."""
-
-
-def decoder(root, archive=None):
+def decoder(root):
     """Check the release's bundled ARM FFmpeg; updates never fetch a second binary."""
     ff = Path(root) / 'ffmpeg'
     if not ff.is_file() or not os.access(ff, os.X_OK):
@@ -580,7 +575,7 @@ def wrappers(card):
     return changed
 
 
-def stage(card, package, archive=None):
+def stage(card, package):
     root = card / 'misterzine-jellyfin'
     manifest = json.loads((package / 'manifest.json').read_text())
     files = manifest['files']
@@ -621,9 +616,9 @@ def stage(card, package, archive=None):
     return manifest
 
 
-def install(card, package, archive=None):
+def install(card, package):
     root = card / 'misterzine-jellyfin'
-    manifest = stage(card, package, archive)
+    manifest = stage(card, package)
     ident = manifest['id']
     # Activate only after every executable and dependency has been verified.
     state = read_state(root) if (root / 'active.json').exists() else {}
@@ -1122,7 +1117,7 @@ def display_check(card, altcfg=read_altcfg):
     """What the app's Options show about the MiSTer INI: which file main read
     for the core and ini_findings for it. vrr is 'unknown' when the file main read
     cannot be told or read."""
-    path, number = active_ini(card, altcfg)
+    path, _ = active_ini(card, altcfg)
     if path is None:
         return {'ini': '', 'vrr': 'unknown'}
     try:
@@ -1234,9 +1229,9 @@ def system_facts(root, secrets, proc_root=Path('/proc'), altcfg=read_altcfg):
         findings = ini_findings(entries)
         for key in ('vrr_mode', 'vsync_adjust'):   # the raw values below say it
             del findings[key]
-        facts['plex_video'] = {key: values[key][:40] for key in VIDEO_KEYS if key in values}
+        facts['ini_video'] = {key: values[key][:40] for key in VIDEO_KEYS if key in values}
         elsewhere = '' if own else section_elsewhere(card, ini or card / 'MiSTer.ini')
-        facts['plex_video'].update(findings, own_section=own, section_in=ini_label(card, elsewhere))
+        facts['ini_video'].update(findings, own_section=own, section_in=ini_label(card, elsewhere))
     except OSError:
         pass
     try:
@@ -1287,16 +1282,12 @@ def system_facts(root, secrets, proc_root=Path('/proc'), altcfg=read_altcfg):
         import ipaddress, urllib.parse
         u = urllib.parse.urlsplit(url)
         host = u.hostname or ''
-        if host.endswith('.plex.direct'):
-            private = bool(re.match(r'(10-|192-168-|172-(1[6-9]|2\d|3[01])-)', host))
-        else:
-            # the plain HTTP connection is the address itself
-            try:
-                private = ipaddress.ip_address(host).is_private
-            except ValueError:
-                private = None
-        facts['server'] = {'scheme': u.scheme, 'port': u.port,
-                           'kind': 'relay' if u.port == 8443 else 'plex.direct' if host.endswith('.plex.direct') else 'address',
+        # An address tells whether the server is on the LAN; a host name does not.
+        try:
+            private, kind = ipaddress.ip_address(host).is_private, 'address'
+        except ValueError:
+            private, kind = None, 'name'
+        facts['server'] = {'scheme': u.scheme, 'port': u.port, 'kind': kind,
                            'private_lan': private,
                            'bitrate': cfg.get('bitrate'), 'progressive': cfg.get('progressive')}
     except (OSError, ValueError):
@@ -1325,7 +1316,8 @@ def report_secrets(root):
     for path in (root / 'plexcrt.json', root / 'plexcrt.json.bak'):
         try:
             cfg = json.loads(path.read_text())
-            secrets += [cfg.get(k, '') for k in ('token', 'server_token', 'server_url', 'server_name', 'client_id', 'account_name')]
+            secrets += [cfg.get(k, '') for k in ('server_token', 'server_url', 'server_name', 'server_id', 'client_id',
+                                                 'user_id', 'user_name', 'token', 'account_name')]   # the last two: older files
             # a plain HTTP server URL is a bare address, which network errors quote without the URL
             secrets.append(urllib.parse.urlsplit(str(cfg.get('server_url') or '')).hostname or '')
         except (OSError, ValueError):
@@ -1441,28 +1433,6 @@ def stop_child(child):
             child.wait()
 
 
-def cleanup_player(folder):
-    marker = ('MISTERZINE_PLEX_OWNER=' + str(folder / 'jfplay')).encode()
-    owned = []
-    for proc in Path('/proc').iterdir():
-        if not proc.name.isdigit() or int(proc.name) == os.getpid():
-            continue
-        try:
-            if marker in (proc / 'environ').read_bytes().split(b'\0'):
-                os.kill(int(proc.name), signal.SIGTERM)
-                owned.append(proc)
-        except OSError:
-            pass
-    if owned:
-        time.sleep(0.5)
-    for proc in owned:
-        try:
-            if marker in (proc / 'environ').read_bytes().split(b'\0'):
-                os.kill(int(proc.name), signal.SIGKILL)
-        except OSError:
-            pass
-
-
 def core_file(root, folder=None):
     if folder is None:
         folder = root / 'releases' / read_state(root)['current']
@@ -1485,11 +1455,6 @@ def core_launch_entry(root, folder):
     entry = root.parent / '.misterzine-jellyfin-core.mgl'
     atomic(entry, launch_body(root, folder).encode())
     return entry
-
-
-def prepare_framebuffer(parameters=Path('/sys/module/MiSTer_fb/parameters')):
-    """Compatibility no-op: the Jellyfin Go app owns H264 setup."""
-    return False
 
 
 def mister_processes(proc_root=Path('/proc')):
@@ -1516,25 +1481,6 @@ def selected_core(core, proc_root=Path('/proc'), before=()):
     happened even when the same core was already loaded."""
     return any(pid not in before and arg == str(core).encode()
                for pid, arg in mister_processes(proc_root).items())
-
-
-def core_loaded(core, proc_root=Path('/proc'), corename=Path('/tmp/CORENAME'), wait=3):
-    """True when the main-menu entry already loaded this core, so no reload is needed.
-
-    The core name appears a moment before the restarted main process does,
-    so give the process a little time rather than reloading over it."""
-    deadline = time.monotonic() + wait
-    while True:
-        try:
-            if corename.read_text().strip() != core.stem:
-                return False
-        except OSError:
-            return False
-        if selected_core(core, proc_root):
-            return True
-        if time.monotonic() > deadline:
-            return False
-        time.sleep(.05)
 
 
 def ensure_selected_core(card, root, folder, wait=20, proc_root=Path('/proc'),
@@ -1795,27 +1741,6 @@ def screen_to_ourselves(holders=fb_holders, console=GraphicsConsole):
                 signal.signal(signal.SIGTERM, previous)
 
 
-def lost_core_status(mem, recheck=0.1, sleep=time.sleep):
-    """The ring's status word when it no longer carries the H264 core's
-    signature, else None. A framebuffer mode write zeroes it until the core's
-    next vsync, so a bad reading counts only if it is still bad a few fields
-    later."""
-    for attempt in range(2):
-        status = struct.unpack_from('<I', mem, 0x6c)[0]
-        if status & 0xfffffff0 == 0x56500000:
-            return None
-        if attempt == 0:
-            sleep(recheck)
-    return status
-
-
-def fb_mode(parameters=Path('/sys/module/MiSTer_fb/parameters')):
-    try:
-        return (parameters / 'mode').read_text().strip()
-    except OSError:
-        return '?'
-
-
 # The app's exit status after the menu's Exit (exitToMenu in app/cmd/plexcrt/main.go).
 EXIT_TO_MENU = 3
 
@@ -1827,7 +1752,7 @@ def app_finished(returncode):
     if returncode == EXIT_TO_MENU:
         return True
     if returncode not in (None, 0):
-        raise RuntimeError('App could not start. Run MisterZine-Jellyfin-Diagnostics and check the report.')
+        raise RuntimeError('The Jellyfin application exited with status %s; check its launch log.' % returncode)
     return False
 
 
@@ -1839,9 +1764,9 @@ def menu_core(arg):
 
 
 def load_menu(card, cmd=Path('/dev/MiSTer_cmd'), wait=10):
-    """Return to the MiSTer menu, as a short OSD Reboot does. Only once the app,
-    player and presenter have stopped: the menu draws its background into the
-    framebuffer, and a mode write of ours after that would clear its top.
+    """Return to the MiSTer menu, as a short OSD Reboot does. Only once the app
+    has stopped: the menu draws its background into the framebuffer, and a
+    mode write of ours after that would clear its top.
     MiSTer restarts its main process to load a core, so a new one running a
     menu shows it came up. False when it did not."""
     rbf = card / 'menu.rbf'
@@ -1911,18 +1836,19 @@ def run(root):
         return False
     finally:
         signal.signal(signal.SIGTERM, original_term)
-    if code == EXIT_TO_MENU:
-        return True
-    if code not in (None, 0):
-        raise RuntimeError('The Jellyfin application exited with status %s; check its launch log.' % code)
-    return False
+    # The app only says it wants the menu (exit status 3); loading it is ours.
+    to_menu = app_finished(code)
+    if to_menu and not load_menu(card):
+        raise RuntimeError('Could not return to the MiSTer menu. Use the OSD to leave MisterZine Jellyfin.')
+    return to_menu
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['install', 'run', 'rollback', 'remove', 'diagnostics', 'report', 'maintain'])
     parser.add_argument('--card', type=Path, default=Path('/media/fat'))
     parser.add_argument('--package', type=Path, default=Path(__file__).resolve().parent)
-    parser.add_argument('--decoder-archive', type=Path)
+    parser.add_argument('--decoder-archive', type=Path, help='accepted for older menu scripts; the release bundles its decoder')
     parser.add_argument('--no-upload', action='store_true', help='accepted for older menu scripts; reports are saved locally')
     args = parser.parse_args()
     root = args.card / 'misterzine-jellyfin'
@@ -1952,7 +1878,7 @@ def main():
         # never turns a fresh install's launch into a "running" error.
         with locked(root, patience=30):
             if args.action == 'install':
-                install(args.card, args.package, args.decoder_archive)
+                install(args.card, args.package)
                 prune_releases(root)
             elif args.action == 'run':
                 to_menu = run(root)

@@ -49,8 +49,17 @@ def main() -> int:
     if missing:
         print("missing C string literals: " + ", ".join(missing), file=sys.stderr)
         return 1
+    # and the other way: every key the status file is written with is documented
+    documented = set(table_values(doc, "Status keys"))
+    written = re.findall(r'fprintf\(f, "([a-z_]+)=', source)
+    undocumented = sorted(set(written) - documented)
+    if not written or undocumented:
+        print("status keys missing from jfplay.md: " + (", ".join(undocumented) or "none found in jfplay.c"),
+              file=sys.stderr)
+        return 1
     policy_tokens = {
         "in-file seek option": "--start-in-file",
+        "headers from the environment": 'getenv("JFPLAY_HEADERS")',
         "analog aspect option": "--analog-aspect",
         "analog aspect command": "aspect ",
         "anti-twitter option": "--anti-twitter",
