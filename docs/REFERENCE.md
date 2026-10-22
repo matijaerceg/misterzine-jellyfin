@@ -181,7 +181,8 @@ Options lists, in groups:
 - **Skip intro and credits buttons**.
 - **Playback controls**: Standard, or VCR, an old deck's on-screen display:
   bright green and white block capitals in an on-screen display chip's
-  eight pure colours on a blue band, the progress as a row of blocks, and the
+  eight pure colours on a blue band, the progress as a row of blocks with an
+  upright line for the scrubber's playhead, and the
   lines of the controls wavering sideways by a pixel, as a tape's picture
   did. **VCR, no band** leaves the band out, the text straight over the
   picture as on a deck. In both VCR looks the three dots that show while

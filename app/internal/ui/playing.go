@@ -148,6 +148,9 @@ type listMode struct {
 
 // closePainter stops further overlay work and hides the OSD after playback ends.
 func (p *Playing) closePainter(osd OSD) <-chan struct{} {
+	if l, ok := osd.(dotLiner); ok && p.app.Cfg.vcr() {
+		l.SetDotLine(false)
+	}
 	if j, ok := osd.(jitterer); ok && p.jittering {
 		j.SetJitter(false) // the overlay outlives the playback
 		p.jittering = false
@@ -245,6 +248,9 @@ func NewPlaying(app *App, it *jellyfin.Item, queue []*jellyfin.Item, idx int, se
 	p.painter = newPainter(w, h)
 	if sized, ok := app.osd.(interface{ SetCanvasSize(int, int) }); ok {
 		sized.SetCanvasSize(w, h)
+	}
+	if l, ok := app.osd.(dotLiner); ok {
+		l.SetDotLine(app.Cfg.vcr()) // the VCR playhead is a line
 	}
 	if (len(it.Markers) == 0 || it.SourceID == "") && app.Client != nil {
 		p.metadata = make(chan *jellyfin.Item, 1)
@@ -952,7 +958,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		}
 		// the cursor is the core's bar sprite, beside its row
 		by := SafeY + OsdListTop + l.cur*OsdListRowH - l.at
-		osd.Bar(p.menuX()-MenuBarGap-BarW, by+2, BarW, p.app.F.Body.Height()-4, uint32(gfx.GreyHi),
+		osd.Bar(p.menuX()-MenuBarGap-BarW, by+2, BarW, p.app.F.Body.Height()-4, p.barColour(),
 			by >= SafeY && by+OsdListRowH <= SafeY+OsdListH)
 		return
 	}
@@ -988,7 +994,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 			// here), shown once the hold runs; the core places it meanwhile
 			if vx == 0 || !p.dotOn {
 				p.dotOn = p.peekScrub
-				osd.Dot(p.safeX()+int(float64(p.safeW())*p.scrubTo/p.dur+0.5), p.osdBottom()-p.peekH+p.pillY+PillH/2, uint32(gfx.White), p.dotOn)
+				osd.Dot(p.safeX()+int(float64(p.safeW())*p.scrubTo/p.dur+0.5), p.osdBottom()-p.peekH+p.pillY+PillH/2, p.dotColour(), p.dotOn)
 			}
 		} else {
 			p.dotOn = false
@@ -1015,9 +1021,9 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	if p.composed {
 		p.sprites()
 		if vx == 0 {
-			osd.Dot(p.dotX, p.dotY, uint32(gfx.White), p.dotOn)
+			osd.Dot(p.dotX, p.dotY, p.dotColour(), p.dotOn)
 		}
-		osd.Bar(p.barX, p.barY, p.barW, BarW, uint32(gfx.GreyHi), p.barOn)
+		osd.Bar(p.barX, p.barY, p.barW, BarW, p.barColour(), p.barOn)
 	}
 	key = p.panelKey()
 	if key == p.last && p.composed {
@@ -1030,8 +1036,8 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	if !p.composed {
 		p.composed = true
 		p.sprites()
-		osd.Dot(p.dotX, p.dotY, uint32(gfx.White), p.dotOn)
-		osd.Bar(p.barX, p.barY, p.barW, BarW, uint32(gfx.GreyHi), p.barOn)
+		osd.Dot(p.dotX, p.dotY, p.dotColour(), p.dotOn)
+		osd.Bar(p.barX, p.barY, p.barW, BarW, p.barColour(), p.barOn)
 	}
 	p.last = key
 	p.setJitter(osd, true)

@@ -202,3 +202,32 @@ func TestVCRWaitTapeTurns(t *testing.T) {
 	}
 	<-p.closePainter(o)
 }
+
+// lineOSD is a painterTestOSD that can draw its dot as a line.
+type lineOSD struct {
+	painterTestOSD
+	line bool
+}
+
+func (l *lineOSD) SetDotLine(on bool) { l.line = on }
+
+// The VCR playhead is a green line; the focus bar is green, never grey;
+// the standard look keeps the white disc and its grey bar.
+func TestVCRPlayheadIsAGreenLine(t *testing.T) {
+	for _, look := range []string{"vcr-clear", ""} {
+		a := betaTestApp(t)
+		a.Out = &fakeOut{c: gfx.NewCanvas(720, 480)}
+		o := &lineOSD{}
+		a.osd = o
+		a.Cfg.PlaybackLook = look
+		p := NewPlaying(a, &jellyfin.Item{Title: "A film", Duration: 1460}, nil, 0, func(string) {})
+		vcr := look != ""
+		if o.line != vcr || (p.dotColour() == uint32(vcrText)) != vcr || (p.barColour() == uint32(vcrText)) != vcr {
+			t.Fatalf("look %q: line %v, dot %06x, bar %06x", look, o.line, p.dotColour(), p.barColour())
+		}
+		<-p.closePainter(a.osd)
+		if o.line {
+			t.Fatalf("look %q: the overlay keeps the line after the playback", look)
+		}
+	}
+}

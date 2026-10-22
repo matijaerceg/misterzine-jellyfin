@@ -56,6 +56,27 @@ func vcrKey(b string) string {
 	return strings.ToUpper(b)
 }
 
+// dotLiner is an OSD whose dot can be drawn as a line (ring.Overlay): the
+// VCR playhead, in the highlight green.
+type dotLiner interface{ SetDotLine(on bool) }
+
+// dotColour is the playhead's colour in the look in force.
+func (p *Playing) dotColour() uint32 {
+	if p.app.Cfg.vcr() {
+		return uint32(vcrText)
+	}
+	return uint32(gfx.White)
+}
+
+// barColour is the focus bar's, beside a list row or under a key: the
+// highlight green in the VCR look, which has no greys.
+func (p *Playing) barColour() uint32 {
+	if p.app.Cfg.vcr() {
+		return uint32(vcrText)
+	}
+	return uint32(gfx.GreyHi)
+}
+
 // jitterer is an OSD whose rectangle can shake (ring.Overlay).
 type jitterer interface {
 	SetJitter(on bool)

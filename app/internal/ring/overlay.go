@@ -52,12 +52,29 @@ type Overlay struct {
 	batchDepth   int
 	batchDirty   bool
 
+	dotLine   bool   // the dot drawn as a line with a shadow (SetDotLine)
 	jitter    bool   // the rectangle's lines shake sideways (SetJitter)
 	jitterGen uint32 // the shake's pattern, moved on by Shake
 	shifts    []int  // each of the rectangle's lines' shift, for compose
 }
 
 const dotRadius = 7
+
+// The dot as a line (SetDotLine): dotLineHalf rows above and below its
+// centre, dotLineW pixels wide, and a black shadow two pixels right and
+// down, at the 480-line scale.
+const (
+	dotLineHalf = 9
+	dotLineW    = 4
+)
+
+// SetDotLine draws the dot as an upright line with a hard shadow in place
+// of the disc: the VCR look's playhead. It takes effect at the next change.
+func (o *Overlay) SetDotLine(on bool) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	o.dotLine = on
+}
 
 // RegionSize is how many bytes Upload can hold (as the old plane's region).
 const RegionSize = 0x160000
@@ -526,11 +543,17 @@ func (o *Overlay) compose() {
 		span(o.barY, o.barY+o.barH-1)
 	}
 	dx := o.dotXLocked()
-	radius := 0 // the dot's, worked out once: transform reads the core's status
+	radius, lineW := 0, 0 // the dot's, worked out once: transform reads the core's status
 	if o.dotOn {
 		sx, sy, _, _ := o.transform()
 		radius = int(float64(dotRadius)*min(sx, sy) + 0.5)
-		span(o.dotY-radius, o.dotY+radius)
+		if o.dotLine {
+			radius = int(float64(dotLineHalf)*sy + 0.5)
+			lineW = max(2, int(float64(dotLineW)*sx+0.5))
+			span(o.dotY-radius, o.dotY+radius+2) // and its shadow
+		} else {
+			span(o.dotY-radius, o.dotY+radius)
+		}
 	}
 	if first > last || r.npage == 0 {
 		if !r.overlayDescriptorCurrent(desc{}) {
@@ -582,7 +605,19 @@ func (o *Overlay) compose() {
 				row[x] = 0xFF000000 | o.barRGB
 			}
 		}
-		if o.dotOn {
+		if o.dotOn && o.dotLine {
+			x0 := dx - lineW/2
+			if dy := y - o.dotY - 2; dy >= -radius && dy <= radius {
+				for x := max(0, x0+2); x < min(r.ow, x0+2+lineW); x++ {
+					row[x] = 0xFF000000 // the shadow, under the line where they meet
+				}
+			}
+			if dy := y - o.dotY; dy >= -radius && dy <= radius {
+				for x := max(0, x0); x < min(r.ow, x0+lineW); x++ {
+					row[x] = 0xFF000000 | o.dotRGB
+				}
+			}
+		} else if o.dotOn {
 			if dy := y - o.dotY; dy >= -radius && dy <= radius {
 				half := 0
 				for half*half+dy*dy <= radius*radius {

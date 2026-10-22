@@ -105,3 +105,33 @@ func TestOverlayShakesThePanelsLines(t *testing.T) {
 		}
 	}
 }
+
+// The dot as a line: dotLineHalf rows either side of its centre, dotLineW
+// pixels wide on its x, and the black shadow two pixels right and down.
+func TestOverlayDrawsTheDotAsALine(t *testing.T) {
+	f := newFake(t, false)
+	o := f.r.Overlay()
+	o.SetDotLine(true)
+	const x, y, rgb = 300, 200, 0x00FF00
+	o.Dot(x, y, rgb, true)
+	at := func(px, py int) uint32 { return f.r.pages[f.r.cur][py*W+px] }
+	for _, c := range []struct {
+		x, y int
+		want uint32
+	}{
+		{x, y - dotLineHalf, 0xFF000000 | rgb},
+		{x - dotLineW/2, y + dotLineHalf, 0xFF000000 | rgb},
+		{x, y - dotLineHalf - 1, 0},
+		{x - dotLineW/2 - 1, y, 0},
+		{x - dotLineW/2 + dotLineW + 1, y, 0xFF000000},
+		{x, y + dotLineHalf + 2, 0xFF000000},
+		{x - dotLineW/2 + dotLineW + 2, y, 0},
+	} {
+		if got := at(c.x, c.y); got != c.want {
+			t.Fatalf("pixel %d,%d = %08x, want %08x", c.x, c.y, got, c.want)
+		}
+	}
+	if band := f.lo(wOvlBand); band != uint32(y+dotLineHalf+2)<<16|uint32(y-dotLineHalf) {
+		t.Fatalf("band %x does not cover the line and its shadow", band)
+	}
+}
