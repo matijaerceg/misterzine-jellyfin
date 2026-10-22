@@ -181,9 +181,9 @@ Options lists, in groups:
 - **Skip intro and credits buttons**.
 - **Playback controls**: Standard, or VCR, an old deck's on-screen display:
   block capitals on a blue band, the progress as a row of blocks, and the
-  lines of the controls shaking sideways a little, as on worn tape. The
-  controls work the same in both; the picture and the subtitles do not
-  shake.
+  lines of the controls wavering sideways by a pixel, as a tape's picture
+  did. The controls work the same in both; the picture and the subtitles do
+  not waver.
 - **Video bitrate** (see Sound and playback quality).
 - **Show** and a library's name, one row per library: off leaves it out of
   Home, the menu and search. Shown once the libraries have loaded.

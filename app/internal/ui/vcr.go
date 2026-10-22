@@ -8,8 +8,9 @@ import (
 
 // The VCR look of the playback controls (Options > Playback controls): an
 // old deck's on-screen display, white block capitals with a hard shadow on
-// a flat blue band, the progress as a row of blocks, and every line of it
-// shaking sideways a little as worn tape did (ring.Overlay.SetJitter). The
+// a flat blue band, the progress as a row of blocks, and its lines
+// wavering sideways by a pixel as a tape's picture did
+// (ring.Overlay.SetJitter). The
 // controls work as in the standard look; only the drawing differs. The
 // subtitles and the wait dots keep their own look and stay still.
 var (
@@ -31,7 +32,7 @@ const (
 	vcrBlock               = 6        // a block's width
 	vcrBlockGap            = 2
 	vcrKeyGap              = 22 // between the keys
-	// ShakeFields is how many fields each pattern of the shake holds.
+	// ShakeFields is how many fields each step of the waver holds.
 	ShakeFields = 3
 )
 

@@ -28,32 +28,43 @@ func TestShiftRowContinuesTheEdge(t *testing.T) {
 	}
 }
 
-// The shake stays within a few pixels, repeats for a pattern, and moves on
-// from one pattern to the next.
-func TestJitterShiftsStaySmall(t *testing.T) {
+// The waver stays within a pixel (two at twice the scale), moves from one
+// line to the next by a pixel at most, leaves most lines in place, repeats
+// for a step and moves on from one step to the next.
+func TestJitterShiftsStaySubtle(t *testing.T) {
 	a, b := make([]int, 208), make([]int, 208)
-	changed := false
+	changed, moved, lines := false, 0, 0
 	for gen := uint32(0); gen < 2000; gen++ {
 		jitterShifts(a, gen, 1)
 		jitterShifts(b, gen, 1)
 		if !slices.Equal(a, b) {
-			t.Fatalf("pattern %d is not repeatable", gen)
+			t.Fatalf("step %d is not repeatable", gen)
 		}
 		for y, k := range a {
-			if k < -9 || k > 9 {
-				t.Fatalf("pattern %d shifts line %d by %d", gen, y, k)
+			if k < -1 || k > 1 || y > 0 && (k-a[y-1] > 1 || a[y-1]-k > 1) {
+				t.Fatalf("step %d shifts line %d by %d after %d", gen, y, k, a[max(0, y-1)])
+			}
+			if k != 0 {
+				moved++
+			}
+			lines++
+		}
+		jitterShifts(b, gen, 2)
+		for y, k := range b {
+			if k < -2 || k > 2 {
+				t.Fatalf("step %d at scale 2 shifts line %d by %d", gen, y, k)
 			}
 		}
 		jitterShifts(b, gen+1, 1)
 		changed = changed || !slices.Equal(a, b)
 	}
-	if !changed {
-		t.Fatal("the patterns never change")
+	if !changed || moved == 0 || moved*2 > lines {
+		t.Fatalf("changed %v; %d of %d lines moved, want some and under half", changed, moved, lines)
 	}
 }
 
-// With the shake on, each of the panel's lines lands where the pattern
-// puts it; Shake shows the next pattern; off, the lines are back in place.
+// With the waver on, each of the panel's lines lands where the step puts
+// it; Shake shows the next step; off, the lines are back in place.
 func TestOverlayShakesThePanelsLines(t *testing.T) {
 	f := newFake(t, false)
 	o := f.r.Overlay()
@@ -64,31 +75,33 @@ func TestOverlayShakesThePanelsLines(t *testing.T) {
 		px[i] = uint32(i % W) // each pixel holds its column
 	}
 	column := func(y int) int { return int(f.r.pages[f.r.cur][(top+y)*W+360] & 0xFFFFFF) }
+	want := make([]int, h)
+	moves := func(gen uint32) bool {
+		jitterShifts(want, gen, 1)
+		return slices.ContainsFunc(want, func(k int) bool { return k != 0 })
+	}
 	check := func(gen uint32) {
 		t.Helper()
-		want := make([]int, h)
 		jitterShifts(want, gen, 1)
-		moved := false
 		for y, k := range want {
 			if got := column(y); got != 360-k {
-				t.Fatalf("pattern %d line %d shows column %d at 360, want %d", gen, y, got, 360-k)
+				t.Fatalf("step %d line %d shows column %d at 360, want %d", gen, y, got, 360-k)
 			}
-			moved = moved || k != 0
 		}
-		if !moved {
-			t.Fatalf("pattern %d moved no line", gen)
-		}
+	}
+	for !moves(o.jitterGen) {
+		o.jitterGen++ // a step that moves a line, so the check tells
 	}
 	o.SetJitter(true)
 	o.Show(0, top, panel, nil)
-	check(0)
+	check(o.jitterGen)
 	o.Shake()
-	check(1)
+	check(o.jitterGen)
 	o.SetJitter(false)
 	o.Show(0, top, panel, nil)
 	for y := 0; y < h; y++ {
 		if got := column(y); got != 360 {
-			t.Fatalf("still shaking: line %d shows column %d", y, got)
+			t.Fatalf("still wavering: line %d shows column %d", y, got)
 		}
 	}
 }

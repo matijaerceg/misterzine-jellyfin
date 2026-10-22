@@ -438,19 +438,19 @@ func (o *Overlay) Bar(x, y, w, h int, rgb uint32, on bool) {
 	o.update()
 }
 
-// SetJitter makes the rectangle's lines shake sideways, a pixel or a few
-// each and the sprites on them with them, as an old deck's on-screen
-// display wobbled on worn tape: the VCR look of the playback controls.
-// The video under them stays put. It takes effect at the next change.
+// SetJitter makes the rectangle's lines waver sideways, a pixel at most
+// and the sprites on them with them, as an old deck's picture wavered on
+// tape: the VCR look of the playback controls. The video under them stays
+// put. It takes effect at the next change.
 func (o *Overlay) SetJitter(on bool) {
 	o.r.mu.Lock()
 	defer o.r.mu.Unlock()
 	o.jitter = on
 }
 
-// Shake moves the shake on to its next pattern and shows it, while the
-// rectangle is up and shaking. A dimmed screen holds still: its veil
-// makes every line of the page a compose's work.
+// Shake moves the waver on a step and shows it, while the rectangle is
+// up and wavering. A dimmed screen holds still: its veil makes every line
+// of the page a compose's work.
 func (o *Overlay) Shake() {
 	o.r.mu.Lock()
 	defer o.r.mu.Unlock()
@@ -460,47 +460,22 @@ func (o *Overlay) Shake() {
 	}
 }
 
-// jitterShifts fills shifts, one a line of the rectangle, with pattern
-// gen's sideways shift in raster pixels at s raster pixels a design pixel:
-// a slow wave of about a pixel that drifts from one pattern to the next, a
-// pixel's twitch on some lines, and in one pattern in three a torn band of
-// a few lines pushed further.
+// jitterShifts fills shifts, one a line of the rectangle, with step gen's
+// sideways shift in raster pixels at s raster pixels a design pixel: two
+// slow waves down the lines that crawl a little at each step, their sum
+// under a pixel, swelling and settling over some seconds. A deck's drum
+// speeds up and slows down a little all the time, so its lines waver
+// smoothly from one to the next (ntsc-rs's VHS edge wave is half a pixel
+// by default); rounded to whole pixels, most lines sit in place and some
+// stretches of them one pixel over.
 func jitterShifts(shifts []int, gen uint32, s float64) {
-	g := mix32(gen)
-	tear0, tearN, tearD := -1, 0, 0
-	if g%3 == 0 && len(shifts) > 0 {
-		tear0 = int(g>>12) % len(shifts)
-		tearN = 2 + int(g>>8%7)
-		tearD = 3 + int(g>>20%4)
-		if g&(1<<30) != 0 {
-			tearD = -tearD
-		}
-	}
-	phase := float64(gen) * 0.45
+	t := float64(gen)
+	a := 0.55 + 0.25*math.Sin(t*0.05)
 	for y := range shifts {
-		d := 1.2 * math.Sin(float64(y)*(2*math.Pi/48)+phase)
-		if h := mix32(gen*0x9E3779B9 ^ uint32(y)); h%6 == 0 {
-			if h&64 != 0 {
-				d++
-			} else {
-				d--
-			}
-		}
-		if y >= tear0 && y < tear0+tearN {
-			d += float64(tearD)
-		}
+		fy := float64(y)
+		d := a * (0.7*math.Sin(fy*(2*math.Pi/64)+t*0.12) + 0.3*math.Sin(fy*(2*math.Pi/23)-t*0.08+1.3))
 		shifts[y] = int(math.Round(d * s))
 	}
-}
-
-// mix32 scrambles x (Wellons' lowbias32): the shake's dice.
-func mix32(x uint32) uint32 {
-	x ^= x >> 16
-	x *= 0x7feb352d
-	x ^= x >> 15
-	x *= 0x846ca68b
-	x ^= x >> 16
-	return x
 }
 
 // shiftRow copies src into dst k pixels to the right (left for negative
