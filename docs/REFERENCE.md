@@ -161,8 +161,18 @@ address stays for the next sign-in.
   or show. Another audio track, or a subtitle track the server burns in,
   restarts the stream at the same position; a subtitle track the app draws
   changes without a restart (see Subtitles).
-- **More** holds **Crop**, for a picture wider than 4:3, **Surround downmix
-  boost** and **Subtitle size** (see Display setup, Sound and Subtitles).
+- **More** holds **Crop**, for every picture, **Surround downmix
+  boost** and **Subtitle size** (see Display setup, Sound and Subtitles),
+  then:
+  - **Autoplay next**, for an episode: On or Off with Left, Right or OK. It is
+    the Options setting, saved at once, and decides this playback's end.
+  - **Video bitrate**: Left and Right pick a step of the Options ladder, OK
+    saves it. A transcode restarts at the same position with the new cap; a
+    direct play (marked on the row) keeps playing and uses it next time.
+  - **Playback info**: a read-only page, refreshed every second: direct play
+    or transcode, the picture size and frame rate, the bitrate, the sound and
+    its downmix, the subtitle track, the position, and the decoder's late
+    frames and errors. OK or Back returns to More.
 - Over an intro or credits Jellyfin has marked (its media segments),
   **Skip intro** or **Skip credits** shows for 20 seconds once playback reaches
   them, also after a resume or a seek into them. OK skips to their end; Back
