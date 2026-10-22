@@ -30,10 +30,9 @@ const (
 	vcrShadow    gfx.Color = 0x000000
 	vcrLo        gfx.Color = 0xFFFFFF // keys and values not under the cursor, the episode line
 	vcrOff       gfx.Color = 0x0000FF // keys with nothing to do
-	vcrYellow    gfx.Color = 0xFFFF00 // Play while paused, a marker's blocks
 	vcrBlockOff  gfx.Color = 0xFFFFFF // progress still to come
 	vcrBuffered  gfx.Color = 0x00FFFF // downloaded ahead of the playhead
-	vcrMarkerCol gfx.Color = 0xFFFF00 // an intro or credits marker
+	vcrMarkerCol gfx.Color = 0xFF00FF // an intro or credits marker
 	vcrBarH                = 10       // the progress blocks' height
 	vcrBlock               = 6        // a block's width
 	vcrBlockGap            = 2
@@ -167,9 +166,6 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 		col := vcrLo
 		if i == p.focus && !p.scrub {
 			col = vcrText
-		}
-		if p.paused && osdButtons[i] == "Pause" {
-			col = vcrYellow
 		}
 		if p.dimmed(i) {
 			col = vcrOff
