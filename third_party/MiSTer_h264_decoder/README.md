@@ -104,9 +104,12 @@ USE_DOCKER=1 hps/build_arm.sh                  # the library, h264play, h264stat
 USE_DOCKER=1 clients/moonlight/build.sh        # likewise clients/player, clients/uvc (and clients/jellyfin)
 ```
 
-Copy the `.rbf` to `_Other/` on the SD card and each client's `build/dist/*` to the card's root.
-MisterZine Jellyfin builds and installs its own copy of the core (`release/build_package.py` in
-that repository).
+Copy each client's `build/dist/*` to the card's root. The clients load an `H264` core from
+`_Other/`; the core built here names itself MisterZine Jellyfin, which starts MisterZine
+Jellyfin's app where it is installed, so give them an `H264` core, such as owenb321's upstream
+release. MisterZine Jellyfin packages its own copy of the core as `H264.rbf`
+(`release/build_package.py` in that repository) and installs it in each release's folder,
+`misterzine-jellyfin/releases/<id>/`.
 [Building from source](site/content/about/building.md) has the details.
 
 ## Documentation

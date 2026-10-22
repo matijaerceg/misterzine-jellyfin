@@ -282,7 +282,9 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		if burn != "-1" && src.TranscodingURL == "" {
 			return fmt.Errorf("Jellyfin did not offer a subtitle transcode; check this user's transcoding permissions")
 		}
+		s.mu.Lock() // Direct reads it from the UI thread
 		s.direct = (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == ""
+		s.mu.Unlock()
 		s.fullTimeline = !s.direct && hasFullTimelineHLS(src.TranscodingProtocol, src.TranscodingURL)
 		if s.direct {
 			s.url = p.Client.DirectStreamURL(s.item.ID, src, info.PlaySessionID)
@@ -802,6 +804,14 @@ func (s *Session) suppressStopCancellation(err error) error {
 // ReportsDone closes after this session's stopped report has been sent.
 // UI refreshes can wait in the background before reading resume metadata.
 func (s *Session) ReportsDone() <-chan struct{} { return s.reported }
+
+// Direct reports whether the running stream is the stored file, untranscoded:
+// then the player's duration is exact. It changes on a fallback to a transcode.
+func (s *Session) Direct() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.direct
+}
 
 // SendUI queues a command for the session worker and returns immediately.
 // Repeated seeks coalesce to the newest target, keeping rapid input bounded.

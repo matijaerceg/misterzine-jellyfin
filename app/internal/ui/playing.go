@@ -32,6 +32,7 @@ type Playing struct {
 	queue                  []*jellyfin.Item    // the episodes around it, for Prev and Next
 	idx                    int
 	send                   func(string)
+	direct                 func() bool // whether the stream is direct (Session.Direct); nil reads as a transcode
 	visible                bool
 	shownAt                time.Time
 	closedAt               time.Time     // when Back last cleared the screen: Back rests for BackGrace
@@ -316,15 +317,20 @@ func (p *Playing) status() {
 	if time.Since(p.pausedAt) > 700*time.Millisecond {
 		p.paused = values["state"] == "paused"
 	}
-	p.dur = playingDuration(float64(p.item.Duration), dur)
+	p.dur = playingDuration(float64(p.item.Duration), dur, p.direct != nil && p.direct())
 	p.bufferStart, p.bufferEnd = bufferedInterval(values, p.dur)
 }
 
-// playingDuration is the length the bar shows: the server's for the item
-// when it has one, else the player's. A transcode's container carries the
-// whole item's length again, and the player adds the start offset to it, so
-// after a resume or a seek the player's is the item's plus the offset.
-func playingDuration(item, player float64) float64 {
+// playingDuration is the length the bar shows. A direct stream is the file
+// itself, so the player's length is exact and wins when it has one. A
+// transcode's container carries the whole item's length again, and the
+// player adds the start offset to it, so after a resume or a seek the
+// player's is the item's plus the offset: there the server's length for the
+// item wins when it has one.
+func playingDuration(item, player float64, direct bool) float64 {
+	if direct && player > 0 {
+		return player
+	}
 	if item > 0 {
 		return item
 	}

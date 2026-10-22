@@ -236,11 +236,17 @@ class InstallerTests(unittest.TestCase):
                     mock.patch.object(manager, 'load_menu', return_value=menu) as load_menu:
                 return manager.run(self.root), load_menu
         # Exit to the MiSTer menu: the app only says so, run() loads it.
-        to_menu, load_menu = launch(manager.EXIT_TO_MENU, True)
-        self.assertTrue(to_menu)
-        load_menu.assert_called_once_with(self.card)
-        with self.assertRaisesRegex(RuntimeError, 'Could not return to the MiSTer menu'):
-            launch(manager.EXIT_TO_MENU, False)
+        import io
+        for loaded in (True, False):
+            with mock.patch.object(manager.sys, 'stderr', new_callable=io.StringIO) as err:
+                to_menu, load_menu = launch(manager.EXIT_TO_MENU, loaded)
+            # the Exit status either way: a failure would read as a failed start to the updater
+            self.assertTrue(to_menu)
+            load_menu.assert_called_once_with(self.card)
+            if loaded:
+                self.assertEqual(err.getvalue(), '')
+            else:
+                self.assertIn('Could not return to the MiSTer menu. Use the OSD to leave MisterZine Jellyfin.', err.getvalue())
         to_menu, load_menu = launch(0, True)
         self.assertFalse(to_menu)
         load_menu.assert_not_called()
@@ -321,6 +327,18 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn('private.local', value)
         self.assertIn('&v=1', value)
 
+    def test_names_are_redacted_as_words_and_short_ones_kept(self):
+        text = 'log /tmp/misterzine-jellyfin.log\nuser tv signed in on the tv\nRosalind, Rosalinds, rosalind\nGET /x?k=TESTsecret9&v=1'
+        value = manager.safe_log(text, [('tv', True), ('Rosalind', True), 'TESTsecret9'])
+        self.assertIn('/tmp/misterzine-jellyfin.log', value)
+        self.assertIn('user tv signed in on the tv', value)
+        self.assertIn('[redacted], Rosalinds, [redacted]', value)
+        self.assertNotIn('TESTsecret9', value)
+        self.assertIn('&v=1', value)
+        # a name that is also a path segment leaves the path alone
+        self.assertIn('/media/fat/x', manager.safe_log('/media/fat/x on media', [('media', True)]))
+        self.assertNotIn(' media', manager.safe_log('/media/fat/x on media', [('media', True)]))
+
 
 class ReportTests(unittest.TestCase):
     def setUp(self):
@@ -380,6 +398,17 @@ class ReportTests(unittest.TestCase):
         self.assertIn(evidence, text)
         self.assertNotIn('TESTtoken', text)
         self.assertNotIn('jellyfin.home', text)
+
+    def test_report_redacts_names_as_words(self):
+        (self.root / 'plexcrt.json').write_text(json.dumps({'server_token': 'TESTtoken', 'server_url': 'https://jellyfin.home.example:8096',
+                                                            'user_name': 'tv', 'server_name': 'Rosalind'}))
+        with (self.tmp / 'misterzine-jellyfin.log').open('a') as log:
+            log.write('signed in to Rosalind as tv\nRosalinds stays\nGET https://x.invalid/y?api_key=TESTtoken\nraw TESTtoken\n')
+        text = self.report()
+        self.assertIn('== LOG misterzine-jellyfin.log', text)
+        self.assertIn('signed in to [redacted] as tv', text)
+        self.assertIn('Rosalinds stays', text)
+        self.assertNotIn('TESTtoken', text)
 
     def test_plain_http_server_address_stays_out_of_the_report(self):
         lan = '10.0.0.2'

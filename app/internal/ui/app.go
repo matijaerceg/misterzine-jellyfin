@@ -14,6 +14,7 @@ import (
 	"runtime/debug"
 	"runtime/metrics"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -144,7 +145,14 @@ type App struct {
 	Notice   string
 	NoticeAt time.Time
 	// later holds closures for the render thread (results of background work).
-	later       chan func()
+	later chan func()
+	// held keeps the closures playLoop takes off later while a playback has
+	// the screen, in order, for runLater once the menus are back: a long
+	// autoplay posts one per episode and must not fill the queue.
+	held []func()
+	// laterFull is set once Later has dropped a closure for a full queue
+	// (logged once), and cleared when the queue is drained.
+	laterFull   atomic.Bool
 	seasonData  *seasonData // one selected season, shared with its opening page
 	scr         *gfx.Canvas
 	osd         OSD            // the playback overlay: the core's plane
@@ -493,6 +501,7 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 			break
 		}
 		ctl := NewPlaying(a, it, queue, idx, sess.SendUI)
+		ctl.direct = sess.Direct
 		ctl.pos = float64(offset)
 		if offset < 0 {
 			ctl.pos = float64(it.ViewOffset)
@@ -666,6 +675,7 @@ func (a *App) playLoop(sess *Session, ctl *Playing) (int, bool) {
 				selectionPresented()
 			}
 		case <-tick.C:
+			a.holdLater()
 			if stopped {
 				continue
 			}
@@ -896,10 +906,14 @@ func (a *App) section(key string) (jellyfin.Section, bool) {
 }
 
 // Later queues a closure to run on the render thread before the next frame.
+// A full queue drops it; the first drop until the queue is drained is logged.
 func (a *App) Later(f func()) {
 	select {
 	case a.later <- f:
 	default:
+		if a.laterFull.CompareAndSwap(false, true) && a.Log != nil {
+			a.Log.Printf("render-thread queue full (%d): dropped a background result", cap(a.later))
+		}
 	}
 	select {
 	case a.Wake <- struct{}{}:
@@ -907,13 +921,36 @@ func (a *App) Later(f func()) {
 	}
 }
 
+// runLater runs the closures held during a playback, then the queued ones.
 func (a *App) runLater() {
+	held := a.held
+	a.held = nil
+	for _, f := range held {
+		f()
+		a.dirty = true
+	}
 	for {
 		select {
 		case f := <-a.later:
 			f()
 			a.dirty = true
 		default:
+			a.laterFull.Store(false)
+			return
+		}
+	}
+}
+
+// holdLater empties the queue into held without running anything: playLoop
+// calls it so Later keeps room during a long autoplay, while the closures,
+// which may change the items the playback is using, wait for the menus.
+func (a *App) holdLater() {
+	for {
+		select {
+		case f := <-a.later:
+			a.held = append(a.held, f)
+		default:
+			a.laterFull.Store(false)
 			return
 		}
 	}

@@ -14,7 +14,9 @@ USE_DOCKER=1 ./build_release.sh --compile   # -> releases/H264_<version>_<date>_
 
 `build_release.sh` also runs the build gates (implicit nets, undriven signals, the
 decoder-clock timing gate at both corners, the netlist canary) and packs a **compressed**
-`.rbf`, which MiSTer's loader requires. Copy it to `_Other/` on the SD card.
+`.rbf`, which MiSTer's loader requires. MisterZine Jellyfin's release build packages the
+core as `H264.rbf` in each release, which the app installs in
+`misterzine-jellyfin/releases/<id>/` on the SD card.
 
 Simulation benches run under Icarus Verilog and Verilator: `bench/h264/run_*.sh` (add `--red`
 to prove each bench can fail; `bench/h264/README.md` lists them).
@@ -25,8 +27,10 @@ MisterZine Jellyfin (the app and its player) is built by the MisterZine Jellyfin
 this fork lives in ([its build guide](https://github.com/matijaerceg/misterzine-jellyfin/blob/main/docs/BUILD.md));
 nothing below is part of it. The programs in `clients/` and the client library are ARM programs,
 cross-compiled in their own Docker images. Each client's build writes the SD card's layout
-to its `build/dist/`: copy its contents to the card's root, and put the core you built in
-`_Other/`, where these programs load it from.
+to its `build/dist/`: copy its contents to the card's root. These programs load an `H264`
+core from `_Other/`; the core built here names itself MisterZine Jellyfin, which starts
+MisterZine Jellyfin's app where it is installed
+([The other programs](../getting-started/install.md#the-other-programs)).
 
 ```bash
 USE_DOCKER=1 hps/build_arm.sh               # the library, h264play, h264stat, cavlc2cabac -> hps/build/arm/

@@ -4,7 +4,8 @@
 
 Your program loads the core the way MiSTer's own tools do: it writes a small MGL file and
 sends `load_core` for it through MiSTer's command interface. `h264ring_launch_core` does
-exactly this, and only when `/tmp/CORENAME` does not already say `H264`:
+exactly this, and only when `/tmp/CORENAME` does not already say `H264` or
+`MisterZine Jellyfin`:
 
 ```xml
 <mistergamedescription>

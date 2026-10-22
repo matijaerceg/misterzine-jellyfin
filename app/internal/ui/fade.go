@@ -242,12 +242,20 @@ func (f *Fade) cancel() {
 
 // Done cancels the worker and waits for it, so the pages may be reused.
 func (f *Fade) Done() {
+	f.halt()
+	f.start = time.Time{}
+}
+
+// halt stops the worker and waits for it. Waiting without stopping it
+// first can hang: a worker parked until Frame moves past a canvas's step
+// (a presenter that fell behind, or a fade Frame already ended) only
+// leaves on stop.
+func (f *Fade) halt() {
 	if f.stop != nil {
 		close(f.stop)
 		f.stop = nil
 	}
 	f.wg.Wait()
-	f.start = time.Time{}
 }
 
 // Transitioning keeps late artwork from replacing an in-progress layout change.

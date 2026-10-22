@@ -8,7 +8,8 @@ releases ([Watching from a Jellyfin server](../using/jellyfin.md)).
    describes. It installs the app and this core together, in `misterzine-jellyfin/` on the
    SD card, and adds **MisterZine Jellyfin** to the main menu.
 2. Open that entry. It loads the core and starts the app; updates from the app's
-   **Options** replace both together.
+   **Options** replace both together. Each release keeps its own copy of the core, as
+   `misterzine-jellyfin/releases/<id>/H264.rbf`.
 
 ## The other programs
 
@@ -25,8 +26,11 @@ root of the SD card, which places its script in `Scripts/` and its folder beside
   ([Showing a USB camera](../using/camera.md)).
 
 These programs load the core from `_Other/` (the `H264*.rbf` there that sorts last by
-name), not from
-MisterZine Jellyfin's folder, so put a core built from the same source in `_Other/` as well.
+name), not from MisterZine Jellyfin's folder, and accept a core that names itself `H264`,
+as owenb321's upstream core does, or **MisterZine Jellyfin**. The core built from this
+source names itself **MisterZine Jellyfin**, and on a card where MisterZine Jellyfin is
+installed, loading a core of that name starts the app, which loads its own copy of the core
+in place of the program's. So put an `H264` core in `_Other/` for them.
 Run a program from **Scripts**; it loads the core itself when it starts playing.
 
 ## Version check

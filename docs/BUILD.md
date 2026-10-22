@@ -83,7 +83,7 @@ it is not a desktop media player. Unit tests can run on a Linux desktop.
 
 The font atlases in `app/internal/gfx/fonts` are committed and embedded in the
 build. `app/tools/genatlas.ps1` generates them on Windows from the installed
-Roboto, Roboto Medium, Roboto Black and Roboto Condensed fonts
+Roboto and Roboto Medium fonts
 (`powershell -File app\tools\genatlas.ps1`); run it only to change a face or
 size, and keep every atlas the app loads by name.
 

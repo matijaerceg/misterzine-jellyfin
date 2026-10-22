@@ -39,7 +39,7 @@ press Y for another audio track.
 
 MisterZine Jellyfin releases do not include the player: build it and copy its
 `Scripts/h264player.sh` and `h264player/` folder to the root of the SD card (`/media/fat/`), with
-the core in `_Other/` ([The other programs](../getting-started/install.md#the-other-programs)).
+an `H264` core in `_Other/` ([The other programs](../getting-started/install.md#the-other-programs)).
 
 ## Where the videos go
 

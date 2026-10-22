@@ -59,7 +59,7 @@ func (v *Show) tracePublished() {
 			t.Count++
 		}
 		if !v.pacedTransition() {
-			v.fade.wg.Wait() // read worker-owned timestamps only after completion
+			v.fade.halt() // read worker-owned timestamps only once it has stopped
 			data, _ := json.Marshal(t)
 			v.app.Log.Printf("transition trace %s", data)
 			v.trace, v.fade.trace = nil, nil
