@@ -246,7 +246,7 @@ func TestPlayingSubtitleTiming(t *testing.T) {
 	}
 }
 
-// More > Subtitle size saves the size and repaints the subtitle larger,
+// More > Subtitle size, stepped with Right, saves the size and repaints the subtitle larger,
 // without a word to the session.
 func TestSubtitleSizeFromMoreRepaintsWithoutRestart(t *testing.T) {
 	p, c, sent, now := subtitledPlaying(t)
@@ -270,18 +270,15 @@ func TestSubtitleSizeFromMoreRepaintsWithoutRestart(t *testing.T) {
 		t.Fatalf("More: %+v", p.list)
 	}
 	p.list.cur = row
-	pressPlay(p, input.Enter)
-	if p.list == nil || p.list.kind != "Subtitle size" || p.list.set != 0 {
-		t.Fatalf("Subtitle size list: %+v", p.list)
-	}
-	pressPlay(p, input.Down, input.Enter)
-	if p.list != nil || p.app.Cfg.SubtitleSize != 150 || LoadConfig(p.app.Cfg.path).SubtitleSizeValue() != 150 {
-		t.Fatalf("Large chosen: list %+v, size %d", p.list, p.app.Cfg.SubtitleSize)
+	pressPlay(p, input.Right)
+	if p.list == nil || p.list.kind != "More" || p.list.vals[row] != "Large" ||
+		p.app.Cfg.SubtitleSize != 150 || LoadConfig(p.app.Cfg.path).SubtitleSizeValue() != 150 {
+		t.Fatalf("Right to Large: list %+v, size %d", p.list, p.app.Cfg.SubtitleSize)
 	}
 	if len(*sent) != 0 {
 		t.Fatalf("the size change sent %q", *sent)
 	}
-	pressPlay(p, input.Back) // the controls go
+	pressPlay(p, input.Back, input.Back) // More, then the controls go
 	tickAt(p, c, now.Add(time.Second))
 	p.painter.flush()
 	if !isSubtitleKey(p.last) || c.showH <= normal {

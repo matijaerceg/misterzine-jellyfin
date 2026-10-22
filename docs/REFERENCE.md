@@ -161,8 +161,11 @@ address stays for the next sign-in.
   or show. Another audio track, or a subtitle track the server burns in,
   restarts the stream at the same position; a subtitle track the app draws
   changes without a restart (see Subtitles).
-- **More** holds **Crop**, for every picture, **Surround downmix
-  boost** and **Subtitle size** (see Display setup, Sound and Subtitles),
+- **More** is one list with no pages behind it: Left and Right change the
+  value of the row under the cursor in place, shown by the small arrows
+  either side of it, and stop at the first and last choice. It holds
+  **Crop**, for every picture, **Downmix boost** and **Subtitle size** (see
+  Display setup, Sound and Subtitles), each applied as soon as it changes,
   then:
   - **Autoplay next**, for an episode: On or Off with Left, Right or OK. It is
     the Options setting, saved at once, and decides this playback's end.
@@ -280,8 +283,8 @@ twice more, then gives up and shows none; turning subtitles off and on again
 asks once more.
 
 **Options > Subtitle size** chooses Normal, Large (150%) or Extra large (200%)
-and is saved for future playback. During playback, **More > Subtitle size**
-changes the same setting at once.
+and is saved for future playback. During playback, Left and Right on
+**More > Subtitle size** change the same setting at once.
 
 Picture subtitles (PGS, VobSub, DVB) are burned into the picture by Jellyfin.
 The server must transcode the video for that, so it needs permission to
@@ -319,8 +322,8 @@ Sound is decoded on the MiSTer and folded to stereo. A plain fold of a
 surround track comes out noticeably quieter than a stereo track, so
 **Surround downmix boost** raises the level of surround sources: Off, Small or
 Large (the default), with loud peaks softened rather than clipped. Stereo
-tracks are passed through unchanged. **More > Downmix boost** in the
-playback controls changes it without restarting the video.
+tracks are passed through unchanged. Left and Right on **More > Downmix
+boost** in the playback controls change it without restarting the video.
 
 ### Update, rollback and remove
 
@@ -449,8 +452,8 @@ widescreen on 4:3 sets: thin bars remain and little is lost. **Fill** cuts
 whatever overhangs the screen, so there are no bars: a 16:9 picture on a 4:3
 screen loses a quarter of its width. A crop can cut the ends of long subtitle
 lines burned in by the server, but not subtitles the app draws. Each playback
-starts with this setting; **More > Crop** in the playback controls changes it
-for that playback, including the episodes that follow it, and the change shows
+starts with this setting; Left and Right on **More > Crop** in the playback
+controls change it for that playback, including the episodes that follow it, and the change shows
 at once.
 
 For HDMI scaling, MiSTer INI sections and refresh rates, see
