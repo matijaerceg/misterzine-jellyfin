@@ -177,7 +177,11 @@ func (p *Playing) waitPanel(frame int, strip *gfx.Canvas, stripAlpha []byte) (c 
 	}
 	c, alpha = p.waitCanvas, p.waitAlpha
 	clear(alpha)
-	p.wait.draw(c, alpha, w/2, WaitDotY-waitTop, frame)
+	if p.app.Cfg.vcr() {
+		p.wait.drawVCR(c, alpha, w/2, WaitDotY-waitTop, frame)
+	} else {
+		p.wait.draw(c, alpha, w/2, WaitDotY-waitTop, frame)
+	}
 	if strip != nil {
 		top := h - strip.H
 		copy(c.Pix[top*w*4:], strip.Pix[:strip.W*strip.H*4])

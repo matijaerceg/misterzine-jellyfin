@@ -916,7 +916,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 				p.last = ""
 			}
 		}
-		p.setJitter(osd, false)
+		p.setJitter(osd, p.wait != nil) // the VCR blocks waver, the subtitles stay put
 		if p.wait == nil {
 			p.showSubtitle(osd, lines)
 		}

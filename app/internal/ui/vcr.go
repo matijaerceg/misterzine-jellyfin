@@ -199,6 +199,37 @@ func (p *Playing) inMarker(t float64) bool {
 	return false
 }
 
+// vcrDotSize is a wait block's side, in pixels: an even number of lines,
+// its shadow inside the dots' box.
+const vcrDotSize = 12
+
+// drawVCR is draw in the VCR look: three blocks, the one the swell is
+// nearest lit white and the others the progress blocks' blue, the light
+// stepping from block to block as a deck's display did, with no swell.
+func (d *waitDot) drawVCR(c *gfx.Canvas, alpha []byte, cx, cy, frame int) {
+	lit := (frame + waitSlots/2) / waitSlots
+	for i := range 3 {
+		col := vcrBlockOff
+		if i == lit {
+			col = vcrWhite
+		}
+		x0, y0 := cx+(i-1)*d.gap-vcrDotSize/2, cy-vcrDotSize/2
+		c.Fill(x0+2, y0+2, vcrDotSize, vcrDotSize, vcrShadow)
+		c.Fill(x0, y0, vcrDotSize, vcrDotSize, col)
+		opaque(alpha, c.W, c.H, x0+2, y0+2, vcrDotSize)
+		opaque(alpha, c.W, c.H, x0, y0, vcrDotSize)
+	}
+}
+
+// opaque marks an n x n square at x0, y0 of a w x h alpha plane drawn.
+func opaque(alpha []byte, w, h, x0, y0, n int) {
+	for y := max(0, y0); y < min(h, y0+n); y++ {
+		for x := max(0, x0); x < min(w, x0+n); x++ {
+			alpha[y*w+x] = 255
+		}
+	}
+}
+
 // vcrRunningTime draws the time the scrub dot stands for, centred in the
 // room composeStaticVCR left for it.
 func (p *Playing) vcrRunningTime(c *gfx.Canvas) {

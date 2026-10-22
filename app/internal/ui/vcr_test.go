@@ -164,3 +164,45 @@ func TestVCRWithoutTheBandIsClearBetweenItsText(t *testing.T) {
 		t.Fatal("VCR, no band is not a VCR look")
 	}
 }
+
+// In the VCR look the wait dots are three blocks, one lit white at a
+// time, stepping left to right; the panel is drawn only where they are,
+// and they waver with the controls.
+func TestVCRWaitBlocksStep(t *testing.T) {
+	p := waitPlaying(t)
+	p.app.Cfg.PlaybackLook = "vcr"
+	o := &shakeOSD{}
+	p.Tick(time.Now(), o, true)
+	p.painter.flush()
+	if p.wait == nil || p.last != "wait" {
+		t.Fatalf("no wait shown: %q", p.last)
+	}
+	if j, _ := o.seen(); !slices.Equal(j, []bool{true}) {
+		t.Fatalf("the wait blocks' jitter %v, want [true]", j)
+	}
+	lit := func(frame int) int {
+		c, alpha, _ := p.waitPanel(frame, nil, nil)
+		n, at := 0, -1
+		for i := range 3 {
+			x, y := c.W/2+(i-1)*p.wait.gap, WaitDotY-waitTop
+			o := (y*c.W + x) * 4
+			if alpha[y*c.W+x] != 255 {
+				t.Fatalf("frame %d: block %d not drawn", frame, i)
+			}
+			if gfx.Color(c.Pix[o+2])<<16|gfx.Color(c.Pix[o+1])<<8|gfx.Color(c.Pix[o]) == vcrWhite {
+				n, at = n+1, i
+			}
+		}
+		if n != 1 {
+			t.Fatalf("frame %d: %d blocks lit", frame, n)
+		}
+		if alpha[0] != 0 || alpha[c.W/2+p.wait.gap/2] != 0 {
+			t.Fatalf("frame %d: the panel is drawn between the blocks", frame)
+		}
+		return at
+	}
+	if lit(0) != 0 || lit(waitSlots) != 1 || lit(2*waitSlots) != 2 {
+		t.Fatal("the light does not step left to right")
+	}
+	<-p.closePainter(o)
+}
