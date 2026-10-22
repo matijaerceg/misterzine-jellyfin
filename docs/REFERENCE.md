@@ -293,7 +293,8 @@ transcode is also made smaller, so the bits go further: 854x480 at 1 and
 2 Mbps, 640x360 at 0.4 Mbps. That costs little on a 480i or 576i screen. A file
 whose video is above the chosen bitrate is never streamed as stored; it is
 transcoded to that bitrate. Start low on Wi-Fi and raise it while playback
-stays smooth.
+stays smooth. The first run of a release with the decoder core sets it to the top value;
+change it afterwards and it stays.
 
 Sound is decoded on the MiSTer and folded to stereo. A plain fold of a
 surround track comes out noticeably quieter than a stereo track, so
