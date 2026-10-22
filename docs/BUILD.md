@@ -104,20 +104,29 @@ in [distribution](../release/DISTRIBUTION.md).
 
 ## Development install
 
-Use a separate directory on the MiSTer's SD card. Copy `plexcrt`, `jfplay`, and
-`ffmpeg` into it and make them executable. `ffmpeg` decodes show theme music, so
-the preflight requires it alongside the app.
+An installed release keeps its own core: `release/manager.py` installs a
+package into `misterzine-jellyfin/releases/<id>/`, beside `plexcrt`, `jfplay`
+and `ffmpeg`, as `H264.rbf`, and loads that file itself before starting the
+app (`ensure_selected_core`, through an internal MGL at the card root). Nothing
+goes in `_Other`.
 
-Install an H.264 core built from this repository's fork in
-`third_party/MiSTer_h264_decoder` (see [distribution](../release/DISTRIBUTION.md))
-in the SD card's `_Other` folder as `H264.rbf`. See its [launch instructions](../third_party/MiSTer_h264_decoder/site/content/integrating/launch.md).
-By default the app loads the `_Other/H264` core through an MGL. An optional
-`MISTERZINE_H264_RBF` override is an MGL core name such as `_Other/H264`, relative
-to the SD root and without the `.rbf` extension.
+To try a build the way users get it, package it (see
+[distribution](../release/DISTRIBUTION.md); `build_package.py` takes the core
+with `--rbf` and accepts only a qualified, committed `jf-` core with its Quartus
+manifest), extract the ZIP to the SD card root and run
+`python3 /media/fat/misterzine-jellyfin-beta/manager.py install`. The release
+becomes current, the previous one stays for Rollback, and MisterZine Jellyfin
+on the main menu starts it.
 
-Run `./plexcrt -check` on the device to check the application files, then
-`./plexcrt` to load the core and sign in on screen. Configuration and cached
-artwork are stored alongside the executable. Keep account files private.
+To try a freshly built core or app without packaging, use a separate directory
+on the SD card. Copy `plexcrt`, `jfplay` and `ffmpeg` into it and make them
+executable (`ffmpeg` decodes show theme music, so the preflight requires it),
+and copy the core anywhere on the card. Set `MISTERZINE_H264_RBF` to the core's
+path relative to the SD root without `.rbf` (for example `dev/H264` for
+`/media/fat/dev/H264.rbf`); without it the app loads `_Other/H264`. Run
+`./plexcrt -check` to check the application files, then `./plexcrt` to load the
+core and sign in on screen. Configuration and cached artwork are stored
+alongside the executable. Keep account files private.
 
 Switching to another core stops the app and playback worker. Their shared-memory
 mappings outlive FPGA reconfiguration, so they check MiSTer's core name and the
