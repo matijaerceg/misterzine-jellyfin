@@ -140,9 +140,10 @@ address stays for the next sign-in.
   unless paused. Down closes them.
 - Back steps out one level at a time. The first Back clears what is on screen:
   a list, the scrubber, the seek strip, a skip button or the controls. With
-  nothing on screen, the next Back stops playback. A Back within a second of
-  something leaving the screen by itself is ignored, so it does not stop the
-  video by surprise.
+  nothing on screen, the next Back stops playback. A second Back within half
+  a second of the one that cleared the screen is ignored, so a double press
+  does not stop the video by surprise; what leaves the screen by itself, such
+  as the controls hiding, leaves the next Back free to stop.
 - Up opens the scrubber. A tap of Left or Right moves the dot ten seconds; a
   hold runs it, speeding up after half a second. The seek goes on its own
   400 ms after the last release; OK sends it at once. Down returns to the

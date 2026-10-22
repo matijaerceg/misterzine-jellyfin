@@ -40,7 +40,9 @@ func TestBackRestsAfterTheOverlayGoes(t *testing.T) {
 	}
 }
 
-func TestBackRestsAfterTheOverlayTimesOut(t *testing.T) {
+// The rest is only after a Back of the user's own: what goes away by itself
+// leaves the next Back free to stop the playback.
+func TestBackStopsRightAfterTheOverlayTimesOut(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}
 	now := time.Now()
@@ -51,16 +53,12 @@ func TestBackRestsAfterTheOverlayTimesOut(t *testing.T) {
 	if p.visible {
 		t.Fatal("the controls did not time out")
 	}
-	if keyAt(p, c, input.Back, now.Add(200*time.Millisecond)) {
-		t.Fatal("Back just as the controls timed out stopped the playback")
-	}
-	// a press long after anything was on screen stops at once
-	if !keyAt(p, c, input.Back, now.Add(5*time.Second)) {
-		t.Fatal("Back with nothing on screen did not stop the playback")
+	if !keyAt(p, c, input.Back, now.Add(200*time.Millisecond)) {
+		t.Fatal("Back just as the controls timed out did not stop the playback")
 	}
 }
 
-func TestBackRestsAfterTheSeekStripGoes(t *testing.T) {
+func TestBackStopsRightAfterTheSeekStripGoes(t *testing.T) {
 	p := waitPlaying(t)
 	c := &coreOSD{}
 	now := time.Now()
@@ -80,8 +78,8 @@ func TestBackRestsAfterTheSeekStripGoes(t *testing.T) {
 		}
 		now = now.Add(16683 * time.Microsecond)
 	}
-	if keyAt(p, c, input.Back, now.Add(100*time.Millisecond)) {
-		t.Fatal("Back just as the strip went stopped the playback")
+	if !keyAt(p, c, input.Back, now.Add(100*time.Millisecond)) {
+		t.Fatal("Back just as the strip went did not stop the playback")
 	}
 }
 

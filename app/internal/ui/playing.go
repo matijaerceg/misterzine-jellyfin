@@ -16,8 +16,8 @@ import (
 // Playing drives the overlay while a video plays: OK opens it, Up opens
 // it on the timeline, Down and Back step out of it a level at a time (the
 // timeline, then the buttons; Down keeps a scrub, Back drops it), Back
-// stops once it is closed (not within BackGrace of anything on screen
-// going away), left and right seek ten seconds with
+// stops once it is closed (not within BackGrace of a Back that cleared
+// the screen), left and right seek ten seconds with
 // it closed (a slim peek of the bar and the times shows the jump) and move
 // along its buttons with it open. It hides itself after a few seconds
 // unless paused. Audio and Subtitles
@@ -34,7 +34,7 @@ type Playing struct {
 	send                   func(string)
 	visible                bool
 	shownAt                time.Time
-	closedAt               time.Time     // when the overlay last left the screen: Back rests for BackGrace
+	closedAt               time.Time     // when Back last cleared the screen: Back rests for BackGrace
 	peekAt                 time.Time     // a closed-overlay seek: the bar and times peek until OsdFlash
 	peekH                  int           // the peek's height, from the last compose
 	peekFor                time.Duration // how long the peek stays after peekAt; 0 means OsdFlash
@@ -226,7 +226,7 @@ const (
 	OsdH        = 480 - OsdY // panel background reaches the output edge
 	OsdAlpha    = 200
 	OsdHide     = 4 * time.Second
-	BackGrace   = time.Second             // after the overlay goes, Back does not stop the playback
+	BackGrace   = 500 * time.Millisecond  // after a Back clears the screen, Back does not stop the playback
 	OsdFlash    = 2 * time.Second         // how long a closed-overlay seek shows the bar
 	OsdLinger   = 3500 * time.Millisecond // how long the start strip stays over the picture
 	OsdBtnGap   = 30
@@ -807,22 +807,25 @@ func (p *Playing) Key(ev input.Event, now time.Time) bool {
 		if p.peeking(now) {
 			p.peekAt = time.Time{}
 			p.scrub, p.held, p.armed = false, 0, false
+			p.closedAt = now
 			p.dirty = true
 			return false
 		}
 		if p.skipShown(now) {
 			p.skipOff = true // dismiss the skip button
+			p.closedAt = now
 			p.dirty = true
 			return false
 		}
 		if p.visible {
 			p.visible = false
 			p.scrub = false
+			p.closedAt = now
 			p.dirty = true
 			return false
 		}
 		if now.Sub(p.closedAt) < BackGrace {
-			return false // meant for what just went away, not for the film
+			return false // a second press of the one that cleared the screen
 		}
 		return true
 	}
@@ -911,9 +914,6 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		// nothing else up: the drawn subtitles, if any are showing now
 		lines := p.subtitleLines(now)
 		if p.dirty {
-			if p.last != "" && p.last != "wait" && !isSubtitleKey(p.last) {
-				p.closedAt = now // something just left the screen: Back rests for BackGrace
-			}
 			osd.Dot(0, 0, 0, false)
 			osd.Bar(0, 0, 0, 0, 0, false)
 			p.dirty = false
