@@ -174,7 +174,7 @@ address stays for the next sign-in.
     its downmix, the subtitle track, the position, and the decoder's late
     frames and errors. OK or Back returns to More.
 - Over an intro or credits Jellyfin has marked (its media segments),
-  **Skip intro** or **Skip credits** shows for 20 seconds once playback reaches
+  **Skip intro** or **Skip credits** shows at the lower right for 20 seconds once playback reaches
   them, also after a resume or a seek into them. OK skips to their end; Back
   dismisses the button. Options can turn the buttons off.
 - When an episode plays to its end, the next one in the season is shown for
