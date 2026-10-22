@@ -219,7 +219,7 @@ func (c *Client) ShowEpisodes(ctx context.Context, showID string) ([]*Item, erro
 // ShowAspect is the picture aspect of a show's first episode, 0 when the
 // server has not measured it: one small request per show.
 func (c *Client) ShowAspect(ctx context.Context, showID string) (float64, error) {
-	items, err := c.Items(ctx, "/Shows/"+url.PathEscape(showID)+"/Episodes", url.Values{"fields": {"Width,Height"}}, 1)
+	items, err := c.Items(ctx, "/Shows/"+url.PathEscape(showID)+"/Episodes", url.Values{"fields": {"Width,Height,MediaStreams"}}, 1)
 	if err != nil || len(items) == 0 {
 		return 0, err
 	}
@@ -228,10 +228,12 @@ func (c *Client) ShowAspect(ctx context.Context, showID string) (float64, error)
 
 // FirstEpisodeAspects is the picture aspect of every show in a TV library
 // with an episode 1 of some season, keyed by show id and taken from its
-// lowest season: one request for the whole library.
+// lowest season: one request for the whole library. The streams come too:
+// a DVD rip's pixels are 720x480 whatever its picture, and only the
+// stream's aspect ratio says which shape the player shows.
 func (c *Client) FirstEpisodeAspects(ctx context.Context, section string) (map[string]float64, error) {
 	q := url.Values{"parentId": {section}, "recursive": {"true"}, "includeItemTypes": {"Episode"},
-		"indexNumber": {"1"}, "fields": {"Width,Height"}, "enableImages": {"false"}}
+		"indexNumber": {"1"}, "fields": {"Width,Height,MediaStreams"}, "enableImages": {"false"}}
 	items, err := c.all(ctx, "/Items", q)
 	if err != nil {
 		return nil, err
