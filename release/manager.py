@@ -1292,7 +1292,6 @@ def system_facts(root, secrets, proc_root=Path('/proc'), altcfg=read_altcfg):
                            'bitrate': cfg.get('bitrate'), 'progressive': cfg.get('progressive')}
     except (OSError, ValueError):
         pass
-    facts['decoder_present'] = (root / 'ffmpeg').is_file() and os.access(root / 'ffmpeg', os.X_OK)
     try:
         state = read_state(root)
         folder = root / 'releases' / state['current']
