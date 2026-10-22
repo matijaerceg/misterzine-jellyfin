@@ -29,6 +29,7 @@ type Config struct {
 	Bitrate            int      `json:"bitrate"`                 // transcode cap in kbit/s; 0 is the default
 	AudioBoost         int      `json:"audio_boost,omitempty"`   // surround downmix gain; 0 is the default
 	SubtitleSize       int      `json:"subtitle_size,omitempty"` // drawn text subtitles, a percentage (SubtitleSizes); 0 is Normal
+	PlaybackLook       string   `json:"playback_look,omitempty"` // the playback controls' look (PlaybackLooks); "" is Standard
 	Geometry           Geometry `json:"geometry"`                // where video goes on the raster (menus ignore it)
 	Crop               Crop     `json:"crop,omitempty"`          // what each playback starts cropping; nothing saved is off
 	ShowBeta           bool     `json:"show_beta_features"`      // show (and run) the features still in beta
@@ -185,6 +186,26 @@ func (c *Config) SubtitleSizeValue() int {
 	}
 	return 100
 }
+
+// PlaybackLooks are the looks of the playback controls: the app's own,
+// and an old deck's blocky on-screen display that shakes like worn tape
+// (vcr.go).
+var PlaybackLooks = []struct {
+	Label string
+	Value string
+}{{"Standard", ""}, {"VCR", "vcr"}}
+
+func (c *Config) playbackLookIndex() int {
+	for i, l := range PlaybackLooks {
+		if l.Value == c.PlaybackLook {
+			return i
+		}
+	}
+	return 0
+}
+
+// vcr reports whether the playback controls take the VCR look.
+func (c *Config) vcr() bool { return c.PlaybackLook == "vcr" }
 
 func (c *Config) subtitleSizeIndex() int {
 	for i, s := range SubtitleSizes {

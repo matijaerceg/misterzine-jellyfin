@@ -179,6 +179,11 @@ Options lists, in groups:
   missing from the filtered view or shown in it wrongly.
 - **Autoplay next episode**: the countdown into the next episode.
 - **Skip intro and credits buttons**.
+- **Playback controls**: Standard, or VCR, an old deck's on-screen display:
+  block capitals on a blue band, the progress as a row of blocks, and the
+  lines of the controls shaking sideways a little, as on worn tape. The
+  controls work the same in both; the picture and the subtitles do not
+  shake.
 - **Video bitrate** (see Sound and playback quality).
 - **Show** and a library's name, one row per library: off leaves it out of
   Home, the menu and search. Shown once the libraries have loaded.

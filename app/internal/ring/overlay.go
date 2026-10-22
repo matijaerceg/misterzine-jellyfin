@@ -1,6 +1,7 @@
 package ring
 
 import (
+	"math"
 	"time"
 	"unsafe"
 
@@ -50,6 +51,10 @@ type Overlay struct {
 	row          []uint32
 	batchDepth   int
 	batchDirty   bool
+
+	jitter    bool   // the rectangle's lines shake sideways (SetJitter)
+	jitterGen uint32 // the shake's pattern, moved on by Shake
+	shifts    []int  // each of the rectangle's lines' shift, for compose
 }
 
 const dotRadius = 7
@@ -433,6 +438,94 @@ func (o *Overlay) Bar(x, y, w, h int, rgb uint32, on bool) {
 	o.update()
 }
 
+// SetJitter makes the rectangle's lines shake sideways, a pixel or a few
+// each and the sprites on them with them, as an old deck's on-screen
+// display wobbled on worn tape: the VCR look of the playback controls.
+// The video under them stays put. It takes effect at the next change.
+func (o *Overlay) SetJitter(on bool) {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	o.jitter = on
+}
+
+// Shake moves the shake on to its next pattern and shows it, while the
+// rectangle is up and shaking. A dimmed screen holds still: its veil
+// makes every line of the page a compose's work.
+func (o *Overlay) Shake() {
+	o.r.mu.Lock()
+	defer o.r.mu.Unlock()
+	o.jitterGen++
+	if o.jitter && o.on && o.r.dim == 0 {
+		o.update()
+	}
+}
+
+// jitterShifts fills shifts, one a line of the rectangle, with pattern
+// gen's sideways shift in raster pixels at s raster pixels a design pixel:
+// a slow wave of about a pixel that drifts from one pattern to the next, a
+// pixel's twitch on some lines, and in one pattern in three a torn band of
+// a few lines pushed further.
+func jitterShifts(shifts []int, gen uint32, s float64) {
+	g := mix32(gen)
+	tear0, tearN, tearD := -1, 0, 0
+	if g%3 == 0 && len(shifts) > 0 {
+		tear0 = int(g>>12) % len(shifts)
+		tearN = 2 + int(g>>8%7)
+		tearD = 3 + int(g>>20%4)
+		if g&(1<<30) != 0 {
+			tearD = -tearD
+		}
+	}
+	phase := float64(gen) * 0.45
+	for y := range shifts {
+		d := 1.2 * math.Sin(float64(y)*(2*math.Pi/48)+phase)
+		if h := mix32(gen*0x9E3779B9 ^ uint32(y)); h%6 == 0 {
+			if h&64 != 0 {
+				d++
+			} else {
+				d--
+			}
+		}
+		if y >= tear0 && y < tear0+tearN {
+			d += float64(tearD)
+		}
+		shifts[y] = int(math.Round(d * s))
+	}
+}
+
+// mix32 scrambles x (Wellons' lowbias32): the shake's dice.
+func mix32(x uint32) uint32 {
+	x ^= x >> 16
+	x *= 0x7feb352d
+	x ^= x >> 15
+	x *= 0x846ca68b
+	x ^= x >> 16
+	return x
+}
+
+// shiftRow copies src into dst k pixels to the right (left for negative
+// k), the end it uncovers continuing src's edge pixel: a panel that spans
+// the raster keeps its background to the edge.
+func shiftRow(dst, src []uint32, k int) {
+	n := len(dst)
+	switch {
+	case k == 0 || n == 0:
+		copy(dst, src)
+	case k > 0:
+		k = min(k, n)
+		copy(dst[k:], src[:n-k])
+		for x := range dst[:k] {
+			dst[x] = src[0]
+		}
+	default:
+		k = min(-k, n)
+		copy(dst[:n-k], src[k:])
+		for x := n - k; x < n; x++ {
+			dst[x] = src[n-1]
+		}
+	}
+}
+
 // compose draws the rectangle, the bar and the dot into the page not on
 // screen and flips to it; with none of them visible it hides the overlay.
 // Called with r.mu held.
@@ -476,6 +569,15 @@ func (o *Overlay) compose() {
 		return
 	}
 	page := r.pages[p]
+	jit := o.jitter && o.on
+	if jit {
+		if cap(o.shifts) < o.h {
+			o.shifts = make([]int, o.h)
+		}
+		o.shifts = o.shifts[:o.h]
+		sx, _, _, _ := o.transform()
+		jitterShifts(o.shifts, o.jitterGen, sx)
+	}
 	for y := first; y <= last; y++ {
 		row := o.row
 		if o.opaque {
@@ -539,7 +641,12 @@ func (o *Overlay) compose() {
 				row[x] = alpha<<24 | red<<16 | green<<8 | blue
 			}
 		}
-		copy(page[y*(r.ostride/4):y*(r.ostride/4)+r.ow], row)
+		dst := page[y*(r.ostride/4) : y*(r.ostride/4)+r.ow]
+		if jit && y >= o.y && y < o.y+o.h {
+			shiftRow(dst, row, o.shifts[y-o.y])
+		} else {
+			copy(dst, row)
+		}
 	}
 	r.describe(p, first, last)
 	o.drawnDotX, o.drawnDotSet = dx, true

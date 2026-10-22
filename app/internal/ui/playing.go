@@ -4,6 +4,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"plexcrt/internal/gfx"
@@ -110,6 +111,11 @@ type Playing struct {
 	// panelKey's last answer and what it was made from
 	panelFor  panelState
 	panelText string
+	// the VCR look's shake (vcr.go): whether what is up shakes, the fields
+	// counted towards the next pattern, and a shake waiting on the painter
+	jittering bool
+	shakeTick int
+	shaking   atomic.Bool
 }
 
 // panelState is what panelKey describes, kept to compare every field.
@@ -142,6 +148,10 @@ type listMode struct {
 
 // closePainter stops further overlay work and hides the OSD after playback ends.
 func (p *Playing) closePainter(osd OSD) <-chan struct{} {
+	if j, ok := osd.(jitterer); ok && p.jittering {
+		j.SetJitter(false) // the overlay outlives the playback
+		p.jittering = false
+	}
 	if p.painter != nil {
 		p.painter.close(osd)
 		if sized, ok := osd.(interface{ SetCanvasSize(int, int) }); ok {
@@ -888,6 +898,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		p.peekAt = time.Time{}
 		p.dirty = true
 	}
+	p.shake(osd, field)
 	peek := p.peeking(now)
 	skipBtn := p.skipShown(now)
 	if !p.visible && !skipBtn && !peek {
@@ -905,6 +916,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 				p.last = ""
 			}
 		}
+		p.setJitter(osd, false)
 		if p.wait == nil {
 			p.showSubtitle(osd, lines)
 		}
@@ -933,6 +945,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 			moved = true
 		}
 		if moved || p.last != "list" {
+			p.setJitter(osd, true)
 			p.last = "list"
 			off := (l.at - l.base) * OsdListW * 4
 			p.painter.do(func() { osd.ShowAt(0, SafeY, OsdListW, OsdListH, off) })
@@ -957,6 +970,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 			key += "|w" + itoa(frame)
 		}
 		if key != p.last && !(vx != 0 && p.scrubTick&1 == 1) {
+			p.setJitter(osd, true)
 			p.last = key
 			p.compose(true)
 			h := p.peekStripH()
@@ -989,6 +1003,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		x, y = (p.canvas.W-240)/2, 240
 		key = p.skipKey()
 		if key != p.last {
+			p.setJitter(osd, true)
 			p.last = key
 			p.composeSkip()
 			p.painter.show(osd, x, y, &gfx.Canvas{W: 240, H: 40, Pix: p.canvas.Pix[:240*40*4]}, p.alpha[:240*40])
@@ -1019,6 +1034,7 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 		osd.Bar(p.barX, p.barY, p.barW, BarW, uint32(gfx.GreyHi), p.barOn)
 	}
 	p.last = key
+	p.setJitter(osd, true)
 	p.painter.show(osd, 0, p.osdY(), &gfx.Canvas{W: p.canvas.W, H: p.osdHeight(), Pix: p.canvas.Pix[:p.canvas.W*p.osdHeight()*4]}, p.alpha[:p.canvas.W*p.osdHeight()])
 	p.dirty = false
 }
@@ -1047,6 +1063,7 @@ func (p *Playing) resizeCanvas(osd OSD) {
 	p.last = ""
 	p.composed = false
 	p.painter = newPainter(w, h)
+	p.shaking.Store(false) // a shake queued on the old painter was dropped
 	if sized, ok := osd.(interface{ SetCanvasSize(int, int) }); ok {
 		sized.SetCanvasSize(w, h)
 	}
@@ -1138,7 +1155,7 @@ func (p *Playing) compose(peek bool) {
 		// alpha: the panel, its top edge eased in; the same for every panel
 		for y := 0; y < c.H; y++ {
 			a := OsdAlpha
-			if y < 20 {
+			if y < 20 && !p.app.Cfg.vcr() { // the VCR band has a hard edge
 				a = OsdAlpha * y / 20
 			}
 			row := p.alpha[y*c.W : (y+1)*c.W]
@@ -1156,12 +1173,19 @@ func (p *Playing) compose(peek bool) {
 	if p.static == nil {
 		p.static = gfx.NewCanvas(p.canvas.W, p.osdHeight())
 	}
+	vcr := p.app.Cfg.vcr()
 	if key != p.staticFor {
-		p.composeStatic(p.static, peek, timed)
+		if vcr {
+			p.composeStaticVCR(p.static, peek, timed)
+		} else {
+			p.composeStatic(p.static, peek, timed)
+		}
 		p.staticFor = key
 	}
 	copy(c.Pix, p.static.Pix)
-	if timed {
+	if timed && vcr {
+		p.vcrRunningTime(c)
+	} else if timed {
 		c.TextCenter(p.safeX()+p.safeW()/2, p.timeY, p.app.F.Body, gfx.White, clock(int(p.scrubTo)))
 	}
 }
@@ -1263,6 +1287,10 @@ func (p *Playing) composeSkip() {
 	if p.skip != nil && strings.Contains(p.skip.Type, "credit") {
 		label = "Skip credits"
 	}
+	if p.app.Cfg.vcr() {
+		p.composeSkipVCR(c, label)
+		return
+	}
 	c.Text(24, 8, f.Body, gfx.White, label)
 	chevronRight(c, 24+f.Body.Width(label)+18, 14, gfx.GreyLo)
 
@@ -1285,6 +1313,12 @@ func (p *Playing) uploadList(osd OSD) {
 	// list must be this list's background, not what was there before
 	rows := max(min(h-base, maxRows), OsdListH)
 	c := gfx.NewCanvas(OsdListW, rows)
+	if p.app.Cfg.vcr() {
+		p.drawListVCR(c, base)
+		l.base, l.uploaded, l.loaded = base, rows, true
+		p.painter.do(func() { osd.Upload(0, c, 240) })
+		return
+	}
 	c.Fill(0, 0, c.W, c.H, gfx.Bg)
 	if base == 0 {
 		title := l.kind
