@@ -1188,6 +1188,9 @@ func (p *Playing) compose(peek bool) {
 	} else if timed {
 		c.TextCenter(p.safeX()+p.safeW()/2, p.timeY, p.app.F.Body, gfx.White, clock(int(p.scrubTo)))
 	}
+	if vcr && p.app.Cfg.vcrClear() {
+		p.vcrClearBand(c)
+	}
 }
 
 // staticKey describes the static panel, without the running time.

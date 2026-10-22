@@ -122,8 +122,45 @@ func TestOptionsStepThePlaybackLook(t *testing.T) {
 		t.Fatalf("right stepped to %q (%q)", a.Cfg.PlaybackLook, row().val())
 	}
 	pressOption(t, o, "Playback controls", input.Right)
+	if a.Cfg.PlaybackLook != "vcr-clear" || row().val() != "VCR, no band" {
+		t.Fatalf("right again stepped to %q (%q)", a.Cfg.PlaybackLook, row().val())
+	}
+	pressOption(t, o, "Playback controls", input.Left)
 	pressOption(t, o, "Playback controls", input.Left)
 	if a.Cfg.PlaybackLook != "" {
 		t.Fatalf("left stepped to %q, want Standard", a.Cfg.PlaybackLook)
+	}
+}
+
+// VCR, no band: the panel is clear where the band would be and opaque
+// where something is drawn, the running time of a scrub included.
+func TestVCRWithoutTheBandIsClearBetweenItsText(t *testing.T) {
+	a := betaTestApp(t)
+	a.Out = &fakeOut{c: gfx.NewCanvas(720, 480)}
+	a.osd = &painterTestOSD{}
+	a.Cfg.PlaybackLook = "vcr-clear"
+	p := NewPlaying(a, &jellyfin.Item{Title: "A film", Duration: 1460}, nil, 0, func(string) {})
+	defer func() { <-p.closePainter(a.osd) }()
+	p.pos, p.scrub, p.scrubTo = 300, true, 900
+	p.compose(false)
+	if p.alpha[0] != 0 || p.alpha[(p.osdHeight()-1)*p.canvas.W] != 0 {
+		t.Fatal("the band's corners are not clear")
+	}
+	opaque := func(x0, y0, w, h int) bool {
+		for y := y0; y < y0+h; y++ {
+			for x := x0; x < x0+w; x++ {
+				if p.alpha[y*p.canvas.W+x] == 255 {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !opaque(p.safeX(), 12, 200, vcrBig.Height()) || !opaque(p.safeX(), p.pillY, 40, PillH) ||
+		!opaque(p.safeX()+p.safeW()/2-60, p.timeY, 120, vcrBig.Height()) {
+		t.Fatal("the title, the blocks or the running time is not opaque")
+	}
+	if !a.Cfg.vcr() {
+		t.Fatal("VCR, no band is not a VCR look")
 	}
 }

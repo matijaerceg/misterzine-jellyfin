@@ -182,8 +182,9 @@ Options lists, in groups:
 - **Playback controls**: Standard, or VCR, an old deck's on-screen display:
   block capitals on a blue band, the progress as a row of blocks, and the
   lines of the controls wavering sideways by a pixel, as a tape's picture
-  did. The controls work the same in both; the picture and the subtitles do
-  not waver.
+  did. **VCR, no band** leaves the band out, the text straight over the
+  picture as on a deck. The controls work the same in every look; the
+  picture and the subtitles do not waver.
 - **Video bitrate** (see Sound and playback quality).
 - **Show** and a library's name, one row per library: off leaves it out of
   Home, the menu and search. Shown once the libraries have loaded.

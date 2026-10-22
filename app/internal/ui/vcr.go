@@ -153,6 +153,21 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 	}
 }
 
+// vcrClearBand takes the band away for VCR, no band: the panel's alpha
+// is opaque where something is drawn and clear where the band shows, as
+// a deck put its text straight over the picture.
+func (p *Playing) vcrClearBand(c *gfx.Canvas) {
+	b, g, r := byte(vcrBlue&0xFF), byte(vcrBlue>>8&0xFF), byte(vcrBlue>>16)
+	for i := range p.alpha[:c.W*c.H] {
+		o := i * 4
+		if c.Pix[o] == b && c.Pix[o+1] == g && c.Pix[o+2] == r {
+			p.alpha[i] = 0
+		} else {
+			p.alpha[i] = 255
+		}
+	}
+}
+
 // vcrBlocks draws the progress as blocks across the safe width, each
 // coloured by the film time at its middle: played, in a marker, buffered,
 // or still to come.
