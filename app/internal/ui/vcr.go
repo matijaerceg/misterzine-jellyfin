@@ -7,27 +7,31 @@ import (
 )
 
 // The VCR look of the playback controls (Options > Playback controls): an
-// old deck's on-screen display, white block capitals with a hard shadow on
-// a flat blue band, the progress as a row of blocks, and its lines
-// wavering sideways by a pixel as a tape's picture did
-// (ring.Overlay.SetJitter). The
-// controls work as in the standard look; only the drawing differs. The
-// subtitles and the wait dots keep their own look and stay still.
+// old deck's on-screen display, white and bright green block capitals with
+// a hard shadow on a flat blue band (or none), the progress as a row of
+// blocks, the wait dots as blocks, and its lines wavering sideways by a
+// pixel as a tape's picture did (ring.Overlay.SetJitter). The controls
+// work as in the standard look; only the drawing differs. The subtitles
+// keep their own look and stay still.
 var (
 	vcrBig   = gfx.PixelFont{SX: 3, SY: 4} // 15x28: titles, the counter, the keys
 	vcrSmall = gfx.PixelFont{SX: 2, SY: 3} // 10x21: the episode line, the lists
 )
 
+// The VCR look's colours are an old on-screen display chip's: each of red,
+// green and blue fully on or off, eight colours and no greys, the text
+// white or bright green. The band is a deck's blue back, a darker blue of
+// its own, so that the full blue of the idle keys still shows on it.
 const (
-	vcrBlue      gfx.Color = 0x10208C // the band behind the controls
-	vcrWhite     gfx.Color = 0xF0F0F0
+	vcrBlue      gfx.Color = 0x0000AA // the band behind the controls
+	vcrWhite     gfx.Color = 0xFFFFFF
 	vcrShadow    gfx.Color = 0x000000
-	vcrGrey      gfx.Color = 0xA8B0D0 // keys and values not under the cursor
-	vcrOff       gfx.Color = 0x56609A // keys with nothing to do
-	vcrYellow    gfx.Color = 0xF0D040 // Play while paused
-	vcrBlockOff  gfx.Color = 0x2C3CA8 // progress still to come
-	vcrBuffered  gfx.Color = 0x5868C8 // downloaded ahead of the playhead
-	vcrMarkerCol gfx.Color = 0x8C98E8 // an intro or credits marker
+	vcrGreen     gfx.Color = 0x00FF00 // keys and values not under the cursor, the episode line
+	vcrOff       gfx.Color = 0x0000FF // keys with nothing to do
+	vcrYellow    gfx.Color = 0xFFFF00 // Play while paused, a marker's blocks
+	vcrBlockOff  gfx.Color = 0x00FF00 // progress still to come
+	vcrBuffered  gfx.Color = 0x00FFFF // downloaded ahead of the playhead
+	vcrMarkerCol gfx.Color = 0xFFFF00 // an intro or credits marker
 	vcrBarH                = 10       // the progress blocks' height
 	vcrBlock               = 6        // a block's width
 	vcrBlockGap            = 2
@@ -101,7 +105,7 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 	c.PixelText(x0, y, vcrBig, vcrWhite, vcrShadow, vcrBig.Fit(title, w))
 	y += vcrBig.Height() + 4
 	if sub != "" {
-		c.PixelText(x0, y, vcrSmall, vcrGrey, vcrShadow, vcrSmall.Fit(sub, w))
+		c.PixelText(x0, y, vcrSmall, vcrGreen, vcrShadow, vcrSmall.Fit(sub, w))
 	}
 	y += vcrSmall.Height() + 10
 	p.pillY = y + (vcrBarH-PillH)/2 // the dot rides the blocks' middle
@@ -137,7 +141,7 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 	}
 	x := (c.W - total) / 2
 	for i, b := range labels {
-		col := vcrGrey
+		col := vcrGreen
 		if i == p.focus && !p.scrub {
 			col = vcrWhite
 		}
@@ -271,7 +275,7 @@ func (p *Playing) drawListVCR(c *gfx.Canvas, base int) {
 		}
 		if i < len(l.vals) {
 			v := strings.ToUpper(l.vals[i])
-			c.PixelText(OsdListW-OsdListPad-vcrSmall.Width(v), y+2, vcrSmall, vcrGrey, vcrShadow, v)
+			c.PixelText(OsdListW-OsdListPad-vcrSmall.Width(v), y+2, vcrSmall, vcrGreen, vcrShadow, v)
 		}
 	}
 }
