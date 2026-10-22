@@ -184,7 +184,12 @@ Options lists, in groups:
   missing from the filtered view or shown in it wrongly.
 - **Autoplay next episode**: the countdown into the next episode.
 - **Skip intro and credits buttons**.
-- **Playback controls**: Standard, or VCR, an old deck's on-screen display:
+- **Playback UI theme**: the look of the playback controls. **Standard**;
+  **Icons**, Standard with the buttons drawn as small icons instead of
+  words (back and forward 10 seconds as double arrows over a 10, pause bars
+  or a play triangle, previous and next as arrows against a bar, a speaker
+  for Audio, a caption box for Subs, three dots for More), in the same
+  places, colours and order; or **VCR**, an old deck's on-screen display:
   bright green and white block capitals in an on-screen display chip's
   eight pure colours on a blue band, the progress as a row of blocks with an
   upright line for the scrubber's playhead, and the
@@ -215,7 +220,7 @@ Options lists, in groups:
 - **Version**. The foot of the screen shows the build.
 
 Up and Down wrap between the first and last rows. OK, Left or Right turns a
-setting on or off; a setting with more choices (playback controls, bitrate,
+setting on or off; a setting with more choices (playback UI theme, bitrate,
 crop, downmix boost, subtitle size) changes with Left and Right only, shown by the arrows either
 side of its value when it is selected. A scrollbar on the right shows where the
 list is.
@@ -304,7 +309,7 @@ Sound is decoded on the MiSTer and folded to stereo. A plain fold of a
 surround track comes out noticeably quieter than a stereo track, so
 **Surround downmix boost** raises the level of surround sources: Off, Small or
 Large (the default), with loud peaks softened rather than clipped. Stereo
-tracks are passed through unchanged. **More > Surround downmix boost** in the
+tracks are passed through unchanged. **More > Downmix boost** in the
 playback controls changes it without restarting the video.
 
 ### Update, rollback and remove
