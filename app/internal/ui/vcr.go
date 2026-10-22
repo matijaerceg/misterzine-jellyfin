@@ -2,14 +2,15 @@ package ui
 
 import (
 	"strings"
+	"time"
 
 	"plexcrt/internal/gfx"
 )
 
 // The VCR look of the playback controls (Options > Playback controls): an
-// old deck's on-screen display, white and bright green block capitals with
+// old deck's on-screen display, bright green and white block capitals with
 // a hard shadow on a flat blue band (or none), the progress as a row of
-// blocks, the wait dots as blocks, and its lines wavering sideways by a
+// blocks, the wait dots as a turning tape, and its lines wavering sideways by a
 // pixel as a tape's picture did (ring.Overlay.SetJitter). The controls
 // work as in the standard look; only the drawing differs. The subtitles
 // keep their own look and stay still.
@@ -19,17 +20,18 @@ var (
 )
 
 // The VCR look's colours are an old on-screen display chip's: each of red,
-// green and blue fully on or off, eight colours and no greys, the text
-// white or bright green. The band is a deck's blue back, a darker blue of
-// its own, so that the full blue of the idle keys still shows on it.
+// green and blue fully on or off, eight colours and no greys, bright green
+// the highlight and white the rest. The band is a deck's blue back, a
+// darker blue of its own, so that the full blue of the idle keys still
+// shows on it.
 const (
 	vcrBlue      gfx.Color = 0x0000AA // the band behind the controls
-	vcrWhite     gfx.Color = 0xFFFFFF
+	vcrText      gfx.Color = 0x00FF00 // the title, the counter, the key under the cursor, the played blocks, the tape
 	vcrShadow    gfx.Color = 0x000000
-	vcrGreen     gfx.Color = 0x00FF00 // keys and values not under the cursor, the episode line
+	vcrLo        gfx.Color = 0xFFFFFF // keys and values not under the cursor, the episode line
 	vcrOff       gfx.Color = 0x0000FF // keys with nothing to do
 	vcrYellow    gfx.Color = 0xFFFF00 // Play while paused, a marker's blocks
-	vcrBlockOff  gfx.Color = 0x00FF00 // progress still to come
+	vcrBlockOff  gfx.Color = 0xFFFFFF // progress still to come
 	vcrBuffered  gfx.Color = 0x00FFFF // downloaded ahead of the playhead
 	vcrMarkerCol gfx.Color = 0xFFFF00 // an intro or credits marker
 	vcrBarH                = 10       // the progress blocks' height
@@ -102,10 +104,10 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 	x0, w := p.safeX(), p.safeW()
 	title, sub := heading(p.item)
 	y := 12
-	c.PixelText(x0, y, vcrBig, vcrWhite, vcrShadow, vcrBig.Fit(title, w))
+	c.PixelText(x0, y, vcrBig, vcrText, vcrShadow, vcrBig.Fit(title, w))
 	y += vcrBig.Height() + 4
 	if sub != "" {
-		c.PixelText(x0, y, vcrSmall, vcrGreen, vcrShadow, vcrSmall.Fit(sub, w))
+		c.PixelText(x0, y, vcrSmall, vcrLo, vcrShadow, vcrSmall.Fit(sub, w))
 	}
 	y += vcrSmall.Height() + 10
 	p.pillY = y + (vcrBarH-PillH)/2 // the dot rides the blocks' middle
@@ -115,7 +117,7 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 	if p.paused {
 		status = string(gfx.PixelPause) + " PAUSE"
 	}
-	c.PixelText(x0, y, vcrBig, vcrWhite, vcrShadow, status)
+	c.PixelText(x0, y, vcrBig, vcrText, vcrShadow, status)
 	if timed {
 		p.timeY = y
 	} else {
@@ -123,7 +125,7 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 		if p.dur > 0 {
 			t += " / " + clock(int(p.dur))
 		}
-		c.PixelText(x0+w-vcrBig.Width(t), y, vcrBig, vcrWhite, vcrShadow, t)
+		c.PixelText(x0+w-vcrBig.Width(t), y, vcrBig, vcrText, vcrShadow, t)
 	}
 	y += vcrBig.Height() + 14
 	if peek {
@@ -141,9 +143,9 @@ func (p *Playing) composeStaticVCR(c *gfx.Canvas, peek, timed bool) {
 	}
 	x := (c.W - total) / 2
 	for i, b := range labels {
-		col := vcrGreen
+		col := vcrLo
 		if i == p.focus && !p.scrub {
-			col = vcrWhite
+			col = vcrText
 		}
 		if p.paused && osdButtons[i] == "Pause" {
 			col = vcrYellow
@@ -183,7 +185,7 @@ func (p *Playing) vcrBlocks(c *gfx.Canvas, y int) {
 			t := float64(x+vcrBlock/2) * p.dur / float64(w)
 			switch {
 			case t <= p.pos:
-				col = vcrWhite
+				col = vcrText
 			case p.inMarker(t):
 				col = vcrMarkerCol
 			case t >= p.bufferStart && t < p.bufferEnd:
@@ -203,25 +205,58 @@ func (p *Playing) inMarker(t float64) bool {
 	return false
 }
 
-// vcrDotSize is a wait block's side, in pixels: an even number of lines,
-// its shadow inside the dots' box.
-const vcrDotSize = 12
+// The tape the VCR looks show while the picture is held up: two reels, the
+// tape drawn tight across their tops, in chunky cells. Two frames turn the
+// reels' spokes from a cross to a saltire and back, a spinning a deck's
+// display could draw.
+const (
+	vcrTapeCell = 4                              // a cell's side, pixels and lines
+	vcrTapeR    = 4                              // a reel's radius, cells
+	vcrTapeGap  = 12                             // reel centre to reel centre, cells
+	vcrTapeW    = vcrTapeGap + 2*vcrTapeR + 1    // cells across
+	vcrTapeH    = (2*vcrTapeR + 1) * vcrTapeCell // lines down
+	vcrTapeTop  = (WaitDotY - vcrTapeH/2) &^ 1   // the tape's top line, even for the 480i grid
+	// VCRTapeStep is how long each frame of the turn holds.
+	VCRTapeStep = 220 * time.Millisecond
+)
 
-// drawVCR is draw in the VCR look: three blocks, the one the swell is
-// nearest lit white and the others the progress blocks' blue, the light
-// stepping from block to block as a deck's display did, with no swell.
-func (d *waitDot) drawVCR(c *gfx.Canvas, alpha []byte, cx, cy, frame int) {
-	lit := (frame + waitSlots/2) / waitSlots
-	for i := range 3 {
-		col := vcrBlockOff
-		if i == lit {
-			col = vcrWhite
+// tapeCell reports whether cell x, y of the tape is drawn in frame f.
+func tapeCell(x, y, f int) bool {
+	if y == 0 && x >= vcrTapeR && x <= vcrTapeR+vcrTapeGap {
+		return true // the tape across the reels' tops
+	}
+	for _, cx := range []int{vcrTapeR, vcrTapeR + vcrTapeGap} {
+		dx, dy := x-cx, y-vcrTapeR
+		d2 := dx*dx + dy*dy
+		switch {
+		case d2 >= 13 && d2 <= 20: // the rim
+			return true
+		case d2 == 0: // the hub
+			return true
+		case f == 0 && (dx == 0 || dy == 0) && d2 <= 4: // the spokes as a cross
+			return true
+		case f == 1 && (dx == dy || dx == -dy) && d2 <= 2: // turned an eighth, short of the rim
+			return true
 		}
-		x0, y0 := cx+(i-1)*d.gap-vcrDotSize/2, cy-vcrDotSize/2
-		c.Fill(x0+2, y0+2, vcrDotSize, vcrDotSize, vcrShadow)
-		c.Fill(x0, y0, vcrDotSize, vcrDotSize, col)
-		opaque(alpha, c.W, c.H, x0+2, y0+2, vcrDotSize)
-		opaque(alpha, c.W, c.H, x0, y0, vcrDotSize)
+	}
+	return false
+}
+
+// drawTape paints the tape's frame f centred on cx, with its top at the
+// canvas's line 0, each cell with the hard shadow of the VCR text.
+func drawTape(c *gfx.Canvas, alpha []byte, cx, f int) {
+	x0 := cx - vcrTapeW*vcrTapeCell/2
+	for pass, col := range []gfx.Color{vcrShadow, vcrText} {
+		off := 2 * (1 - pass) // the shadow first, two pixels right and down
+		for y := range 2*vcrTapeR + 1 {
+			for x := range vcrTapeW {
+				if tapeCell(x, y, f) {
+					px, py := x0+x*vcrTapeCell+off, y*vcrTapeCell+off
+					c.Fill(px, py, vcrTapeCell, vcrTapeCell, col)
+					opaque(alpha, c.W, c.H, px, py, vcrTapeCell)
+				}
+			}
+		}
 	}
 }
 
@@ -238,14 +273,14 @@ func opaque(alpha []byte, w, h, x0, y0, n int) {
 // room composeStaticVCR left for it.
 func (p *Playing) vcrRunningTime(c *gfx.Canvas) {
 	t := clock(int(p.scrubTo))
-	c.PixelText(p.safeX()+(p.safeW()-vcrBig.Width(t))/2, p.timeY, vcrBig, vcrWhite, vcrShadow, t)
+	c.PixelText(p.safeX()+(p.safeW()-vcrBig.Width(t))/2, p.timeY, vcrBig, vcrText, vcrShadow, t)
 }
 
 // composeSkipVCR is composeSkip's button in the VCR look.
 func (p *Playing) composeSkipVCR(c *gfx.Canvas, label string) {
 	c.Fill(0, 0, c.W, c.H, vcrBlue)
 	label = strings.ToUpper(label)
-	c.PixelText((c.W-vcrBig.Width(label))/2, (c.H-vcrBig.Height())/2, vcrBig, vcrWhite, vcrShadow, label)
+	c.PixelText((c.W-vcrBig.Width(label))/2, (c.H-vcrBig.Height())/2, vcrBig, vcrText, vcrShadow, label)
 }
 
 // drawListVCR is uploadList's column in the VCR look, from column row base.
@@ -262,20 +297,20 @@ func (p *Playing) drawListVCR(c *gfx.Canvas, base int) {
 		if f.Width(title) > OsdListW-x-OsdListPad {
 			f = vcrSmall
 		}
-		c.PixelText(x, 10, f, vcrWhite, vcrShadow, f.Fit(title, OsdListW-x-OsdListPad))
+		c.PixelText(x, 10, f, vcrText, vcrShadow, f.Fit(title, OsdListW-x-OsdListPad))
 	}
 	for i, item := range l.items {
 		y := OsdListTop + i*OsdListRowH - base
 		if y+OsdListRowH <= 0 || y >= c.H {
 			continue
 		}
-		c.PixelText(x, y+2, vcrSmall, vcrWhite, vcrShadow, vcrSmall.Fit(item, OsdListW-x-52))
+		c.PixelText(x, y+2, vcrSmall, vcrText, vcrShadow, vcrSmall.Fit(item, OsdListW-x-52))
 		if i == l.set {
-			c.PixelText(OsdListW-34, y+2, vcrSmall, vcrWhite, vcrShadow, string(gfx.PixelTick))
+			c.PixelText(OsdListW-34, y+2, vcrSmall, vcrText, vcrShadow, string(gfx.PixelTick))
 		}
 		if i < len(l.vals) {
 			v := strings.ToUpper(l.vals[i])
-			c.PixelText(OsdListW-OsdListPad-vcrSmall.Width(v), y+2, vcrSmall, vcrGreen, vcrShadow, v)
+			c.PixelText(OsdListW-OsdListPad-vcrSmall.Width(v), y+2, vcrSmall, vcrLo, vcrShadow, v)
 		}
 	}
 }

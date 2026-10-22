@@ -45,7 +45,8 @@ type waitDot struct {
 	start time.Time
 	step  time.Duration
 	gap   int
-	frame int // the frame last drawn; -1 before the first
+	frame int  // the frame last drawn; -1 before the first
+	tape  bool // the VCR looks' tape (vcr.go): two frames, turned at VCRTapeStep
 }
 
 // newWaitDot lays the dots out from a "step_ms,gap" spec (PLEXCRT_WAIT_DOT,
@@ -77,6 +78,9 @@ func (d *waitDot) phase(now time.Time) float64 {
 
 // frameAt is the drawn frame for now: the phase in whole slots.
 func (d *waitDot) frameAt(now time.Time) int {
+	if d.tape {
+		return int(now.Sub(d.start)/VCRTapeStep) % 2
+	}
 	return int(d.phase(now)*waitSlots + 0.5)
 }
 
@@ -156,6 +160,7 @@ func (p *Playing) waiting(now time.Time) {
 	}
 	if held := p.heldUp(now); held && p.wait == nil {
 		p.wait = newWaitDot(p.waitSpec, now)
+		p.wait.tape = p.app.Cfg.vcr()
 	} else if !held {
 		p.stopWait()
 	}
@@ -167,9 +172,12 @@ func (p *Playing) waiting(now time.Time) {
 // clear, so the two show together (the overlay is one rectangle).
 func (p *Playing) waitPanel(frame int, strip *gfx.Canvas, stripAlpha []byte) (c *gfx.Canvas, alpha []byte, y int) {
 	w := p.canvas.W
-	h := 2 * (WaitDotRMax + 1)
+	top, h := waitTop, 2*(WaitDotRMax+1)
+	if p.wait.tape {
+		top, h = vcrTapeTop, vcrTapeH+2 // and its shadow
+	}
 	if strip != nil {
-		h = p.canvasHeight() - waitTop // the strip's panel reaches the raster edge
+		h = p.canvasHeight() - top // the strip's panel reaches the raster edge
 	}
 	if p.waitCanvas == nil || p.waitCanvas.W != w || p.waitCanvas.H != h {
 		p.waitCanvas = gfx.NewCanvas(w, h)
@@ -177,8 +185,8 @@ func (p *Playing) waitPanel(frame int, strip *gfx.Canvas, stripAlpha []byte) (c 
 	}
 	c, alpha = p.waitCanvas, p.waitAlpha
 	clear(alpha)
-	if p.app.Cfg.vcr() {
-		p.wait.drawVCR(c, alpha, w/2, WaitDotY-waitTop, frame)
+	if p.wait.tape {
+		drawTape(c, alpha, w/2, frame)
 	} else {
 		p.wait.draw(c, alpha, w/2, WaitDotY-waitTop, frame)
 	}
@@ -187,7 +195,7 @@ func (p *Playing) waitPanel(frame int, strip *gfx.Canvas, stripAlpha []byte) (c 
 		copy(c.Pix[top*w*4:], strip.Pix[:strip.W*strip.H*4])
 		copy(alpha[top*w:], stripAlpha[:strip.W*strip.H])
 	}
-	return c, alpha, waitTop
+	return c, alpha, top
 }
 
 // framed notes a frame published by the presenter: a held picture moves

@@ -165,44 +165,40 @@ func TestVCRWithoutTheBandIsClearBetweenItsText(t *testing.T) {
 	}
 }
 
-// In the VCR look the wait dots are three blocks, one lit white at a
-// time, stepping left to right; the panel is drawn only where they are,
-// and they waver with the controls.
-func TestVCRWaitBlocksStep(t *testing.T) {
+// In the VCR look the wait dots are a tape: two reels with the tape across
+// their tops, drawn only where its cells are, the two frames turning the
+// spokes; it wavers with the controls.
+func TestVCRWaitTapeTurns(t *testing.T) {
 	p := waitPlaying(t)
 	p.app.Cfg.PlaybackLook = "vcr"
 	o := &shakeOSD{}
-	p.Tick(time.Now(), o, true)
+	now := time.Now()
+	p.Tick(now, o, true)
 	p.painter.flush()
-	if p.wait == nil || p.last != "wait" {
-		t.Fatalf("no wait shown: %q", p.last)
+	if p.wait == nil || !p.wait.tape || p.last != "wait" || o.showY != vcrTapeTop {
+		t.Fatalf("no tape shown: %q at line %d", p.last, o.showY)
 	}
 	if j, _ := o.seen(); !slices.Equal(j, []bool{true}) {
-		t.Fatalf("the wait blocks' jitter %v, want [true]", j)
+		t.Fatalf("the tape's jitter %v, want [true]", j)
 	}
-	lit := func(frame int) int {
+	if p.wait.frameAt(now) != 0 || p.wait.frameAt(now.Add(VCRTapeStep)) != 1 || p.wait.frameAt(now.Add(2*VCRTapeStep)) != 0 {
+		t.Fatal("the tape does not turn between its two frames")
+	}
+	at := func(frame, cx, cy int) bool {
 		c, alpha, _ := p.waitPanel(frame, nil, nil)
-		n, at := 0, -1
-		for i := range 3 {
-			x, y := c.W/2+(i-1)*p.wait.gap, WaitDotY-waitTop
-			o := (y*c.W + x) * 4
-			if alpha[y*c.W+x] != 255 {
-				t.Fatalf("frame %d: block %d not drawn", frame, i)
-			}
-			if gfx.Color(c.Pix[o+2])<<16|gfx.Color(c.Pix[o+1])<<8|gfx.Color(c.Pix[o]) == vcrWhite {
-				n, at = n+1, i
-			}
-		}
-		if n != 1 {
-			t.Fatalf("frame %d: %d blocks lit", frame, n)
-		}
-		if alpha[0] != 0 || alpha[c.W/2+p.wait.gap/2] != 0 {
-			t.Fatalf("frame %d: the panel is drawn between the blocks", frame)
-		}
-		return at
+		x := c.W/2 - vcrTapeW*vcrTapeCell/2 + cx*vcrTapeCell + 1
+		y := cy*vcrTapeCell + 1
+		o := (y*c.W + x) * 4
+		return alpha[y*c.W+x] == 255 && gfx.Color(c.Pix[o+2])<<16|gfx.Color(c.Pix[o+1])<<8|gfx.Color(c.Pix[o]) == vcrText
 	}
-	if lit(0) != 0 || lit(waitSlots) != 1 || lit(2*waitSlots) != 2 {
-		t.Fatal("the light does not step left to right")
+	mid, hub := vcrTapeR+vcrTapeGap/2, vcrTapeR
+	for f := range 2 {
+		if !at(f, mid, 0) || !at(f, hub, hub) || at(f, mid, hub) {
+			t.Fatalf("frame %d: the tape's top, a hub or the gap between the reels is wrong", f)
+		}
+	}
+	if !at(0, hub, hub-2) || at(1, hub, hub-2) || at(0, hub+1, hub-1) || !at(1, hub+1, hub-1) {
+		t.Fatal("the spokes do not turn from a cross to a saltire")
 	}
 	<-p.closePainter(o)
 }
