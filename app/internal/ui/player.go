@@ -805,6 +805,15 @@ func (s *Session) suppressStopCancellation(err error) error {
 // UI refreshes can wait in the background before reading resume metadata.
 func (s *Session) ReportsDone() <-chan struct{} { return s.reported }
 
+// FinalPosition is where the playback stood when it was last read, in
+// seconds: once Done has fired, the position its stopped report carries.
+// False when the playback never started playing.
+func (s *Session) FinalPosition() (float64, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.state.Position, s.started
+}
+
 // Direct reports whether the running stream is the stored file, untranscoded:
 // then the player's duration is exact. It changes on a fallback to a transcode.
 func (s *Session) Direct() bool {
