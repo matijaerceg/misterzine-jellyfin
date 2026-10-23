@@ -89,9 +89,10 @@ func TestFeatureLifecycle(t *testing.T) {
 	if (Feature{Premium: true}).Allowed(202610, true) {
 		t.Fatal("missing threshold fails open")
 	}
-	theme := false
+	theme, random := false, false
 	for _, e := range Catalog() {
 		theme = theme || (e.ID == "playback-theme" && e.Feature == PlaybackTheme)
+		random = random || (e.ID == "random-sort" && e.Feature == RandomSort)
 		if !e.Premium || !e.Since.Valid() {
 			t.Fatal("catalogue entry without a threshold", e)
 		}
@@ -101,6 +102,9 @@ func TestFeatureLifecycle(t *testing.T) {
 	}
 	if Screensaver.Since != 202610 || Screensaver.Beta || !Screensaver.Premium {
 		t.Fatal("the screensaver is not a supporter extra from October 2026")
+	}
+	if !random || RandomSort.Since != 202609 || RandomSort.Beta || !RandomSort.Premium {
+		t.Fatal("the Random tab is not a supporter extra from September 2026")
 	}
 }
 

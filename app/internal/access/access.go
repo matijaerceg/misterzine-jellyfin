@@ -64,6 +64,10 @@ func (f Feature) Allowed(month Month, showBeta bool) bool {
 // October 2026) covers the first supporter extras.
 var (
 	Screensaver = Feature{Premium: true, Since: 202610}
+	// RandomSort is the Random tab in movie and TV libraries (Options >
+	// Random tab in libraries). Its threshold is Plex's, September 2026,
+	// so every Jellyfin code covers it.
+	RandomSort = Feature{Premium: true, Since: 202609}
 	// PlaybackTheme is the playback controls' looks other than Standard
 	// (Options > Playback UI theme).
 	PlaybackTheme = Feature{Premium: true, Since: 202610}
@@ -82,6 +86,7 @@ type Entry struct {
 func Catalog() []Entry {
 	return []Entry{
 		{"screensaver", "Screensaver", Screensaver},
+		{"random-sort", "Random library order", RandomSort},
 		{"playback-theme", "Playback UI theme", PlaybackTheme},
 		{"no-home-logo", "Home logo: MisterKun or none", NoHomeLogo},
 	}

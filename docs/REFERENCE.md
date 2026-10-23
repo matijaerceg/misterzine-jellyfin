@@ -101,6 +101,18 @@ address stays for the next sign-in.
   belong to one library, so every movie and TV library shows the same ones.
   OK on a collection shows its items; Back returns to the tab. With the 4:3
   filter on, a collection holding nothing the filter keeps is left out.
+- With a MisterZine code that covers it, Options has **Random tab in
+  libraries**, on by default. Movie and TV libraries then have a **Random**
+  tab after Released: the whole library in a random order, through the 4:3
+  filter like the other tabs, shown once all of it has been listed. The order
+  and the selected poster stay through an item's page and back and through the
+  other tabs; a title added on the server meanwhile slots in without changing
+  the order of the rest. Leaving the library (back to Home or the menu)
+  shuffles it again and forgets the place: a library left on Random opens on
+  it again, in a new order from the first poster. On the tabs, OK on Random
+  shuffles again and starts at the first poster; Down goes to the posters.
+  With the setting off or without the code there is no Random tab, and the
+  library opens on A to Z.
 - **Search** has an on-screen keyboard, and a USB keyboard types into it. It
   lists up to 30 movies and shows that match, through the 4:3 filter
   and without hidden libraries. Right from the keyboard's last column, or
@@ -496,8 +508,12 @@ keeps the features of its month on that SD card for good; later features
 come with a new code. A card unlocked for the October 2026 beta already has
 the extras that code covers.
 
+Supporter builds add a **Random tab in libraries** row to Options, with the
+star: a **Random** tab in movie and TV libraries (see Controls). Every
+MisterZine Jellyfin code covers it.
+
 The registry of issued MisterZine codes and the features they unlock (such as
-the screensavers) come from a separate private repository; see [public
+Random library order and the screensavers) come from a separate private repository; see [public
 source and supporter builds](SUPPORTER_BUILDS.md).
 
 Supporter builds add a **Home logo** row to Options, with the star. **Default**
