@@ -157,6 +157,14 @@ address stays for the next sign-in.
 - With the controls hidden, Left and Right show a strip with the title, the
   progress bar and the times, and work the same way: taps and holds add up into
   one seek. The last picture stays on screen until the new position plays.
+- When the server has made preview thumbnails for the video (Jellyfin's
+  trickplay images, a library setting), a hold of Left or Right shows a
+  small frame of the film at the dot's place above the scrubber or the strip.
+  The thumbnails download in the background as the hold nears them, so a hold
+  into a part of the film not yet loaded may show none for a moment. While the
+  hold runs, playback pauses; it resumes when the seek is sent, or when Back
+  drops the scrub. A tap never pauses, and a video paused beforehand stays
+  paused.
 - The progress bar shows how far is downloaded in pale purple. A seek inside
   that range can reuse what is already downloaded.
 - **Audio** and **Subs** open a list of tracks. A change is kept for the movie

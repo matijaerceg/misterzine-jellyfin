@@ -14,8 +14,9 @@ import (
 // sources (large, and only needed when an item is opened).
 const listFields = "SortName,Overview,Taglines,Genres,ChildCount,RecursiveItemCount,ParentId,Width,Height"
 
-// itemFields are those of a single item: everything a pre-play page shows.
-const itemFields = listFields + ",MediaSources,MediaStreams"
+// itemFields are those of a single item: everything a pre-play page shows,
+// and the scrub preview sheets the playback overlay uses.
+const itemFields = listFields + ",MediaSources,MediaStreams,Trickplay"
 
 // splitPath separates a listing's path from the query it carries
 // ("/Shows/x/Episodes?seasonId=y") and merges q over it.

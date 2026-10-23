@@ -194,3 +194,18 @@ func (c *Client) ThemeFile(ctx context.Context, showID, song string) (string, er
 	}
 	return file, writeAtomic(c.CacheDir, file, data)
 }
+
+// trickplayLimit bounds a preview sheet: 10x10 frames of 320x180 are
+// about 1.4 MB.
+const trickplayLimit = 16 << 20
+
+// TrickplaySheet fetches sheet n of a source's preview frames at the given
+// width (Item.Trickplay): GET /Videos/{id}/Trickplay/{width}/{n}.jpg.
+func (c *Client) TrickplaySheet(ctx context.Context, itemID, sourceID string, width, n int) ([]byte, error) {
+	v := url.Values{}
+	if sourceID != "" {
+		v.Set("mediaSourceId", sourceID)
+	}
+	path := "/Videos/" + url.PathEscape(itemID) + "/Trickplay/" + strconv.Itoa(width) + "/" + strconv.Itoa(n) + ".jpg"
+	return c.do(ctx, c.http, "GET", path, v, nil, true, trickplayLimit)
+}

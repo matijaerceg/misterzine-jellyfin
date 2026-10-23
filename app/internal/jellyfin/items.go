@@ -40,12 +40,55 @@ type Item struct {
 	Rating      float64
 	Tagline     string
 	Genres      []string
-	Colors      [4]uint32 // poster corner colours from its blurhash (TL, TR, BR, BL), 0 if none
-	Markers     []Marker  // intro and credits (media segments), when fetched
-	SourceID    string    // the first media source (plex PartID), for PlaybackInfo
-	Audio       []Stream  // its audio streams
-	Subs        []Stream  // its subtitle streams
-	Library     string    // the library (view) id, when known
+	Colors      [4]uint32  // poster corner colours from its blurhash (TL, TR, BR, BL), 0 if none
+	Markers     []Marker   // intro and credits (media segments), when fetched
+	SourceID    string     // the first media source (plex PartID), for PlaybackInfo
+	Audio       []Stream   // its audio streams
+	Subs        []Stream   // its subtitle streams
+	Library     string     // the library (view) id, when known
+	Trickplay   *Trickplay // the scrub preview sheets of SourceID, when the server made them
+}
+
+// Trickplay describes the server's preview sheets for a media source (GET
+// /Videos/{id}/Trickplay/{Width}/{n}.jpg): each sheet is TileWidth x
+// TileHeight frames of Width x Height, one every Interval milliseconds,
+// Count in all.
+type Trickplay struct {
+	Width, Height         int
+	TileWidth, TileHeight int
+	Count                 int
+	Interval              int // milliseconds
+}
+
+type trickplayDTO struct {
+	Width          int `json:"Width"`
+	Height         int `json:"Height"`
+	TileWidth      int `json:"TileWidth"`
+	TileHeight     int `json:"TileHeight"`
+	ThumbnailCount int `json:"ThumbnailCount"`
+	Interval       int `json:"Interval"`
+}
+
+// trickplay picks the smallest usable width the server made for the
+// source (the usual one is 320), or the only source's when source is not
+// among them.
+func trickplay(m map[string]map[string]trickplayDTO, source string) *Trickplay {
+	widths, ok := m[source]
+	if !ok && len(m) == 1 {
+		for _, w := range m {
+			widths = w
+		}
+	}
+	var best *Trickplay
+	for _, t := range widths {
+		if t.Width <= 0 || t.Height <= 0 || t.TileWidth <= 0 || t.TileHeight <= 0 || t.ThumbnailCount <= 0 || t.Interval <= 0 {
+			continue
+		}
+		if best == nil || t.Width < best.Width {
+			best = &Trickplay{t.Width, t.Height, t.TileWidth, t.TileHeight, t.ThumbnailCount, t.Interval}
+		}
+	}
+	return best
 }
 
 // Marker is a span the server has found: "intro" or "credits", in seconds.
@@ -142,10 +185,11 @@ type dto struct {
 		Played                bool  `json:"Played"`
 		UnplayedItemCount     *int  `json:"UnplayedItemCount"`
 	} `json:"UserData"`
-	MediaSources []mediaSource `json:"MediaSources"`
-	MediaStreams []MediaStream `json:"MediaStreams"`
-	Width        int           `json:"Width"`
-	Height       int           `json:"Height"`
+	MediaSources []mediaSource                      `json:"MediaSources"`
+	MediaStreams []MediaStream                      `json:"MediaStreams"`
+	Width        int                                `json:"Width"`
+	Height       int                                `json:"Height"`
+	Trickplay    map[string]map[string]trickplayDTO `json:"Trickplay"`
 }
 
 type mediaSource struct {
@@ -306,6 +350,9 @@ func (x *dto) item() *Item {
 				it.Subs = append(it.Subs, s)
 			}
 		}
+	}
+	if it.Playable() && len(x.Trickplay) > 0 {
+		it.Trickplay = trickplay(x.Trickplay, it.SourceID)
 	}
 	if it.Aspect == 0 && x.Width > 0 && x.Height > 0 && it.Playable() {
 		it.Aspect = aspect("", x.Width, x.Height)
