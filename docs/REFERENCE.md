@@ -159,9 +159,11 @@ address stays for the next sign-in.
   one seek. The last picture stays on screen until the new position plays.
 - When the server has made preview thumbnails for the video (Jellyfin's
   trickplay images, a library setting), a hold of Left or Right shows a
-  small frame of the film at the dot's place above the scrubber or the strip.
-  The thumbnails download in the background as the hold nears them, so a hold
-  into a part of the film not yet loaded may show none for a moment. While the
+  small borderless frame of the film at the dot's place above the scrubber or
+  the strip. The thumbnails download in the background as the hold nears them;
+  where none is ready yet (a hold right after the start, or into a part of the
+  film not yet loaded), a dark box of the same size with the animated wait dots
+  stands in its place until the frame arrives. While the
   hold runs, playback pauses; it resumes when the seek is sent, or when Back
   drops the scrub. A tap never pauses, and a video paused beforehand stays
   paused.
