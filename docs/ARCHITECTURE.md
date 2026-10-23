@@ -139,9 +139,10 @@ the meaning carried over (`compat.go`).
   word 3): heartbeat, state, live flags (OSD open, session), shown-picture count,
   overlay generation/state/error, raster (word 80), aspect (word 47).
   `Field()` is the heartbeat; `Foreign`/`Published` follow the display's
-  `fetch_changes` (word 13) while a picture is shown. The PlexCRT core's video
-  lease and audio tap are no-ops (`compat.go`); brightness is applied in
-  software as frames are copied into a page.
+  `fetch_changes` (word 13) while a picture is shown. Brightness is applied
+  in software as frames are copied into a page. `Tap`, the navigation tick,
+  writes a short synthesised note straight to `/dev/MrAudio` from a
+  background goroutine (`tick.go`).
 - **Launch.** `ring.Open` calls `LaunchCore` (MGL in `/tmp/h264ring.mgl`,
   `load_core` written once to `/dev/MiSTer_cmd`, only when `/tmp/CORENAME` is
   not `H264`; rbf `_Other/H264`, or `$MISTERZINE_H264_RBF`) and waits for the
