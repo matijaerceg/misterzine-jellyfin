@@ -2,7 +2,9 @@ package ui
 
 import (
 	"net/url"
+	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"plexcrt/internal/jellyfin"
@@ -440,6 +442,14 @@ func (p *Pager) want(i int, ahead bool) {
 }
 
 func (p *Pager) fetch(n int) {
+	// a page is parsed on its own thread at low priority, as the art
+	// workers decode: the drawing loop keeps the CPU during a scroll
+	runtime.LockOSThread()
+	syscall.Setpriority(syscall.PRIO_PROCESS, 0, 10)
+	defer func() {
+		syscall.Setpriority(syscall.PRIO_PROCESS, 0, 0)
+		runtime.UnlockOSThread()
+	}()
 	q := url.Values{}
 	for k, v := range p.query {
 		q[k] = v
