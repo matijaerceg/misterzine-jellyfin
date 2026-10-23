@@ -66,9 +66,9 @@ func TestOptionsGroups(t *testing.T) {
 		"Only show 4:3 media": "Playback", "Autoplay next episode": "Playback", "Skip intro and credits buttons": "Playback",
 		"Video bitrate":                    "Playback",
 		"Video calibration (preview only)": "Picture", "Video crop": "Picture", "HDMI sound": "Picture",
-		"Theme music": "Sound", "Navigation sounds": "Sound",
-		"Sign out": "Account",
-		"Updates":  "App", "Send a report": "App", "Version": "App",
+		"Theme music": "Sound",
+		"Sign out":    "Account",
+		"Updates":     "App", "Send a report": "App", "Version": "App",
 	} {
 		if got, ok := under[label]; !ok || got != want {
 			t.Errorf("%q under %q, want %q", label, got, want)

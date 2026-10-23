@@ -251,8 +251,10 @@ Options lists, in groups:
   [HDMI setup](HDMI.md#settings-options-warn-about).
 - **Surround downmix boost**, **Subtitle size** and **Subtitle background**
   (see Subtitles), **Theme
-  music** (a show's theme song on its pages, when Jellyfin has one) and
-  **Navigation sounds** (no sound plays with the H.264 core).
+  music** (a show's theme song on its pages, when Jellyfin has one). No sound
+  plays with the H.264 core yet: its audio path carries the video's sound only,
+  so the theme song and the menus' navigation sounds are silent for now, and the
+  Navigation sounds row is left out of the list.
 - Supporter extras, in builds that have them, each with the purple star (see
   [Beta builds and supporter access](#beta-builds-and-supporter-access)): **Screensavers** and, with a saver
   running, **Screensaver**, **Screensaver after**, and for Media art **Art
