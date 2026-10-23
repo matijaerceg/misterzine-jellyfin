@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"image"
+	"image/color"
 	"image/draw"
 	"image/jpeg"
 	"log"
@@ -83,8 +84,12 @@ type trickplayPreview struct {
 	last    *gfx.Image // Frame's last frame, and its number
 	lastAt  int
 	failed  map[int]int // failed fetches or decodes, by sheet
-	closed  bool
-	cancel  context.CancelFunc
+	// the worker's priority, and the sheet under the start position while
+	// it is still to come (-1 after): that one decodes at normal priority
+	boot   int
+	prio   workerPrio
+	closed bool
+	cancel context.CancelFunc
 }
 
 // newPreviewer starts the item's previews: nil when its source has none.
@@ -104,19 +109,21 @@ func newPreviewer(app *App, it *jellyfin.Item, w, h int, start float64) previewe
 // its worker prepares them from the first without waiting for a Near.
 func newTrickplayPreview(tp jellyfin.Trickplay, w, h int, start float64) *trickplayPreview {
 	b := &trickplayPreview{w: w, h: h, tp: tp, want: -1, at: start, dir: 1, dec: 2,
-		sheets: map[int][]*gfx.Image{}, failed: map[int]int{}}
+		sheets: map[int][]*gfx.Image{}, failed: map[int]int{}, prio: newWorkerPrio()}
 	b.cond = sync.NewCond(&b.mu)
-	b.want, _, _, _ = trickplayAt(tp, start)
+	b.want, b.boot, _, _ = trickplayAt(tp, start)
 	return b
 }
 
 // run fetches and decodes the wanted sheets, a sheet at a time, on its
-// own thread: at nice 10 as the art workers do, at normal priority while
-// a held run waits on it.
+// own thread: at nice 10 as the art workers do, at normal priority for
+// the sheet under the start and while a held run waits on it
+// (previewNice).
 func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 	runtime.LockOSThread()
-	prio := 10
-	syscall.Setpriority(syscall.PRIO_PROCESS, 0, prio)
+	b.mu.Lock()
+	b.prio.tid = syscall.Gettid()
+	b.mu.Unlock()
 	for {
 		b.mu.Lock()
 		n := -1
@@ -131,17 +138,10 @@ func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 			return
 		}
 		tp, w, h := b.tp, b.w, b.h
-		nice := 10
-		if b.lead() != 0 {
-			// a run waits on this: the paused picture leaves the time,
-			// and at nice 10 a decode took ten times as long
-			nice = trickplayRunNice
-		}
+		// a run waits on this (the paused picture leaves the time), or it
+		// is the first: at nice 10 a sheet took half a minute
+		b.prio.to(previewNice(b.lead() != 0, n == b.boot))
 		b.mu.Unlock()
-		if nice != prio {
-			prio = nice
-			syscall.Setpriority(syscall.PRIO_PROCESS, 0, prio)
-		}
 		var frames []*gfx.Image
 		data, err := fetch(n)
 		at := time.Now()
@@ -163,10 +163,16 @@ func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 			b.failed[n]++
 			if b.failed[n] >= trickplayTries {
 				log.Printf("preview: sheet %d failed", n)
+				if n == b.boot {
+					b.boot = -1
+				}
 			}
 		} else {
 			b.dec = (3*b.dec + took) / 4
 			b.add(n, frames)
+			if n == b.boot {
+				b.boot = -1
+			}
 		}
 		b.mu.Unlock()
 	}
@@ -270,7 +276,11 @@ func (b *trickplayPreview) Near(t float64) {
 	if b.wanted() != before {
 		b.drop()
 	}
-	b.cond.Broadcast() // the worker's priority follows the run
+	if b.lead() != 0 {
+		// a run: a decode under way speeds up now, not at the next sheet
+		b.prio.to(trickplayRunNice)
+	}
+	b.cond.Broadcast()
 }
 
 func (b *trickplayPreview) Frame(t float64) *gfx.Image {
@@ -317,6 +327,9 @@ func (b *trickplayPreview) Close() {
 // megabytes). A frame the picture does not hold whole ends the sheet.
 // Run it holding a decode slot.
 func trickplayCut(img image.Image, tp jellyfin.Trickplay, n, w, h int) []*gfx.Image {
+	if ycc, ok := img.(*image.YCbCr); ok && w < tp.Width && h < tp.Height {
+		return trickplayCutYCbCr(ycc, tp, n, w, h)
+	}
 	per := trickplayFrames(tp)
 	count := min(per, tp.Count-n*per)
 	bounds := img.Bounds()
@@ -334,6 +347,56 @@ func trickplayCut(img image.Image, tp jellyfin.Trickplay, n, w, h int) []*gfx.Im
 			tile.Pix[o], tile.Pix[o+2], tile.Pix[o+3] = tile.Pix[o+2], tile.Pix[o], 0
 		}
 		frames = append(frames, previewImage(tile, w, h))
+	}
+	return frames
+}
+
+// trickplayCutYCbCr is trickplayCut for a decoded JPEG shrunk to frames
+// smaller than its tiles: each frame is box-filtered straight from the
+// luma, the chroma taken at each box's centre, without converting the
+// tiles to RGBA first. On the device the RGBA route cost more than a
+// second a sheet on top of the decode.
+func trickplayCutYCbCr(img *image.YCbCr, tp jellyfin.Trickplay, n, w, h int) []*gfx.Image {
+	per := trickplayFrames(tp)
+	count := min(per, tp.Count-n*per)
+	bounds := img.Bounds()
+	tw, th := tp.Width, tp.Height
+	xs := make([]int, w+1) // each frame column's span in the tile
+	for i := range xs {
+		xs[i] = i * tw / w
+	}
+	cx := make([]int, w) // and its chroma sample's offset along a row
+	var frames []*gfx.Image
+	for i := 0; i < count; i++ {
+		x, y := i%tp.TileWidth, i/tp.TileWidth
+		r := image.Rect(x*tw, y*th, (x+1)*tw, (y+1)*th).Add(bounds.Min)
+		if !r.In(bounds) {
+			break
+		}
+		for ox := range cx {
+			cx[ox] = img.COffset(r.Min.X+(xs[ox]+xs[ox+1])/2, r.Min.Y) - img.COffset(r.Min.X, r.Min.Y)
+		}
+		out := &gfx.Image{W: w, H: h, Pix: make([]byte, w*h*4)}
+		o := 0
+		for oy := 0; oy < h; oy++ {
+			y0, y1 := r.Min.Y+oy*th/h, r.Min.Y+(oy+1)*th/h
+			crow := img.COffset(r.Min.X, (y0+y1)/2)
+			for ox := 0; ox < w; ox++ {
+				x0, x1 := r.Min.X+xs[ox], r.Min.X+xs[ox+1]
+				sum := 0
+				for sy := y0; sy < y1; sy++ {
+					for _, v := range img.Y[img.YOffset(x0, sy):img.YOffset(x1, sy)] {
+						sum += int(v)
+					}
+				}
+				cnt := (y1 - y0) * (x1 - x0)
+				c := crow + cx[ox]
+				cr, cg, cb := color.YCbCrToRGB(uint8((sum+cnt/2)/cnt), img.Cb[c], img.Cr[c])
+				out.Pix[o], out.Pix[o+1], out.Pix[o+2] = cb, cg, cr
+				o += 4
+			}
+		}
+		frames = append(frames, out)
 	}
 	return frames
 }

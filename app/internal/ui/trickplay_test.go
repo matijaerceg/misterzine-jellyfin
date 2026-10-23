@@ -153,3 +153,60 @@ func TestTrickplayFrameAcrossASheetStillDecoding(t *testing.T) {
 		t.Fatal("the next sheet's frame blinked out before it landed")
 	}
 }
+
+// A decoded JPEG (YCbCr) is cut straight to the frame size, matching the
+// RGBA route within rounding.
+func TestTrickplayCutsYCbCrLikeRGBA(t *testing.T) {
+	img := image.NewYCbCr(image.Rect(0, 0, 64, 36), image.YCbCrSubsampleRatio420)
+	for y := 0; y < 36; y++ {
+		for x := 0; x < 64; x++ {
+			img.Y[img.YOffset(x, y)] = uint8(x*2 + y*2)
+			c := img.COffset(x, y)
+			img.Cb[c], img.Cr[c] = uint8(100+x), uint8(160-y)
+		}
+	}
+	fast := trickplayCut(img, testTP, 0, 18, 9)
+	slow := trickplayCut(struct{ image.Image }{img}, testTP, 0, 18, 9) // hides the type: the RGBA route
+	if len(fast) != 4 || len(slow) != 4 {
+		t.Fatalf("cut %d and %d frames", len(fast), len(slow))
+	}
+	for i := range fast {
+		if fast[i].W != 18 || fast[i].H != 9 {
+			t.Fatalf("frame %d is %dx%d", i, fast[i].W, fast[i].H)
+		}
+		for o, v := range fast[i].Pix {
+			if d := int(v) - int(slow[i].Pix[o]); d < -12 || d > 12 {
+				t.Fatalf("frame %d byte %d: %d against %d", i, o, v, slow[i].Pix[o])
+			}
+		}
+	}
+}
+
+// The sheet under the start decodes at normal priority, the rest at nice
+// 10 until a run waits on them; a run raises a decode already under way.
+func TestTrickplayWorkerPriority(t *testing.T) {
+	if previewNice(false, false) != 10 || previewNice(true, false) != 0 || previewNice(false, true) != 0 {
+		t.Fatal("previewNice")
+	}
+	b := newTrickplayPreview(testTP, 18, 9, 5) // sheet 1
+	var set []int
+	b.prio.set = func(tid, nice int) { set = append(set, nice) }
+	b.prio.tid = 1
+	if b.boot != 1 {
+		t.Fatalf("boot sheet %d", b.boot)
+	}
+	b.prio.to(previewNice(false, b.next() == b.boot))
+	b.add(1, sheetOf(4))
+	b.boot = -1
+	b.prio.to(previewNice(false, b.next() == b.boot))
+	if len(set) != 2 || set[0] != 0 || set[1] != 10 {
+		t.Fatalf("niced %v", set)
+	}
+	// a run: successive Nears a field or two apart
+	b.Near(6)
+	time.Sleep(20 * time.Millisecond)
+	b.Near(7)
+	if len(set) != 3 || set[2] != trickplayRunNice {
+		t.Fatalf("a run niced %v", set)
+	}
+}
