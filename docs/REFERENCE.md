@@ -253,10 +253,20 @@ Options lists, in groups:
   (see Subtitles), **Theme
   music** (a show's theme song on its pages, when Jellyfin has one) and
   **Navigation sounds** (no sound plays with the H.264 core).
+- Supporter extras, in builds that have them, each with the purple star (see
+  [Beta builds and supporter access](#beta-builds-and-supporter-access)): **Screensavers** and, with a saver
+  running, **Screensaver**, **Screensaver after**, and for Media art **Art
+  changes every**, **Art shows title** and an **Art from** row per library;
+  **Menu dim after** (**Screensaver dim after** with a saver), which shows
+  with or without a code; **Random tab in libraries** (see Controls); and
+  **Home logo**.
 - **Switch user** (see Signing in), once signed in, and **Sign out**, with the
   user's name.
 - **Updates**, which says when an update is downloading, ready or available,
   or when one failed.
+- **Beta access**, in official beta builds only: **Unlocked**, **Locked** or
+  **Setup error**, and OK opens the code entry (see
+  [Beta builds and supporter access](#beta-builds-and-supporter-access)).
 - **Send a report**.
 - **Exit to MiSTer menu**, before sign-in only.
 - **Version**. The foot of the screen shows the build.
@@ -515,6 +525,32 @@ MisterZine Jellyfin code covers it.
 The registry of issued MisterZine codes and the features they unlock (such as
 Random library order and the screensavers) come from a separate private repository; see [public
 source and supporter builds](SUPPORTER_BUILDS.md).
+
+Supporter builds add a **Screensavers** row to Options, with the star, off
+by default. It needs a code covering October 2026; a code entered from the row
+turns it on with the DVD logo. With it on, the menus wait the time set in
+**Screensaver after** (1, 3, 5, 10, 15 or 30 minutes, 3 by default) without a
+press, and then the chosen **Screensaver** comes on. **DVD logo**,
+**MiSTer-kun**, **MisterZine logo** and **Jellyfin** draw that picture on black,
+bouncing off the edges of the calibrated picture area a pixel and a line per
+field and changing colour at every bounce. **Media art** is a slideshow of
+backdrops from random movies and shows in the shown movie and TV libraries,
+cross-fading to the next one every **Art changes every** (10, 20, 30 seconds,
+1, 2 or 5 minutes, 20 seconds by default); **Art shows title** (on by
+default) puts the title in the lower left, and an **Art from** row per
+library leaves a library out (at least one stays in). Any press ends a saver
+and does nothing else; with Media art, OK held for a second over a picture
+ends it and opens that title. OK on **Screensaver**, **Screensaver after** or
+**Art changes every** starts the saver at once to try it. A saver never comes
+on during playback, paused or not, or while a stream starts.
+
+The dimming row reads **Menu dim after** with Screensavers off or without a
+code: the menus dim once they have waited that long since the last press
+(Never, 1, 3, 5, 10, 15 or 30 minutes, 3 by default). With a saver running it
+reads **Screensaver dim after**: the menus stay bright until the saver comes
+on, and the screen dims once the saver has been up that long. Never keeps the
+screen at full brightness. OK on the row dims the screen to try it. Paused
+playback always dims after 3 minutes, whatever the row says.
 
 Supporter builds add a **Home logo** row to Options, with the star. **Default**
 draws the app's wordmark at the top left of Home, **MisterKun** draws
