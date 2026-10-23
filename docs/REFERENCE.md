@@ -252,9 +252,7 @@ Options lists, in groups:
 - **Surround downmix boost**, **Subtitle size** and **Subtitle background**
   (see Subtitles), **Theme
   music** (a show's theme song on its pages, when Jellyfin has one) and
-  **Navigation sounds** (a short tick on each move in the menus, a
-  slightly different note each time; silent while a theme song plays and
-  during playback).
+  **Navigation sounds** (no sound plays with the H.264 core).
 - Supporter extras, in builds that have them, each with the purple star (see
   [Beta builds and supporter access](#beta-builds-and-supporter-access)): **Screensavers** and, with a saver
   running, **Screensaver**, **Screensaver after**, and for Media art **Art
