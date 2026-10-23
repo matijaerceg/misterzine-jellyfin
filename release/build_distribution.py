@@ -49,7 +49,7 @@ def installer(out, name, channel=None, pinned=None, database=None):
         '#!/bin/bash\npython3 /media/fat/misterzine-jellyfin/update_service.py uninstall "$@"\n', newline='\n')
 
 
-def build(package, tag, notes, out, previous=None, source_archive=None):
+def build(package, tag, notes, out, previous=None, source_archive=None, pin_legacy=False):
     out.mkdir(parents=True, exist_ok=True)
     if not catalogue.IDENT.fullmatch(tag):
         raise ValueError('Invalid release tag')
@@ -72,8 +72,27 @@ def build(package, tag, notes, out, previous=None, source_archive=None):
                           'url': base + source['filename']}}
     catalogue.entry(release)
     cat = catalogue.catalogue(previous) if previous is not None else {'schema': 1, 'releases': {}}
-    cat['releases'][channel] = release
-    for missing in {'public', 'beta'} - set(cat['releases']):
+    cat = dict(cat, releases=dict(cat['releases']))
+    pins = list(cat.get('legacy_pin', []))
+    cat['current'] = dict(cat.get('current', {}), **{channel: release})
+    if channel in pins:
+        if pin_legacy:
+            raise ValueError('The legacy entry for ' + channel + ' is already pinned')
+        # Cards that read only the legacy slot can install just the release
+        # frozen there, and may update from it at any time, so it stays as it is.
+        if channel not in cat['releases']:
+            raise ValueError('The pinned legacy entry for ' + channel + ' is missing')
+    else:
+        # The channel database is rewritten by every publish; a frozen entry
+        # points at this release's own database asset instead.
+        legacy = dict(release, db_url=base + 'release-db.json.zip') if pin_legacy else release
+        cat['releases'][channel] = legacy
+        if pin_legacy:
+            pins.append(channel)
+    if pins:
+        cat['legacy_pin'] = pins
+    catalogue.catalogue(cat)
+    for missing in {'public', 'beta'} - set(catalogue.offered_channels(cat)):
         (out / ('MisterZine-Jellyfin-Install-' + missing.title() + '.sh')).unlink(missing_ok=True)
     (out / 'catalogue.json').write_text(json.dumps(cat, indent=2) + '\n')
     db = {'v': 1, 'db_id': catalogue.DB_ID, 'timestamp': int(time.time()),
@@ -84,7 +103,7 @@ def build(package, tag, notes, out, previous=None, source_archive=None):
         z.writestr('misterzine_jellyfin.json', json.dumps(db))
     shutil.copyfile(out / (channel + '.json.zip'), out / 'release-db.json.zip')
     (out / 'downloader_misterzine_jellyfin.ini').write_text('[misterzine_jellyfin]\ndb_url = ' + release['db_url'] + '\nfilter =\n')
-    for available in cat['releases']:
+    for available in catalogue.offered_channels(cat):
         installer(out, 'MisterZine-Jellyfin-Install-' + available.title() + '.sh', channel=available)
     installer(out, 'MisterZine-Jellyfin-Install-' + release['version'] + '.sh',
               pinned=release, database=base + 'release-db.json.zip')
@@ -99,6 +118,9 @@ if __name__ == '__main__':
     p.add_argument('--out', type=Path, default=ROOT / 'dist/distribution')
     p.add_argument('--previous', type=Path)
     p.add_argument('--source-archive', type=Path)
+    p.add_argument('--pin-legacy', action='store_true',
+                   help='freeze this release as the entry cards that read only the legacy slot install')
     args = p.parse_args()
     build(args.package, args.tag, args.notes.read_text(), args.out,
-          json.loads(args.previous.read_text()) if args.previous else None, args.source_archive)
+          json.loads(args.previous.read_text()) if args.previous else None, args.source_archive,
+          args.pin_legacy)

@@ -67,6 +67,25 @@ An exact-version installer selects that immutable release; a latest-channel
 installer follows the channel catalogue. Do not create a placeholder stable
 release while only a beta exists.
 
+## Catalogue slots
+
+`catalogue.json` holds two entries per channel. `current` is what the app's
+updater and the channel installer scripts install. `releases` is the legacy
+slot, read by cards whose updater predates `current`. Readers take a channel
+from `current` when it is there and fall back to `releases` otherwise, so a
+catalogue written before `current` existed stays valid. The same release ID
+may appear in both slots, but not twice in one.
+
+Each publish writes its release to `current` and, unless the channel is
+listed in `legacy_pin`, to `releases` too. Publishing with `--pin-legacy`
+freezes that release's `releases` entry and adds the channel to `legacy_pin`,
+for when older cards must keep installing one particular release. The frozen
+entry points at that release's own `release-db.json.zip` asset rather than
+the channel database, which every later publish rewrites. Never edit or
+delete a pinned legacy entry, by hand or with the tools: old cards may update
+from it at any time, and publishing refuses a pinned channel whose entry is
+missing.
+
 ## Validation
 
 Run the Go suite, ARM vet/build, release Python tests and public-content check.
