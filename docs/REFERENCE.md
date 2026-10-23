@@ -221,6 +221,10 @@ Options lists, in groups:
   picture as on a deck. In both VCR looks the three dots that show while
   the picture is held up are a tape whose reels turn. The controls
   work the same in every look; the picture and the subtitles do not waver.
+  The looks other than Standard are a supporter extra: the row carries the
+  purple star, and without a code covering it the row shows **Unlock
+  forever** and OK opens the code entry. A look chosen earlier plays as
+  Standard until a code covers it, and comes back once one does.
 - **Video bitrate** (see Sound and playback quality).
 - **Show** and a library's name, one row per library: off leaves it out of
   Home, the menu and search. Shown once the libraries have loaded.
@@ -477,6 +481,13 @@ without it. The code is saved on the SD card and survives updates and
 rollback. Stable releases and builds from this source need no code. See
 [beta access](../release/BETA_ACCESS.md).
 
-The code entry and the other parts that only official builds carry come from a
-separate private repository; see [public source and supporter
-builds](SUPPORTER_BUILDS.md). They currently add no other features.
+A supporter extra's row in Options carries a purple star. Without a code
+covering it, the row shows **Unlock forever**, and OK opens the code entry:
+six digits, entered with Up and Down or typed. A code is entered once and
+keeps the features of its month on that SD card for good; later features
+come with a new code. A card unlocked for the October 2026 beta already has
+the extras that code covers.
+
+The registry of issued MisterZine codes and the features they unlock (such as
+the screensavers) come from a separate private repository; see [public
+source and supporter builds](SUPPORTER_BUILDS.md).

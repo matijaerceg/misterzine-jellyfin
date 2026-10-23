@@ -71,5 +71,3 @@ func supporterStar() *gfx.Image {
 	supporterStarImg = im
 	return im
 }
-
-// PremiumSettings is Config.Premium for the host: the extras' own settings,

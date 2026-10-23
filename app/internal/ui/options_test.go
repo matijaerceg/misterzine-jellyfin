@@ -53,6 +53,8 @@ func groupNames(t *testing.T, items []option, names ...string) map[string]string
 }
 
 func TestOptionsGroups(t *testing.T) {
+	// the public groups: a supporter build adds its Extras group
+	withExtraOptions(t, func(*App) []option { return nil })
 	a := betaTestApp(t)
 	a.Client = &jellyfin.Client{}
 	a.Display = DisplayCheck{INI: "MiSTer.ini", VRR: "off", DVI: true}

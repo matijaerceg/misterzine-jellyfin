@@ -10,6 +10,7 @@ import (
 	"math/rand/v2"
 	"net/url"
 	"os"
+	"plexcrt/internal/access"
 	"runtime"
 	"runtime/debug"
 	"runtime/metrics"
@@ -110,6 +111,7 @@ type Screen interface {
 type App struct {
 	updates    updateState
 	supporters supporterState
+	access     access.Month // the coverage of the codes on this card (premium.go)
 	Client     *jellyfin.Client
 	Art        *Art
 	F          Fonts
@@ -971,6 +973,7 @@ func (a *App) Start() {
 	if r, ok := a.Out.(*ring.Ring); ok && a.osd == nil {
 		a.osd = r.Overlay()
 	}
+	a.loadAccess()
 	a.premiumStart()
 	if a.Client != nil {
 		a.Push(NewHome(a))

@@ -243,6 +243,8 @@ func TestSearchLeavesOutHiddenLibraries(t *testing.T) {
 }
 
 func TestOptionsLibraryRows(t *testing.T) {
+	// the public groups: a supporter build adds its Extras group
+	withExtraOptions(t, func(*App) []option { return nil })
 	a := betaTestApp(t)
 	a.Client = &jellyfin.Client{}
 	o := &Options{app: a}
