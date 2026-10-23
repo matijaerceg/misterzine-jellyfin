@@ -80,6 +80,8 @@ type trickplayPreview struct {
 	movedAt time.Time
 	dec     float64
 	sheets  map[int][]*gfx.Image
+	last    *gfx.Image // Frame's last frame, and its number
+	lastAt  int
 	failed  map[int]int // failed fetches or decodes, by sheet
 	closed  bool
 	cancel  context.CancelFunc
@@ -286,9 +288,15 @@ func (b *trickplayPreview) Frame(t float64) *gfx.Image {
 				continue
 			}
 			if frames := b.sheets[k/per]; k%per < len(frames) && frames[k%per] != nil {
-				return frames[k%per]
+				b.last, b.lastAt = frames[k%per], k
+				return b.last
 			}
 		}
+	}
+	// a run into a sheet still decoding: the last frame, from the sheet
+	// next to it, stays until it lands
+	if l := b.lead(); l != 0 && b.last != nil && abs(i-b.lastAt) <= per+trickplayNear+abs(l) {
+		return b.last
 	}
 	return nil
 }
@@ -296,7 +304,7 @@ func (b *trickplayPreview) Frame(t float64) *gfx.Image {
 func (b *trickplayPreview) Close() {
 	b.mu.Lock()
 	b.closed = true
-	b.sheets = nil
+	b.sheets, b.last = nil, nil
 	b.mu.Unlock()
 	if b.cancel != nil {
 		b.cancel()

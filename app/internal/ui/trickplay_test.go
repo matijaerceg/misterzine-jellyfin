@@ -135,3 +135,21 @@ func TestTrickplayFrameBeforeItsSheet(t *testing.T) {
 		t.Fatal("frames outlived Close")
 	}
 }
+
+// A run crossing into a sheet still decoding keeps the last frame it was
+// given until that sheet lands.
+func TestTrickplayFrameAcrossASheetStillDecoding(t *testing.T) {
+	b := newTrickplayPreview(testTP, 18, 9, 0)
+	b.add(0, sheetOf(4))
+	last := b.Frame(3)
+	if last == nil {
+		t.Fatal("no frame from the ready sheet")
+	}
+	if b.Frame(11) != nil {
+		t.Fatal("a frame from far away at rest")
+	}
+	b.speed, b.dec, b.movedAt = 2, 0.5, time.Now() // a run past the near look
+	if b.Frame(11) != last {
+		t.Fatal("the next sheet's frame blinked out before it landed")
+	}
+}
