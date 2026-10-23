@@ -4,6 +4,10 @@ Third beta: scrubbing shows frames of the film, the playback controls come in
 four looks, the menus scroll faster, and supporters get screensavers, a choice
 of Home logo and a Random tab.
 
+- From this release on, a release installs itself: the updater on the card
+  fetches and verifies the download, and the release's own installer puts it
+  in place and starts it. Later releases can change what the package contains
+  without a stepping-stone release.
 - Holding Left or Right on the scrubber shows a frame of the film at the dot,
   when the library has trickplay images turned on in Jellyfin. Playback pauses
   while the hold runs and resumes at the seek. A dark box with the wait dots

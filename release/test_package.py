@@ -73,6 +73,7 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(manifest['core']['quartus_manifest_sha256'], build_package.sha(self.rbf_manifest))
             self.assertEqual(manifest['source']['sha256'], build_package.sha(self.source))
             self.assertEqual(manifest['source']['size'], self.source.stat().st_size)
+            self.assertIs(manifest['self_install'], True)
             self.assertEqual(archive.read('misterzine-jellyfin-beta/provenance/quartus-rbf-manifest.json'),
                              self.rbf_manifest.read_bytes())
             self.assertNotIn(self.verifier.encode(), b''.join(archive.read(name) for name in files))

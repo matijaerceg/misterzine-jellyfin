@@ -379,6 +379,12 @@ background at startup and every six hours while browsing; failed background
 checks stay quiet and are tried again after five minutes. An update found by an
 earlier check is still offered while the network is down.
 
+From beta.3 on, a release installs itself: the updater on the card fetches and
+verifies the download, the release's own installer puts it in place and
+starts it, and the card's updater only steps in to put the previous release
+back if it does not start. Later releases can change what the package
+contains without a stepping-stone release.
+
 Updates offers only versions newer than the one running. It never reinstalls
 the current version or goes back to an older one; **MisterZine-Jellyfin-Rollback**
 does that. Stable builds notify about newer stable releases. Beta
