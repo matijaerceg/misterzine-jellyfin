@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"syscall"
+	"time"
 
 	"plexcrt/internal/gfx"
 	"plexcrt/internal/jellyfin"
@@ -17,12 +18,13 @@ import (
 
 // The Jellyfin server's previews are trickplay sheets per media source
 // (jellyfin.Trickplay): each a JPEG grid of TileWidth x TileHeight frames,
-// one every Interval. A sheet is fetched and decoded in the background
-// when the scrub nears it and cut into display-size frames; at most two
-// are kept: the one under the dot and the next the way it moves.
+// one every Interval. A sheet is fetched and decoded in the background and
+// cut into display-size frames. Three are kept, as the previewer contract
+// asks: the one under the position and the one either side of it,
+// prepared in that order with the neighbour the scrub moves towards first.
 
 // trickplayKeep is how many decoded sheets are kept.
-const trickplayKeep = 2
+const trickplayKeep = 3
 
 // trickplayTries is how often a sheet is tried before it is given up.
 const trickplayTries = 2
@@ -30,6 +32,13 @@ const trickplayTries = 2
 // trickplayNear is how far (in frames) Frame looks for a ready one while
 // the one under the dot is still decoding, so the preview does not blink.
 const trickplayNear = 6
+
+// trickplayRunNice is the worker's priority while a run waits on it.
+const trickplayRunNice = 0
+
+// trickplayLeadMax caps how far (in frames) a fast run widens Frame's
+// look for a ready frame.
+const trickplayLeadMax = 60
 
 // trickplayFrames is how many frames a sheet holds.
 func trickplayFrames(tp jellyfin.Trickplay) int { return tp.TileWidth * tp.TileHeight }
@@ -57,17 +66,23 @@ func trickplayAt(tp jellyfin.Trickplay, t float64) (thumb, sheet, x, y int) {
 
 // trickplayPreview is the previewer over a source's trickplay sheets.
 type trickplayPreview struct {
-	mu     sync.Mutex
-	cond   *sync.Cond
-	w, h   int
-	tp     jellyfin.Trickplay
-	want   int     // the frame the scrub is at, -1 before any
-	at     float64 // where the direction was last taken from
-	dir    int     // the way the scrub moves: +1 or -1
-	sheets map[int][]*gfx.Image
-	failed map[int]int // failed fetches or decodes, by sheet
-	closed bool
-	cancel context.CancelFunc
+	mu   sync.Mutex
+	cond *sync.Cond
+	w, h int
+	tp   jellyfin.Trickplay
+	want int     // the frame the scrub is at, -1 before any
+	at   float64 // the last Near's time
+	dir  int     // the way the scrub moves: +1 or -1
+	// how fast it moves (frames a second), when want last changed, and
+	// how long a sheet takes to decode (seconds, averaged): a run widens
+	// Frame's look by the frames the dot passes in a decode
+	speed   float64
+	movedAt time.Time
+	dec     float64
+	sheets  map[int][]*gfx.Image
+	failed  map[int]int // failed fetches or decodes, by sheet
+	closed  bool
+	cancel  context.CancelFunc
 }
 
 // newPreviewer starts the item's previews: nil when its source has none.
@@ -83,19 +98,23 @@ func newPreviewer(app *App, it *jellyfin.Item, w, h int, start float64) previewe
 	return b
 }
 
+// newTrickplayPreview makes a previewer wanting the sheets round start, so
+// its worker prepares them from the first without waiting for a Near.
 func newTrickplayPreview(tp jellyfin.Trickplay, w, h int, start float64) *trickplayPreview {
-	b := &trickplayPreview{w: w, h: h, tp: tp, want: -1, at: start, dir: 1,
+	b := &trickplayPreview{w: w, h: h, tp: tp, want: -1, at: start, dir: 1, dec: 2,
 		sheets: map[int][]*gfx.Image{}, failed: map[int]int{}}
 	b.cond = sync.NewCond(&b.mu)
-	b.Near(start)
+	b.want, _, _, _ = trickplayAt(tp, start)
 	return b
 }
 
-// run fetches and decodes what Near asks for, a sheet at a time, on its
-// own thread at a low priority as the art workers do.
+// run fetches and decodes the wanted sheets, a sheet at a time, on its
+// own thread: at nice 10 as the art workers do, at normal priority while
+// a held run waits on it.
 func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 	runtime.LockOSThread()
-	syscall.Setpriority(syscall.PRIO_PROCESS, 0, 10)
+	prio := 10
+	syscall.Setpriority(syscall.PRIO_PROCESS, 0, prio)
 	for {
 		b.mu.Lock()
 		n := -1
@@ -110,9 +129,20 @@ func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 			return
 		}
 		tp, w, h := b.tp, b.w, b.h
+		nice := 10
+		if b.lead() != 0 {
+			// a run waits on this: the paused picture leaves the time,
+			// and at nice 10 a decode took ten times as long
+			nice = trickplayRunNice
+		}
 		b.mu.Unlock()
+		if nice != prio {
+			prio = nice
+			syscall.Setpriority(syscall.PRIO_PROCESS, 0, prio)
+		}
 		var frames []*gfx.Image
 		data, err := fetch(n)
+		at := time.Now()
 		if err == nil {
 			decoding(func() {
 				var img image.Image
@@ -121,6 +151,7 @@ func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 				}
 			})
 		}
+		took := time.Since(at).Seconds()
 		b.mu.Lock()
 		if b.closed {
 			b.mu.Unlock()
@@ -132,25 +163,39 @@ func (b *trickplayPreview) run(fetch func(n int) ([]byte, error)) {
 				log.Printf("preview: sheet %d failed", n)
 			}
 		} else {
+			b.dec = (3*b.dec + took) / 4
 			b.add(n, frames)
 		}
 		b.mu.Unlock()
 	}
 }
 
-// wanted is the sheets to have: the one under the dot, then the next the
-// way it moves (-1 for none). Called under mu.
+// wanted is the sheets to have, in the order to prepare them: the one
+// under the position, the neighbour the scrub moves towards, the other
+// neighbour (-1 for none). Called under mu.
 func (b *trickplayPreview) wanted() [trickplayKeep]int {
-	ws := [trickplayKeep]int{-1, -1}
+	ws := [trickplayKeep]int{-1, -1, -1}
 	if b.want < 0 {
 		return ws
 	}
 	s := b.want / trickplayFrames(b.tp)
 	ws[0] = s
-	if s+b.dir >= 0 && s+b.dir < trickplaySheets(b.tp) {
-		ws[1] = s + b.dir
+	for k, d := range []int{b.dir, -b.dir} {
+		if s+d >= 0 && s+d < trickplaySheets(b.tp) {
+			ws[k+1] = s + d
+		}
 	}
 	return ws
+}
+
+// wants is whether sheet n is one of the wanted. Called under mu.
+func (b *trickplayPreview) wants(n int) bool {
+	for _, w := range b.wanted() {
+		if n >= 0 && n == w {
+			return true
+		}
+	}
+	return false
 }
 
 // next is the sheet to fetch, -1 for none. Called under mu.
@@ -166,21 +211,29 @@ func (b *trickplayPreview) next() int {
 // add keeps a decoded sheet if it is still wanted, and drops any sheet
 // no longer wanted. Called under mu.
 func (b *trickplayPreview) add(n int, frames []*gfx.Image) {
-	ws := b.wanted()
-	if n == ws[0] || n == ws[1] {
+	if b.wants(n) {
 		b.sheets[n] = frames
 	}
 	b.drop()
 }
 
-// drop lets go of the sheets no longer wanted. Called under mu.
+// drop lets go of the sheets that are none of the wanted. Called under mu.
 func (b *trickplayPreview) drop() {
-	ws := b.wanted()
 	for k := range b.sheets {
-		if k != ws[0] && k != ws[1] {
+		if !b.wants(k) {
 			delete(b.sheets, k)
 		}
 	}
+}
+
+// lead is how many frames the dot moves in a decode and a half, signed:
+// 0 when it stands. Called under mu.
+func (b *trickplayPreview) lead() int {
+	if b.speed == 0 || time.Since(b.movedAt) > 250*time.Millisecond {
+		return 0
+	}
+	l := int(b.speed * b.dec * 1.5)
+	return max(-trickplayLeadMax, min(l, trickplayLeadMax))
 }
 
 func (b *trickplayPreview) Near(t float64) {
@@ -189,20 +242,33 @@ func (b *trickplayPreview) Near(t float64) {
 	if b.closed {
 		return
 	}
-	if d := t - b.at; d >= 1 || d <= -1 {
+	// later than the last Near is forward
+	if t > b.at {
 		b.dir = 1
-		if d < 0 {
-			b.dir = -1
-		}
-		b.at = t
+	} else if t < b.at {
+		b.dir = -1
 	}
+	b.at = t
 	i, _, _, _ := trickplayAt(b.tp, t)
+	if i == b.want {
+		return
+	}
+	now := time.Now()
+	if b.want >= 0 {
+		// a run's speed, from successive moves; a jump (a seek, a first
+		// move after a rest) is no speed
+		if dt := now.Sub(b.movedAt).Seconds(); dt > 0 && dt < 0.25 && abs(i-b.want) <= trickplayLeadMax/4 {
+			b.speed = (b.speed + float64(i-b.want)/dt) / 2
+		} else {
+			b.speed = 0
+		}
+	}
 	before := b.wanted()
-	b.want = i
+	b.want, b.movedAt = i, now
 	if b.wanted() != before {
 		b.drop()
-		b.cond.Broadcast()
 	}
+	b.cond.Broadcast() // the worker's priority follows the run
 }
 
 func (b *trickplayPreview) Frame(t float64) *gfx.Image {
@@ -213,7 +279,8 @@ func (b *trickplayPreview) Frame(t float64) *gfx.Image {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	per := trickplayFrames(b.tp)
-	for d := 0; d <= trickplayNear; d++ {
+	// the nearest ready one: during a run the dot outpaces the decodes
+	for d := 0; d <= trickplayNear+abs(b.lead()); d++ {
 		for _, k := range []int{i - d, i + d} {
 			if k < 0 {
 				continue

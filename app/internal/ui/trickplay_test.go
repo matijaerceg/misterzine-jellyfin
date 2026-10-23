@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"fmt"
 	"image"
 	"testing"
+	"time"
 
 	"plexcrt/internal/gfx"
 	"plexcrt/internal/jellyfin"
@@ -51,9 +53,10 @@ func sheetOf(n int) []*gfx.Image {
 	return f
 }
 
-// The decoder keeps two sheets: the one under the dot and the next the
-// way it moves; moving on drops the rest.
-func TestTrickplayKeepsTwoSheets(t *testing.T) {
+// The decoder keeps three sheets: the one under the dot and both
+// neighbours, fetched in that order with the one it moves towards first;
+// moving on drops only what is none of the three.
+func TestTrickplayKeepsThreeSheets(t *testing.T) {
 	b := newTrickplayPreview(testTP, 18, 9, 0)
 	if n := b.next(); n != 0 {
 		t.Fatalf("first fetch is sheet %d", n)
@@ -65,20 +68,51 @@ func TestTrickplayKeepsTwoSheets(t *testing.T) {
 	b.add(1, sheetOf(4))
 	b.add(2, sheetOf(4)) // not wanted: not kept
 	if len(b.sheets) != 2 || b.next() != -1 {
-		t.Fatalf("kept %d sheets", len(b.sheets))
-	}
-	b.Near(9) // sheet 2, heading on into 3
-	if len(b.sheets) != 0 || b.next() != 2 {
 		t.Fatalf("kept %d sheets, next %d", len(b.sheets), b.next())
 	}
-	b.add(2, sheetOf(4))
-	b.Near(5) // back into sheet 1, heading on into 0
-	if b.wanted() != [2]int{1, 0} || len(b.sheets) != 0 {
-		t.Fatalf("wanted %v, kept %d", b.wanted(), len(b.sheets))
+	b.Near(5) // sheet 1, heading on into 2: 0 stays as the one behind
+	if b.wanted() != [3]int{1, 2, 0} || len(b.sheets) != 2 || b.next() != 2 {
+		t.Fatalf("wanted %v, kept %d, next %d", b.wanted(), len(b.sheets), b.next())
 	}
-	b.failed[1] = trickplayTries
-	if n := b.next(); n != 0 {
+	b.add(2, sheetOf(4))
+	b.Near(9) // sheet 2, heading on into 3: 0 is dropped
+	if b.wanted() != [3]int{2, 3, 1} || len(b.sheets) != 2 || b.sheets[0] != nil || b.next() != 3 {
+		t.Fatalf("wanted %v, kept %d, next %d", b.wanted(), len(b.sheets), b.next())
+	}
+	b.Near(6) // back into sheet 1: 0 comes first, then 2
+	if b.wanted() != [3]int{1, 0, 2} || len(b.sheets) != 2 || b.next() != 0 {
+		t.Fatalf("going back: wanted %v, kept %d, next %d", b.wanted(), len(b.sheets), b.next())
+	}
+	b.failed[0] = trickplayTries
+	if n := b.next(); n != -1 {
 		t.Fatalf("a sheet tried twice is asked again: next %d", n)
+	}
+}
+
+// The worker prepares from its creation, with no Near: the sheet under
+// the start, then the one after, then the one before.
+func TestTrickplayPreparesFromTheStart(t *testing.T) {
+	b := newTrickplayPreview(testTP, 18, 9, 5)
+	var got []int
+	for n := b.next(); n >= 0; n = b.next() {
+		got = append(got, n)
+		b.add(n, sheetOf(4))
+	}
+	if fmt.Sprint(got) != "[1 2 0]" {
+		t.Fatalf("prepared %v", got)
+	}
+}
+
+// A run widens Frame's look to the frames the dot passes in a decode.
+func TestTrickplayFrameDuringARun(t *testing.T) {
+	b := newTrickplayPreview(testTP, 18, 9, 0)
+	b.add(0, sheetOf(4))
+	if b.Frame(11) != nil {
+		t.Fatal("a frame from far away at rest")
+	}
+	b.speed, b.dec, b.movedAt = 4, 1, time.Now()
+	if b.Frame(11) == nil {
+		t.Fatal("no frame within the run's lead")
 	}
 }
 
