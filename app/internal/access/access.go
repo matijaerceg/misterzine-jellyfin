@@ -67,6 +67,9 @@ var (
 	// PlaybackTheme is the playback controls' looks other than Standard
 	// (Options > Playback UI theme).
 	PlaybackTheme = Feature{Premium: true, Since: 202610}
+	// NoHomeLogo is the Home logo's choices other than Default: MisterKun
+	// in place of the wordmark, or no logo (Options > Home logo).
+	NoHomeLogo = Feature{Premium: true, Since: 202610}
 )
 
 // Entry names a feature for the access overview and the coverage register.
@@ -80,6 +83,7 @@ func Catalog() []Entry {
 	return []Entry{
 		{"screensaver", "Screensaver", Screensaver},
 		{"playback-theme", "Playback UI theme", PlaybackTheme},
+		{"no-home-logo", "Home logo: MisterKun or none", NoHomeLogo},
 	}
 }
 

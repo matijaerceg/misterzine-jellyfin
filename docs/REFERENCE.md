@@ -491,3 +491,10 @@ the extras that code covers.
 The registry of issued MisterZine codes and the features they unlock (such as
 the screensavers) come from a separate private repository; see [public
 source and supporter builds](SUPPORTER_BUILDS.md).
+
+Supporter builds add a **Home logo** row to Options, with the star. **Default**
+draws the app's wordmark at the top left of Home, **MisterKun** draws
+MiSTer-kun peeking from behind the Jellyfin triangle in its place, and **Off** draws no
+logo; the BETA and UPDATE marks then start where the wordmark did. The drawer
+and the sign-in screen keep the wordmark. It needs a code covering October 2026;
+without one, Home shows the wordmark whatever the row was set to.
