@@ -76,9 +76,17 @@ def build(package, tag, notes, out, previous=None, source_archive=None, pin_lega
                'source': {'filename': source['filename'], 'size': source['size'], 'sha256': source['sha256'],
                           'url': base + source['filename']}}
     catalogue.entry(release)
+    # The channel being published is replaced whole, so its old entry is not
+    # validated: a catalogue written before the corresponding-source metadata
+    # existed is still a valid starting point. A pinned legacy entry is never
+    # replaced, so it is kept and validated.
+    pins = list(previous.get('legacy_pin', [])) if previous is not None else []
+    if previous is not None:
+        previous = dict(previous, current={c: r for c, r in previous.get('current', {}).items() if c != channel},
+                        releases={c: r for c, r in previous.get('releases', {}).items()
+                                  if c != channel or c in pins})
     cat = catalogue.catalogue(previous) if previous is not None else {'schema': 1, 'releases': {}}
     cat = dict(cat, releases=dict(cat['releases']))
-    pins = list(cat.get('legacy_pin', []))
     cat['current'] = dict(cat.get('current', {}), **{channel: release})
     if channel in pins:
         if pin_legacy:
