@@ -23,6 +23,10 @@ cannot play directly, and every video with subtitles the server burns in
 (picture subtitles such as PGS), is converted by the server. Run **Update All**
 or **Downloader** first so MiSTer Linux is current.
 
+The server must be reachable over IPv4. MiSTer Linux is built without IPv6, so
+no MiSTer app can reach a server that is only on IPv6: use the local network or
+an IPv4 route to the server.
+
 1. Download `MisterZine-Jellyfin-Install-Beta.sh` from
    [Releases](https://github.com/matijaerceg/misterzine-jellyfin/releases) and
    put it in the SD card's `Scripts` folder
