@@ -7,6 +7,11 @@ project's fork of Ben Owen's
 [MiSTer H.264 decoder](third_party/MiSTer_h264_decoder/README.md) core, which
 ships with the app.
 
+Features, what early access includes and the current version:
+[misterzine.fyi/jellyfin](https://misterzine.fyi/jellyfin/)
+
+<img width="1600" height="900" alt="The MisterZine Jellyfin home screen on a Sony Trinitron: a film's artwork above the Continue Watching row" src="docs/images/hero.jpg" />
+
 ## Install
 
 The current release is a beta, published as a GitHub pre-release. Beta builds
