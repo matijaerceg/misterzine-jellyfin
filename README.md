@@ -1,4 +1,4 @@
-# MisterZine Jellyfin
+# MisterZine Jellyfin Client Core for MiSTer FPGA
 
 Watch your Jellyfin library on MiSTer. Built for CRTs, with controller
 navigation and HDMI support. The Go application handles browsing and playback
