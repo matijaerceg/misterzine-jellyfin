@@ -32,6 +32,11 @@ func TestDirectEligible(t *testing.T) {
 		want bool
 	}{
 		{"720p high", videoSource(ok720, 0), true},
+		{"narrow 722 lines", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.Width, v.Height, v.RealFrameRate = 968, 722, 29.97 }), 0), true},
+		{"rounded block boundary", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.Width, v.Height, v.RealFrameRate = 1280, 721, 29.97 }), 0), false},
+		{"narrow tall within budget", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.Width, v.Height, v.RealFrameRate = 960, 960, 29.97 }), 0), true},
+		{"narrow tall over rate", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.Width, v.Height, v.RealFrameRate = 848, 1024, 60 }), 0), false},
+		{"over block budget", videoSource(with(ok720, func(v *jellyfin.MediaStream) { v.Width, v.Height, v.RealFrameRate = 1200, 800, 24 }), 0), false},
 		{"480p60 main", videoSource(ok480, 0), true},
 		{"no probe data trusts server", jellyfin.MediaSource{ID: "source"}, true},
 		{"unknown values pass", videoSource(jellyfin.MediaStream{Codec: "h264"}, 0), true},
@@ -314,5 +319,21 @@ func waitDone(t *testing.T, s *Session) error {
 	case <-time.After(6 * time.Second):
 		t.Fatal("session did not end")
 		return nil
+	}
+}
+
+func TestTallDirectSourceUsesWorkerChecks(t *testing.T) {
+	source := strings.Replace(strings.Replace(eligibleDirect, `"Width":1280`, `"Width":968`, 1), `"Height":720`, `"Height":722`, 1)
+	f := newFallbackServer(t, source)
+	p := f.player(t, nil, "10")
+	session, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitDone(t, session)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.bodies) != 1 || !hasArg(f.launches[0], "--direct") {
+		t.Fatal("tall eligible source did not use checked direct playback")
 	}
 }

@@ -117,3 +117,21 @@ func DeviceProfileJSON(videoKbps int) (json.RawMessage, error) {
 	b, err := json.Marshal(playbackDeviceProfile(videoKbps))
 	return json.RawMessage(b), err
 }
+
+// directProbeProfileJSON lets Jellyfin offer unusual picture shapes. The client
+// checks their rounded block count, bitrate and rate before starting jfplay;
+// the worker then validates the actual coded SPS. Transcode targets retain
+// their normal resolution caps through DeviceProfileJSON.
+func directProbeProfileJSON() (json.RawMessage, error) {
+	p := playbackDeviceProfile(MaxVideoKbps)
+	for i := range p.CodecProfiles {
+		conditions := p.CodecProfiles[i].Conditions[:0]
+		for _, c := range p.CodecProfiles[i].Conditions {
+			if c.Property != "Height" {
+				conditions = append(conditions, c)
+			}
+		}
+		p.CodecProfiles[i].Conditions = conditions
+	}
+	return json.Marshal(p)
+}

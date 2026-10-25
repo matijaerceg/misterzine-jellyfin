@@ -82,3 +82,31 @@ func TestDeviceProfileSizeFollowsCap(t *testing.T) {
 		t.Fatalf("lowest step %d kbit/s is %d wide", Bitrates[0].Kbps, w)
 	}
 }
+
+func TestDirectProbeLeavesHeightToBlockCheck(t *testing.T) {
+	b, err := directProbeProfileJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p deviceProfile
+	if err := json.Unmarshal(b, &p); err != nil {
+		t.Fatal(err)
+	}
+	for _, profile := range p.CodecProfiles {
+		for _, c := range profile.Conditions {
+			if c.Property == "Height" {
+				t.Fatal("probe imposes a rectangular height cap")
+			}
+		}
+	}
+	// Offering a tall source must not loosen the eventual transcode target.
+	found := false
+	for _, c := range playbackDeviceProfile(8000).CodecProfiles[0].Conditions {
+		if c.Property == "Height" && c.Value == "720" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("transcode height cap changed")
+	}
+}
