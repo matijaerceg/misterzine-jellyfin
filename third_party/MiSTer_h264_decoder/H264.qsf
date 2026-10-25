@@ -12,6 +12,14 @@
 # tools/seed_sweep.sh restores its own snapshot).
 #
 # SEED LEDGER (append one line per fit that ships or teaches something; never delete):
+#   2026-10-25 (Jellyfin 0.1.0-beta.4, source c88624b): SEED 13,
+#     clk_dec 103.64/102.64 MHz, clk_vid 94.81/89.57 MHz; both gates PASS.
+#   2026-10-25 (same netlist): SEED 11, clk_dec 97.08/98.95 MHz;
+#     decoder gate FAIL; not released.
+#   2026-10-25 (Jellyfin 0.1.0-beta.4, source c88624b): SEED 7,
+#     clk_dec 103.25/100.99 MHz, clk_vid 90.78/91.62 MHz; decoder gate FAIL.
+#   2026-10-25 (same netlist): SEED 9, clk_dec 100.46/101.44 MHz;
+#     decoder gate FAIL. Neither marginal fit is released.
 #   2026-10-24 (gradient dither default On + Start, source 8553d31): SEED 7,
 #     clk_dec 102.51/103.19 MHz, clk_vid 92.49/92.72 MHz; both gates PASS.
 #   date (branch/slug): SEED n, clk_dec 100C/-40C MHz, ALM %, M10K, DSP, build name, commit
@@ -574,4 +582,4 @@ set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL NORMAL
 #   and video 84.79/81.77 MHz. SEED 7 failed decoder 99.27/100.62 MHz.
 #   SEED 9 qualified: decoder 102.16/104.16 MHz, video 91.49/89.10 MHz;
 #   40,985 ALMs, 421 M10K, 107 DSP; H264_buttons_20261019_0322.rbf.
-set_global_assignment -name SEED 7
+set_global_assignment -name SEED 13
