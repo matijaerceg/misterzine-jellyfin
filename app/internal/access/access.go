@@ -73,7 +73,8 @@ var (
 	PlaybackTheme = Feature{Premium: true, Since: 202610}
 	// NoHomeLogo is the Home logo's choices other than Default: MisterKun
 	// in place of the wordmark, or no logo (Options > Home logo).
-	NoHomeLogo = Feature{Premium: true, Since: 202610}
+	NoHomeLogo       = Feature{Premium: true, Since: 202610}
+	NavigationMelody = Feature{Premium: true, Since: 202610}
 )
 
 // Entry names a feature for the access overview and the coverage register.
@@ -89,6 +90,7 @@ func Catalog() []Entry {
 		{"random-sort", "Random library order", RandomSort},
 		{"playback-theme", "Playback UI theme", PlaybackTheme},
 		{"no-home-logo", "Home logo: MisterKun or none", NoHomeLogo},
+		{"navigation-melody", "Navigation melody", NavigationMelody},
 	}
 }
 

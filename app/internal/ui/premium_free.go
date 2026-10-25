@@ -44,3 +44,7 @@ func PremiumVersion() string { return "" }
 func (a *App) checkPlaybackAccess() error                { return nil }
 func (a *App) requirePlaybackAccess(then func()) bool    { return true }
 func (o *Options) accessOptions(items []option) []option { return items }
+
+// Pitch zero selects the standard random click in public builds.
+func (a *App) premiumMenuNote(advance bool) int { return 0 }
+func (a *App) premiumMenuSustain() bool         { return false }
