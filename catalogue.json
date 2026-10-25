@@ -2,22 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta3-f2ed8f1",
-      "version": "0.1.0-beta.3",
+      "id": "beta-0.1.0-beta.4-20261025",
+      "version": "0.1.0-beta.4",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.3\n\nThird beta: scrubbing shows frames of the film, the playback controls come in\nfour looks, the menus scroll faster, and supporters get screensavers, a choice\nof Home logo and a Random tab.\n\n- From this release on, a release installs itself: the updater on the card\n  fetches and verifies the download, and the release's own installer puts it\n  in place and starts it. Later releases can change what the package contains\n  without a stepping-stone release.\n- Holding Left or Right on the scrubber shows a frame of the film at the dot,\n  when the library has trickplay images turned on in Jellyfin. Playback pauses\n  while the hold runs and resumes at the seek. A dark box with the wait dots\n  stands in for a frame that is still loading.\n- Text subtitles are drawn as white type with a thin dark outline.\n  **Subtitle background** in Options puts them on a translucent box instead.\n- **Playback UI theme** chooses the look of the playback controls: Standard,\n  Icons, VCR or VCR without its band. The looks other than Standard are a\n  supporter extra.\n- **More** in the playback controls is one list: Crop, Downmix boost,\n  Subtitle size, Autoplay next and Video bitrate change in place with Left and\n  Right, and Playback info shows direct play or transcode, the picture, the\n  sound and the decoder's late frames.\n- Supporter extras, each with the purple star in Options: **Screensavers**\n  (a bouncing logo or a slideshow of your libraries' art), **Home logo**\n  (the wordmark, MisterKun or none) and the **Random** tab in libraries. OK\n  on a locked row opens the code entry; a code keeps its month's extras on the\n  card for good.\n- A library wall rounds from its last row to its first, a held direction\n  keeps up with the pictures, and letter jumps fetch nothing until they stop.\n  **Forget my progress** on an item in Continue Watching clears its resume\n  point on the server.\n- Space or P on a USB keyboard pauses and resumes in one press. During\n  playback the first Back clears what is on screen, and a second Back within\n  half a second is ignored, so a double press no longer stops the video.\n- The resume point reaches every screen the moment a playback ends, direct\n  play uses the player's own length, and the MiSTer menu loads after Exit.\n- Every install starts once at the top video bitrate, now that the decoder is\n  in the FPGA.\n\nPlayback updates Jellyfin watched state and resume positions. Network\nseeking, server compatibility and different hardware setups remain beta test\nareas. The included FPGA image is the beta.2 design, unchanged.\n\nInstallers and update notices become available when this release and its\ncatalogue are published. See README.md for setup and feedback instructions.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.3/MisterZine-Jellyfin-beta3-f2ed8f1.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.4\n\nThis update improves gradients, controller playback controls, server-outage\nhandling, menu audio, and the choice between original video and server conversion.\n\n- **Gradient Dither** is on by default. It smooths colour gradients in the\n  final picture and can be switched off in the core OSD.\n- The controller **Start** button pauses and resumes playback.\n- Menus stay responsive while the server is unavailable. Requests can be\n  cancelled, and a connection error offers a retry instead of leaving the\n  screen apparently frozen.\n- Original H.264 video can play at unusual dimensions when it fits the\n  decoder's picture and frame-rate limits. This permits some pictures slightly\n  taller than 720 pixels; it does not add 1080p decoding.\n- Surround audio is converted to stereo by the server. Eligible video stays\n  unchanged during audio conversion; supported mono/stereo audio can still\n  play directly. The selected video bitrate remains a limit on original video.\n- Audio/video feeding is paced more carefully to avoid starving audio when\n  video packets arrive in bursts.\n\n- Navigation clicks play promptly while browsing. Navigation sounds retain\n  their Off, Quiet and Loud settings.\n- The navigation melody chooser includes Trolo, Sahur, Astro, Tetro and Cat.\n- Show theme music is available again when supplied by the server, with an\n  independent Theme music toggle. Themes mix with navigation clicks and stop\n  before video playback.\n\nExisting settings, calibration and saved access are preserved by updates.\nRollback restores the previous application and core. This remains a beta;\nplease include the title, playback position and symptoms when reporting an issue.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.4/MisterZine-Jellyfin-beta-0.1.0-beta.4-20261025.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14222444,
-      "sha256": "bc90e4270a527cf8c37fb0d6c908559985574d885a5f0110b628ba7f624cf926",
+      "size": 14065740,
+      "sha256": "5fbb603773b8e24ee29925f13ac249611987b0efce11df59e998c8cb63862647",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta3-f2ed8f1.zip",
-        "size": 138761262,
-        "sha256": "6d6389fb1436335e6e5889cd3383407ea942122832b8d420002b1b1ef47664b8",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.3/MisterZine-Jellyfin-Source-beta3-f2ed8f1.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.4-20261025.zip",
+        "size": 138984836,
+        "sha256": "b7f5d8c33ee774793ce4ff9c494fd8c58ecd1b2f52c49b6bcf6900199da31fc3",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.4/MisterZine-Jellyfin-Source-beta-0.1.0-beta.4-20261025.zip"
+      }
+    }
+  },
+  "current": {
+    "beta": {
+      "id": "beta-0.1.0-beta.4-20261025",
+      "version": "0.1.0-beta.4",
+      "channel": "beta",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.4\n\nThis update improves gradients, controller playback controls, server-outage\nhandling, menu audio, and the choice between original video and server conversion.\n\n- **Gradient Dither** is on by default. It smooths colour gradients in the\n  final picture and can be switched off in the core OSD.\n- The controller **Start** button pauses and resumes playback.\n- Menus stay responsive while the server is unavailable. Requests can be\n  cancelled, and a connection error offers a retry instead of leaving the\n  screen apparently frozen.\n- Original H.264 video can play at unusual dimensions when it fits the\n  decoder's picture and frame-rate limits. This permits some pictures slightly\n  taller than 720 pixels; it does not add 1080p decoding.\n- Surround audio is converted to stereo by the server. Eligible video stays\n  unchanged during audio conversion; supported mono/stereo audio can still\n  play directly. The selected video bitrate remains a limit on original video.\n- Audio/video feeding is paced more carefully to avoid starving audio when\n  video packets arrive in bursts.\n\n- Navigation clicks play promptly while browsing. Navigation sounds retain\n  their Off, Quiet and Loud settings.\n- The navigation melody chooser includes Trolo, Sahur, Astro, Tetro and Cat.\n- Show theme music is available again when supplied by the server, with an\n  independent Theme music toggle. Themes mix with navigation clicks and stop\n  before video playback.\n\nExisting settings, calibration and saved access are preserved by updates.\nRollback restores the previous application and core. This remains a beta;\nplease include the title, playback position and symptoms when reporting an issue.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.4/MisterZine-Jellyfin-beta-0.1.0-beta.4-20261025.zip",
+      "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
+      "size": 14065740,
+      "sha256": "5fbb603773b8e24ee29925f13ac249611987b0efce11df59e998c8cb63862647",
+      "access": {
+        "batch": "misterzine-2026-10"
+      },
+      "source": {
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.4-20261025.zip",
+        "size": 138984836,
+        "sha256": "b7f5d8c33ee774793ce4ff9c494fd8c58ecd1b2f52c49b6bcf6900199da31fc3",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.4/MisterZine-Jellyfin-Source-beta-0.1.0-beta.4-20261025.zip"
       }
     }
   }
