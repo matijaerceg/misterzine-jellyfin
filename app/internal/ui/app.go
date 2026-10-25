@@ -144,8 +144,9 @@ type App struct {
 	Connected chan struct{}
 	// Notice is a line shown along the bottom for a few seconds (a file
 	// the server refused to play).
-	Notice   string
-	NoticeAt time.Time
+	serverOffline bool
+	Notice        string
+	NoticeAt      time.Time
 	// later holds closures for the render thread (results of background work).
 	later chan func()
 	// held keeps the closures playLoop takes off later while a playback has
@@ -251,74 +252,24 @@ func (a *App) top() Screen { return a.stack[len(a.stack)-1] }
 // to playback when direct), a show's page of seasons, a season's page of
 // episodes, and for an episode its season's page with it highlighted.
 func (a *App) Open(it *jellyfin.Item, direct bool) {
+	if it.Type == "more" {
+		if sec, ok := a.section(it.Key); ok {
+			a.Push(NewWallView(a, sec, 1))
+		}
+		return
+	}
+	if it.Type == "movie" && direct {
+		a.PlayAt(it, it.ViewOffset)
+		return
+	}
 	switch it.Type {
-	case "more":
-		// the end of a home row: the library, newest first
-		if s, ok := a.section(it.Key); ok {
-			a.Push(NewWallView(a, s, 1))
-		}
-	case "movie":
-		if direct {
-			a.PlayAt(it, it.ViewOffset)
-			return
-		}
-		a.Push(NewPreplay(a, it))
-	case "show":
-		seasons, err := a.seasonsOf(it)
-		if err != nil {
-			a.Log.Printf("seasons of %s: %v", it.Title, err)
-			return
-		}
-		if it.Logo == "" || it.Summary == "" {
-			if fresh, err := a.Client.Item(bg(), it.ID); err == nil {
-				a.takeFresh(it, fresh)
-			}
-		}
-		if len(seasons) == 1 {
-			a.Push(NewShowInSeason(a, it, seasons, 0, ""))
-			return
-		}
-		a.Push(NewShow(a, it, seasons))
-	case "season":
-		a.openSeason(it.ParentID, it.ID, "")
-	case "episode":
-		if it.SeriesID == "" || it.ParentID == "" {
-			if fresh, err := a.Client.Item(bg(), it.ID); err == nil {
-				a.takeFresh(it, fresh)
-			}
-		}
-		a.openSeason(it.SeriesID, it.ParentID, it.ID)
+	case "movie", "show", "season", "episode":
+		a.openItem(it, "")
 	}
 }
 
-// seasonsOf lists a show's seasons.
-func (a *App) seasonsOf(show *jellyfin.Item) ([]*jellyfin.Item, error) {
-	return a.Client.Items(bg(), show.Key, nil, 500)
-}
-
-// openSeason opens a season's page given the show's and the season's
-// rating keys, highlighting the episode at (or the first unwatched).
 func (a *App) openSeason(showKey, seasonKey, at string) {
-	show, err := a.Client.Item(bg(), showKey)
-	if err != nil {
-		a.Log.Printf("show %s: %v", showKey, err)
-		return
-	}
-	seasons, err := a.seasonsOf(show)
-	if err != nil {
-		a.Log.Printf("seasons of %s: %v", show.Title, err)
-		return
-	}
-	si := 0
-	for i, s := range seasons {
-		if s.ID == seasonKey {
-			si = i
-		}
-	}
-	if len(seasons) == 0 {
-		return
-	}
-	a.Push(NewShowInSeason(a, show, seasons, si, at))
+	a.openItem(&jellyfin.Item{Type: "season", ID: seasonKey, ParentID: showKey}, at)
 }
 
 // pager returns the listing for a path and query, kept for the session
@@ -860,9 +811,8 @@ func (a *App) Menu() {
 	if a.Client == nil {
 		return // signing in: nothing to list
 	}
-	if len(a.secs) == 0 {
-		a.loadSections() // not in yet: one request, the first time only
-	}
+	// The background section/Home fetch fills libraries when available.
+	// Always let the drawer open, including Options and Exit, during an outage.
 	items, cur := a.menuItems()
 	a.Push(NewDrawer(a, a.stack[0], items, cur))
 }
@@ -933,6 +883,7 @@ func (a *App) Later(f func()) {
 
 // runLater runs the closures held during a playback, then the queued ones.
 func (a *App) runLater() {
+	a.pollServerRequest()
 	held := a.held
 	a.held = nil
 	for _, f := range held {
@@ -1341,6 +1292,9 @@ func (a *App) Run(events <-chan input.Event, stop <-chan struct{}) {
 			c := a.Out.Begin()
 			warmFadesFor(c.W, c.H)
 			animating = a.drawScreen(c, t0)
+			if a.serverOffline && a.Notice == "" {
+				a.text(c, SafeX, SafeBottom+6, a.F.SmallBold, gfx.White, "Server unavailable")
+			}
 			if a.Notice != "" {
 				if time.Since(a.NoticeAt) > 6*time.Second {
 					a.Notice = ""

@@ -125,6 +125,7 @@ func TestWallFoldersTab(t *testing.T) {
 
 	press(input.Right)
 	press(input.Enter)
+	settleServerRequest(t, a)
 	if p, ok := a.top().(*Preplay); !ok || p.item.ID != "31" {
 		t.Fatalf("OK on a file in the folder opened %T", a.top())
 	}

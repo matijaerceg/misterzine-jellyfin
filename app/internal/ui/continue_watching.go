@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"maps"
 	"time"
 
@@ -75,25 +76,26 @@ func (l *continueList) has(key string) bool { return l.keys[key] }
 
 // forgetProgress clears an item's resume point on the server, which takes
 // it out of Continue Watching, then out of the page's list and the Home row
-// at once, not at their next fetch. False when the server refused; the
-// notice line says so.
-func (a *App) forgetProgress(it *jellyfin.Item, l *continueList) bool {
-	if err := a.Client.ClearResumePoint(bg(), it.ID); err != nil {
-		a.Log.Printf("forget progress %s: %v", it.ID, err)
-		a.Notice, a.NoticeAt = "Could not forget your progress.", time.Now()
-		a.dirty = true
-		return false
-	}
-	it.ViewOffset = 0
-	l.pending = nil // an answer from before the removal would still hold it
-	delete(l.keys, it.ID)
-	for _, screen := range a.stack {
-		if h, ok := screen.(*Home); ok && h.home {
-			h.dropContinue(it.ID)
+// at once, not at their next fetch. The request screen reports failures.
+func (a *App) forgetProgress(it *jellyfin.Item, l *continueList, done func()) {
+	client, key := a.Client, it.ID
+	a.requestServer(func(ctx context.Context) (func(), error) {
+		if err := client.ClearResumePoint(ctx, key); err != nil {
+			return nil, err
 		}
-	}
-	a.dirty = true
-	return true
+		return func() {
+			it.ViewOffset = 0
+			l.pending = nil // an answer from before the removal would still hold it
+			delete(l.keys, it.ID)
+			for _, screen := range a.stack {
+				if h, ok := screen.(*Home); ok && h.home {
+					h.dropContinue(it.ID)
+				}
+			}
+			a.dirty = true
+			done()
+		}, nil
+	})
 }
 
 // dropContinue takes an item out of the Continue Watching row and has the

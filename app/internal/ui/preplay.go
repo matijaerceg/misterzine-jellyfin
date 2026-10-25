@@ -70,14 +70,9 @@ const (
 )
 
 // NewPreplay makes the page for a playable item. Hub listings omit the
-// summary and genres, so the full record is fetched when it is missing.
+// summary and genres; openItem fetches missing metadata before constructing it.
 func NewPreplay(app *App, it *jellyfin.Item) *Preplay {
 	p := &Preplay{app: app, item: it}
-	if it.Summary == "" || it.SourceID == "" {
-		if fresh, err := app.Client.Item(bg(), it.ID); err == nil {
-			*it = *fresh
-		}
-	}
 	app.applyStreams(it)
 	p.rebuild()
 	p.cw.refetch(app)
@@ -135,9 +130,7 @@ func (p *Preplay) Key(ev input.Event, now time.Time) {
 		a := p.actions[p.cur]
 		switch {
 		case a == ForgetProgress:
-			if p.app.forgetProgress(p.item, &p.cw) {
-				p.rebuild() // Play replaces Resume; the cursor returns to the first
-			}
+			p.app.forgetProgress(p.item, &p.cw, p.rebuild)
 		case strings.HasPrefix(a, "Audio"):
 			p.periodic.reset()
 			p.app.chooseStream(p.item, "Audio", p.rebuild)
@@ -149,13 +142,16 @@ func (p *Preplay) Key(ev input.Event, now time.Time) {
 		case strings.HasPrefix(a, "Play"):
 			p.play(0)
 		case strings.HasPrefix(a, "Mark"):
-			p.app.Client.Scrobble(bg(), p.item.ID, a == "Mark watched")
-			p.refresh()
-			for i, b := range p.actions {
-				if strings.HasPrefix(b, "Mark") {
-					p.cur = i // stay on the mark, now its counterpart
+			p.app.markItem(p.item, a == "Mark watched", func() {
+				p.periodic.reset()
+				p.rebuild()
+				p.cw.refetch(p.app)
+				for i, b := range p.actions {
+					if strings.HasPrefix(b, "Mark") {
+						p.cur = i
+					}
 				}
-			}
+			})
 		}
 	}
 }
@@ -170,14 +166,7 @@ func (p *Preplay) play(offset int) {
 	p.app.afterReports(func() { p.cw.refetch(p.app) })
 }
 
-func (p *Preplay) refresh() {
-	p.periodic.reset()
-	if fresh, err := p.app.Client.Item(bg(), p.item.ID); err == nil {
-		p.app.takeFresh(p.item, fresh)
-	}
-	p.rebuild()
-	p.cw.refetch(p.app) // a play or a mark can move it in or out
-}
+func (p *Preplay) refresh() { p.periodic.soon(); p.rebuild(); p.cw.refetch(p.app) }
 
 // actionPitch is the distance between the page's action lines, the first
 // at top. A long stack (resumable, both track choices, in Continue

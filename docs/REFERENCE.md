@@ -568,3 +568,8 @@ MiSTer-kun peeking from behind the Jellyfin triangle in its place, and **Off** d
 logo; the BETA and UPDATE marks then start where the wordmark did. The drawer
 and the sign-in screen keep the wordmark. It needs a code covering October 2026;
 without one, Home shows the wordmark whatever the row was set to.
+
+Server outages: opening a title and changing watch state keep the controls responsive.
+Back cancels a pending request. A failed request offers Retry and Back; late replies
+after cancellation cannot open another page. Failed background refreshes retain
+cached content and show Server unavailable until a subsequent request succeeds.

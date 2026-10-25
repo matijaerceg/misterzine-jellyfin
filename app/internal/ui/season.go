@@ -471,9 +471,11 @@ func (s *Season) toShow() {
 func (s *Season) do(a string) {
 	it := s.focused()
 	if a == ForgetProgress {
-		if it != nil && s.app.forgetProgress(it, &s.cw) {
-			s.rebuild() // Play replaces Resume; the cursor returns to the first
-			s.keepActVisible(time.Now())
+		if it != nil {
+			s.app.forgetProgress(it, &s.cw, func() {
+				s.rebuild() // Play replaces Resume; the cursor returns to the first
+				s.keepActVisible(time.Now())
+			})
 		}
 		return
 	}
@@ -516,21 +518,20 @@ func (s *Season) do(a string) {
 			s.app.Shuffle(s.show, done)
 		}
 		return
-	case a == "Mark watched":
-		s.app.Client.Scrobble(bg(), it.ID, true)
-	case a == "Mark unwatched":
-		s.app.Client.Scrobble(bg(), it.ID, false)
+	case a == "Mark watched" || a == "Mark unwatched":
+		s.app.markItem(it, a == "Mark watched", func() {
+			s.refreshAfter(it, nil, false)
+			s.rebuild()
+			for i, b := range s.actions {
+				if strings.HasPrefix(b, "Mark") {
+					s.act = i
+				}
+			}
+			s.keepActVisible(time.Now())
+		})
+		return
 	}
 	s.refreshAfter(it, nil, false)
-	if strings.HasPrefix(a, "Mark") {
-		// stay on the mark, now its counterpart
-		for i, b := range s.actions {
-			if strings.HasPrefix(b, "Mark") {
-				s.act = i
-			}
-		}
-		s.keepActVisible(time.Now())
-	}
 }
 
 // refreshAfter brings the page up to date after a playback or a mark of
