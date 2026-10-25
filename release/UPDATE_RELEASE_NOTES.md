@@ -1,46 +1,23 @@
-# MisterZine Jellyfin 0.1.0-beta.3
+# MisterZine Jellyfin 0.1.0-beta.4
 
-Third beta: scrubbing shows frames of the film, the playback controls come in
-four looks, the menus scroll faster, and supporters get screensavers, a choice
-of Home logo and a Random tab.
+This update improves gradients, controller playback controls, server-outage
+handling, and the choice between original video and server conversion.
 
-- From this release on, a release installs itself: the updater on the card
-  fetches and verifies the download, and the release's own installer puts it
-  in place and starts it. Later releases can change what the package contains
-  without a stepping-stone release.
-- Holding Left or Right on the scrubber shows a frame of the film at the dot,
-  when the library has trickplay images turned on in Jellyfin. Playback pauses
-  while the hold runs and resumes at the seek. A dark box with the wait dots
-  stands in for a frame that is still loading.
-- Text subtitles are drawn as white type with a thin dark outline.
-  **Subtitle background** in Options puts them on a translucent box instead.
-- **Playback UI theme** chooses the look of the playback controls: Standard,
-  Icons, VCR or VCR without its band. The looks other than Standard are a
-  supporter extra.
-- **More** in the playback controls is one list: Crop, Downmix boost,
-  Subtitle size, Autoplay next and Video bitrate change in place with Left and
-  Right, and Playback info shows direct play or transcode, the picture, the
-  sound and the decoder's late frames.
-- Supporter extras, each with the purple star in Options: **Screensavers**
-  (a bouncing logo or a slideshow of your libraries' art), **Home logo**
-  (the wordmark, MisterKun or none) and the **Random** tab in libraries. OK
-  on a locked row opens the code entry; a code keeps its month's extras on the
-  card for good.
-- A library wall rounds from its last row to its first, a held direction
-  keeps up with the pictures, and letter jumps fetch nothing until they stop.
-  **Forget my progress** on an item in Continue Watching clears its resume
-  point on the server.
-- Space or P on a USB keyboard pauses and resumes in one press. During
-  playback the first Back clears what is on screen, and a second Back within
-  half a second is ignored, so a double press no longer stops the video.
-- The resume point reaches every screen the moment a playback ends, direct
-  play uses the player's own length, and the MiSTer menu loads after Exit.
-- Every install starts once at the top video bitrate, now that the decoder is
-  in the FPGA.
+- **Gradient Dither** is on by default. It smooths colour gradients in the
+  final picture and can be switched off in the core OSD.
+- The controller **Start** button pauses and resumes playback.
+- Menus stay responsive while the server is unavailable. Requests can be
+  cancelled, and a connection error offers a retry instead of leaving the
+  screen apparently frozen.
+- Original H.264 video can play at unusual dimensions when it fits the
+  decoder's picture and frame-rate limits. This permits some pictures slightly
+  taller than 720 pixels; it does not add 1080p decoding.
+- Surround audio is converted to stereo by the server. Eligible video stays
+  unchanged during audio conversion; supported mono/stereo audio can still
+  play directly. The selected video bitrate remains a limit on original video.
+- Audio/video feeding is paced more carefully to avoid starving audio when
+  video packets arrive in bursts.
 
-Playback updates Jellyfin watched state and resume positions. Network
-seeking, server compatibility and different hardware setups remain beta test
-areas. The included FPGA image is the beta.2 design, unchanged.
-
-Installers and update notices become available when this release and its
-catalogue are published. See README.md for setup and feedback instructions.
+Existing settings, calibration and saved access are preserved by updates.
+Rollback restores the previous application and core. This remains a beta;
+please include the title, playback position and symptoms when reporting an issue.
