@@ -30,6 +30,7 @@ type PlaybackRequest struct {
 
 // MediaSource is one way the server offers to play an item.
 type MediaSource struct {
+	VideoCopy            bool          `json:"-"` // client-validated video copied through audio conversion
 	ID                   string        `json:"Id"`
 	MediaStreams         []MediaStream `json:"MediaStreams"`
 	Container            string        `json:"Container"`
@@ -57,7 +58,7 @@ type PlaybackInfo struct {
 
 // PlaybackInfo asks how to play an item (POST /Items/{id}/PlaybackInfo).
 func (c *Client) PlaybackInfo(ctx context.Context, id string, r PlaybackRequest) (*PlaybackInfo, error) {
-	body := map[string]any{"UserId": c.UserID(), "AutoOpenLiveStream": false}
+	body := map[string]any{"UserId": c.UserID(), "AutoOpenLiveStream": false, "MaxAudioChannels": 2}
 	if len(r.DeviceProfile) > 0 {
 		body["DeviceProfile"] = r.DeviceProfile
 	}

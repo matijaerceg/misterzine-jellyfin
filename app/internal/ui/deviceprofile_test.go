@@ -35,8 +35,12 @@ func TestDeviceProfileJSON(t *testing.T) {
 			t.Fatalf("subtitle %q method = %q, want Encode", sub.Format, sub.Method)
 		}
 	}
-	if len(got.CodecProfiles) != 2 {
+	if len(got.CodecProfiles) != 3 {
 		t.Fatalf("codec profiles = %d", len(got.CodecProfiles))
+	}
+	audio := got.CodecProfiles[2]
+	if audio.Type != "VideoAudio" || len(audio.Conditions) != 1 || audio.Conditions[0].Property != "AudioChannels" || audio.Conditions[0].Value != "2" || !audio.Conditions[0].IsRequired {
+		t.Fatalf("missing stereo constraint: %+v", audio)
 	}
 	want := map[string]string{"Width": "1280", "Height": "720", "VideoFramerate": "60", "VideoBitrate": "4000000", "VideoBitDepth": "8"}
 	if len(got.CodecProfiles[0].ApplyConditions) != 0 {

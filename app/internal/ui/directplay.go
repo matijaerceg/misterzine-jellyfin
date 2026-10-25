@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"plexcrt/internal/jellyfin"
@@ -155,27 +157,50 @@ func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, sub
 			return nil, fmt.Errorf("Jellyfin offered no playable media source")
 		}
 		src := info.MediaSources[0]
-		if (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == "" {
-			ok, why := directEligible(src, kbps)
-			if ok {
-				if interlacedVideo(src) {
-					s.logf("direct stream is interlaced; jfplay checks for MBAFF before playing")
-				}
-				return info, nil
+		ok, why := directEligible(src, kbps)
+		if ok && src.TranscodingURL != "" && needsStereoConversion(src, audio) {
+			// Preserve the client-validated original video. The worker still
+			// checks its SPS and can fall back to a bounded video transcode.
+			u, err := url.Parse(src.TranscodingURL)
+			if err != nil {
+				return nil, fmt.Errorf("invalid stereo stream URL")
 			}
-			s.logf("direct stream not eligible (%s); requesting a transcode", why)
-			force = true
-		} else {
-			s.mu.Lock()
-			s.probedTranscode = key
-			s.mu.Unlock()
+			q := u.Query()
+			for name, value := range map[string]string{"VideoCodec": "copy", "AudioCodec": "aac", "AudioChannels": "2", "MaxAudioChannels": "2", "AllowAudioStreamCopy": "false"} {
+				for key := range q {
+					if strings.EqualFold(key, name) {
+						q.Del(key)
+					}
+				}
+				q.Set(name, value)
+			}
+			u.RawQuery = q.Encode()
+			info.MediaSources[0].TranscodingURL = u.String()
+			info.MediaSources[0].VideoCopy = true
+			s.logf("audio-only conversion: original video, server stereo AAC")
+			return info, nil
 		}
+		if ok && (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == "" {
+			if needsStereoConversion(src, audio) {
+				return nil, fmt.Errorf("Jellyfin did not offer stereo audio conversion; check this user's transcoding permissions")
+			}
+			if interlacedVideo(src) {
+				s.logf("direct stream is interlaced; jfplay checks for MBAFF before playing")
+			}
+			return info, nil
+		}
+		if !ok {
+			s.logf("direct stream not eligible (%s); requesting a transcode", why)
+		}
+		s.mu.Lock()
+		s.probedTranscode = key
+		s.mu.Unlock()
 	}
 	profile, err := DeviceProfileJSON(kbps)
 	if err != nil {
 		return nil, err
 	}
-	req.DeviceProfile, req.MaxStreamingBitrate, req.ForceTranscode = profile, playbackDeviceProfile(kbps).MaxStreamingBitrate, force
+	req.DeviceProfile, req.MaxStreamingBitrate, req.ForceTranscode = profile, playbackDeviceProfile(kbps).MaxStreamingBitrate, true
 	info, err := p.Client.PlaybackInfo(ctx, s.item.ID, req)
 	if err != nil {
 		return nil, err
@@ -184,6 +209,44 @@ func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, sub
 		return nil, fmt.Errorf("Jellyfin offered no playable media source")
 	}
 	return info, nil
+}
+
+// Match the chosen track, including the server's default when none was named.
+func needsStereoConversion(src jellyfin.MediaSource, audio string) bool {
+	// PlaybackInfo can replace the selected stream's channel count with the
+	// planned output count. Its conversion reason still describes the source.
+	if u, err := url.Parse(src.TranscodingURL); err == nil {
+		for key, values := range u.Query() {
+			if strings.EqualFold(key, "TranscodeReasons") {
+				for _, value := range values {
+					for _, reason := range strings.Split(value, ",") {
+						if reason == "AudioChannelsNotSupported" || reason == "AudioCodecNotSupported" {
+							return true
+						}
+					}
+				}
+			}
+		}
+	}
+	index, err := strconv.Atoi(audio)
+	if err != nil && src.DefaultAudioStream != nil {
+		index, err = *src.DefaultAudioStream, nil
+	}
+	for _, st := range src.MediaStreams {
+		if !strings.EqualFold(st.Type, "Audio") || (err == nil && st.Index != index) {
+			continue
+		}
+		if st.Channels < 1 || st.Channels > 2 {
+			return true
+		}
+		switch strings.ToLower(st.Codec) {
+		case "aac", "ac3", "eac3", "dts", "dca", "mp3", "flac", "opus", "vorbis", "pcm":
+			return false
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 func interlacedVideo(src jellyfin.MediaSource) bool {
@@ -217,7 +280,7 @@ func (s *Session) fallbackLocked(err error) bool {
 		return false
 	}
 	s.mu.Lock()
-	if !s.direct || s.fellBack || s.closing || s.stopRequested {
+	if (!s.direct && !s.videoCopy) || s.fellBack || s.closing || s.stopRequested {
 		s.mu.Unlock()
 		return false
 	}

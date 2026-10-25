@@ -42,8 +42,9 @@ type Player struct {
 }
 
 type Session struct {
-	p    *Player
-	item *jellyfin.Item
+	videoCopy bool // original video in a server-generated audio-conversion stream
+	p         *Player
+	item      *jellyfin.Item
 	// opMu serializes player lifecycle changes and status reports. mu only
 	// protects fields shared with readers such as UI state.
 	opMu                                   sync.Mutex
@@ -291,6 +292,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		}
 		s.mu.Lock() // Direct reads it from the UI thread
 		s.direct = (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == ""
+		s.videoCopy = src.VideoCopy
 		s.mu.Unlock()
 		s.fullTimeline = !s.direct && hasFullTimelineHLS(src.TranscodingProtocol, src.TranscodingURL)
 		if s.direct {
@@ -327,7 +329,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	if paused {
 		args = append(args, "--hold")
 	}
-	if s.direct {
+	if s.direct || s.videoCopy {
 		// jfplay checks the stream before the first picture and watches that
 		// the core keeps up; it exits 7 when a transcode is needed.
 		args = append(args, "--direct")
@@ -400,6 +402,15 @@ func mediaSourceSurround(src jellyfin.MediaSource, item *jellyfin.Item, selected
 		index, _ = strconv.Atoi(selected)
 	} else if src.DefaultAudioStream != nil {
 		index = *src.DefaultAudioStream
+	}
+	// PlaybackInfo may describe the planned stereo output. Item metadata
+	// retains the source channel count used by the optional surround boost.
+	if src.VideoCopy {
+		for _, stream := range item.Audio {
+			if stream.ID == strconv.Itoa(index) && stream.Channels > 0 {
+				return stream.Channels > 2
+			}
+		}
 	}
 	for _, stream := range src.MediaStreams {
 		if strings.EqualFold(stream.Type, "Audio") && stream.Index == index && stream.Channels > 0 {

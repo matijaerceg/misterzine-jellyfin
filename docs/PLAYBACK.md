@@ -12,7 +12,8 @@ profile, the item's selected audio and subtitle tracks, the known media source,
 and the resume position. Unless a subtitle must be burned in, the first request lets
 the server offer the file as stored without applying the configured bitrate
 limit. The app then checks the returned video details against the core's own
-limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280x720, at
+limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280 pixels
+wide and 3,600 rounded-up 16x16 blocks per picture, at
 most 30 frames per second above 854 pixels wide (60 at or below), and an
 average bitrate of at most 6 Mbit/s above 854 pixels wide (8 Mbit/s at or
 below). It also checks the video bitrate against the **Video bitrate**
@@ -21,6 +22,16 @@ whose video is above it is never streamed as stored. A file that fits both is
 streamed directly. Otherwise the app makes a second PlaybackInfo request for a
 transcode with the configured bitrate limit (two requests for a transcoded
 item, one for a direct one).
+
+The device profile advertises supported audio codecs and at most two audio
+channels. Surround, unknown channel counts and unsupported audio codecs need
+server conversion to stereo AAC. If video passes the checks above and no
+subtitle needs burning in, the app requests video copy in the offered HLS
+stream while requiring audio conversion. The worker still checks the original
+video's parameter sets and can fall back once to a bounded video transcode.
+The audio conversion is triggered by capabilities, not a low bitrate target.
+The picture block budget permits shapes such as 968x722, but not 1280x722 or
+1920x1080; the block-rate limit is 108,000 per second with 1% rounding slack.
 
 Jellyfin cannot report every property the core depends on (CABAC versus
 CAVLC entropy coding, MBAFF versus field-coded interlace). MBAFF is refused and
@@ -115,7 +126,8 @@ The core supports up to 60 frames per second at 854 pixels wide or less, and up
 to 30 frames per second above that width. The profile caps the configured video
 bitrate at 8 Mbit/s for transcodes. The bitrate steps below 3 Mbit/s also make
 the transcode smaller, so a low bitrate is spent on fewer pixels: at most
-854x480 at 1 and 2 Mbit/s, and 640x360 at 0.4 Mbit/s. Supported audio is decoded by `jfplay` and downmixed to
+854x480 at 1 and 2 Mbit/s, and 640x360 at 0.4 Mbit/s. Surround audio is converted
+to stereo by the server. Supported mono/stereo audio is decoded by `jfplay` to
 stereo PCM for the core. Other video is requested as an HLS H.264/AAC
 transcode.
 

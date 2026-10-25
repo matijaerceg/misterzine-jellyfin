@@ -8,7 +8,9 @@ import (
 // The Jellyfin device profile for the H.264 decoder core. The FPGA decodes
 // H.264 High or Main profile, 8-bit 4:2:0, up to 1280x720 at 30 frames/s or
 // 854x480 at 60, and falls behind above about 8 Mbit/s at 720p; jfplay
-// decodes the audio and downmixes it to stereo. Everything else is an HLS
+// decodes mono/stereo audio to PCM; the server converts surround to stereo.
+// Eligible original video is copied through an audio-only HLS conversion.
+// Everything outside the video limits is an HLS
 // transcode to the same limits. Subtitles asked of the server (picture
 // tracks, and text the app cannot draw: subtitles.go) use Jellyfin's Encode
 // delivery method, which burns them into the transcoded video.
@@ -107,7 +109,7 @@ func playbackDeviceProfile(videoKbps int) deviceProfile {
 		DirectPlayProfiles: []directPlayProfile{{"mkv,mp4,m4v,ts,mpegts", "Video", "h264",
 			"aac,ac3,eac3,dts,mp3,flac,opus,vorbis,pcm"}},
 		TranscodingProfiles: []transcodingProfile{{"ts", "Video", "hls", "h264", "aac", "2", true}},
-		CodecProfiles:       []codecProfile{{Type: "Video", Codec: "h264", Conditions: base}, hd},
+		CodecProfiles:       []codecProfile{{Type: "Video", Codec: "h264", Conditions: base}, hd, {Type: "VideoAudio", Conditions: []codecCondition{{"LessThanEqual", "AudioChannels", "2", true}}}},
 		SubtitleProfiles:    subs,
 	}
 }
