@@ -478,6 +478,8 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 		}
 		ctl := NewPlaying(a, it, queue, idx, sess.SendUI)
 		ctl.direct = sess.Direct
+		ctl.streamModes = sess.StreamModes
+		ctl.conversionReason = sess.ConversionReason
 		ctl.pos = float64(offset)
 		if offset < 0 {
 			ctl.pos = float64(it.ViewOffset)

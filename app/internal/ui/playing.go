@@ -26,6 +26,8 @@ import (
 // With nothing else up, a text subtitle track shows along the bottom
 // (subtitles.go).
 type Playing struct {
+	conversionReason func() string
+	streamModes func() (string, string)
 	app                    *App
 	item                   *jellyfin.Item
 	metadata               chan *jellyfin.Item // fetched off-thread, applied by Tick on the UI thread
