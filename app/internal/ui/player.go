@@ -42,11 +42,12 @@ type Player struct {
 }
 
 type Session struct {
-	conversionReason string
+	sourceInfo                   playbackSource
+	conversionReason             string
 	videoDecision, audioDecision string // server decisions for the selected streams
-	videoCopy bool // original video in a server-generated audio-conversion stream
-	p         *Player
-	item      *jellyfin.Item
+	videoCopy                    bool   // original video in a server-generated audio-conversion stream
+	p                            *Player
+	item                         *jellyfin.Item
 	// opMu serializes player lifecycle changes and status reports. mu only
 	// protects fields shared with readers such as UI state.
 	opMu                                   sync.Mutex
@@ -295,12 +296,26 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		s.mu.Lock() // Direct reads it from the UI thread
 		s.direct = (src.SupportsDirectPlay || src.SupportsDirectStream) && src.TranscodingURL == ""
 		s.videoCopy = src.VideoCopy
+		s.sourceInfo = playbackSource{}
+		for _, st := range s.item.SourceStreams {
+			if st.Type == "Video" {
+				s.sourceInfo.Video = videoDescription(st.Codec, st.Width, st.Height)
+			}
+			if st.Type == "Audio" && ((audio != "" && strconv.Itoa(st.Index) == audio) || (audio == "" && st.IsDefault)) {
+				s.sourceInfo.Audio = audioDescription(st.Codec, st.Channels)
+			}
+		}
 		s.videoDecision, s.audioDecision = streamDecisions(src.TranscodingURL)
-        s.conversionReason = jellyfinConversionReason(src.TranscodingURL)
-        if s.direct { s.conversionReason = "" } else if burn != "-1" {
-            s.conversionReason = "Subtitle burn-in"
-        } else if force { s.conversionReason = "Decoder compatibility"
-        } else if src.VideoCopy && (s.conversionReason == "" || s.conversionReason == "Server policy") { s.conversionReason = "Audio compatibility" }
+		s.conversionReason = jellyfinConversionReason(src.TranscodingURL)
+		if s.direct {
+			s.conversionReason = ""
+		} else if burn != "-1" {
+			s.conversionReason = "Subtitle burn-in"
+		} else if force {
+			s.conversionReason = "Decoder compatibility"
+		} else if src.VideoCopy && (s.conversionReason == "" || s.conversionReason == "Server policy") {
+			s.conversionReason = "Audio compatibility"
+		}
 		s.mu.Unlock()
 		s.fullTimeline = !s.direct && hasFullTimelineHLS(src.TranscodingProtocol, src.TranscodingURL)
 		if s.direct {
@@ -1049,67 +1064,103 @@ func (s *Session) Stop() {
 
 // StreamModes keeps video and audio conversion separate, even in a remuxed stream.
 func (s *Session) StreamModes() (string, string) {
- s.mu.Lock()
- defer s.mu.Unlock()
- if s.direct { return "Original", "Original" }
- video, audio := conversionLabel(s.videoDecision), conversionLabel(s.audioDecision)
- if s.videoCopy { video = "Original" }
- return video, audio
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.direct {
+		return "Original", "Original"
+	}
+	video, audio := conversionLabel(s.videoDecision), conversionLabel(s.audioDecision)
+	if s.videoCopy {
+		video = "Original"
+	}
+	return video, audio
 }
 
 func conversionLabel(decision string) string {
- switch strings.ToLower(decision) {
- case "copy", "directplay", "directstream": return "Original"
- case "transcode": return "Transcoded"
- }
- return ""
+	switch strings.ToLower(decision) {
+	case "copy", "directplay", "directstream":
+		return "Original"
+	case "transcode":
+		return "Transcoded"
+	}
+	return ""
 }
 
 // Read only the codec choices; never expose a playback URL or its credentials.
 func streamDecisions(raw string) (string, string) {
- u, err := url.Parse(raw)
- if err != nil { return "", "" }
- choices := map[string]string{}
- for key, values := range u.Query() {
-  if len(values) > 0 { choices[strings.ToLower(key)] = values[0] }
- }
- mode := func(codec string) string {
-  if codec == "" { return "" }
-  if strings.EqualFold(codec, "copy") { return "copy" }
-  return "transcode"
- }
- return mode(choices["videocodec"]), mode(choices["audiocodec"])
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", ""
+	}
+	choices := map[string]string{}
+	for key, values := range u.Query() {
+		if len(values) > 0 {
+			choices[strings.ToLower(key)] = values[0]
+		}
+	}
+	mode := func(codec string) string {
+		if codec == "" {
+			return ""
+		}
+		if strings.EqualFold(codec, "copy") {
+			return "copy"
+		}
+		return "transcode"
+	}
+	return mode(choices["videocodec"]), mode(choices["audiocodec"])
 }
 
 func jellyfinConversionReason(raw string) string {
- u, err := url.Parse(raw)
- if err != nil { return "" }
- reasons := ""
- for key, values := range u.Query() {
-  if strings.EqualFold(key, "TranscodeReasons") && len(values) > 0 { reasons = values[0] }
- }
- names := map[string]string{
-  "VideoCodecNotSupported":"Video codec",
-  "AudioCodecNotSupported":"Audio codec",
-  "AudioChannelsNotSupported":"Audio channels",
-  "VideoResolutionNotSupported":"Video resolution",
-  "VideoBitrateNotSupported":"Video bitrate",
-  "ContainerBitrateExceedsLimit":"Stream bitrate",
-  "VideoLevelNotSupported":"Video level",
-  "VideoProfileNotSupported":"Video profile",
-  "VideoBitDepthNotSupported":"Video bit depth",
-  "SubtitleCodecNotSupported":"Subtitle burn-in",
- }
- for _, reason := range strings.Split(reasons, ",") {
-  if name := names[strings.TrimSpace(reason)]; name != "" { return name }
- }
- if raw != "" { return "Server policy" }
- return ""
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	reasons := ""
+	for key, values := range u.Query() {
+		if strings.EqualFold(key, "TranscodeReasons") && len(values) > 0 {
+			reasons = values[0]
+		}
+	}
+	names := map[string]string{
+		"VideoCodecNotSupported":       "Video codec",
+		"AudioCodecNotSupported":       "Audio codec",
+		"AudioChannelsNotSupported":    "Audio channels",
+		"VideoResolutionNotSupported":  "Video resolution",
+		"VideoBitrateNotSupported":     "Video bitrate",
+		"ContainerBitrateExceedsLimit": "Stream bitrate",
+		"VideoLevelNotSupported":       "Video level",
+		"VideoProfileNotSupported":     "Video profile",
+		"VideoBitDepthNotSupported":    "Video bit depth",
+		"SubtitleCodecNotSupported":    "Subtitle burn-in",
+	}
+	var found []string
+	for _, reason := range strings.Split(reasons, ",") {
+		if name := names[strings.TrimSpace(reason)]; name != "" {
+			duplicate := false
+			for _, old := range found {
+				if old == name {
+					duplicate = true
+				}
+			}
+			if !duplicate {
+				found = append(found, name)
+			}
+		}
+	}
+	if len(found) > 0 {
+		return strings.Join(found, "; ")
+	}
+	if raw != "" {
+		return "Server policy"
+	}
+	return ""
 }
 
 func (s *Session) ConversionReason() string {
- s.mu.Lock()
- defer s.mu.Unlock()
- if s.direct { return "" }
- return s.conversionReason
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.direct {
+		return ""
+	}
+	return s.conversionReason
 }

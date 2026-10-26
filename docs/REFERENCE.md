@@ -198,10 +198,16 @@ address stays for the next sign-in.
   - **Video bitrate**: Left and Right pick a step of the Options ladder, OK
     saves it. A transcode restarts at the same position with the new cap; a
     direct play (marked on the row) keeps playing and uses it next time.
-  - **Playback info**: a read-only page, refreshed every second: direct play
-    or transcode, the picture size and frame rate, the bitrate, the sound and
-    its downmix, the subtitle track, the position, and the decoder's late
-    frames and errors. OK or Back returns to More.
+  - **Playback info**: one compact panel, refreshed once a second. Video and
+    audio each say whether the server converted them. Known original formats
+    are shown beside the received formats, with plain-language conversion
+    reasons only when needed. Sound output describes local stereo decoding
+    separately. Video bitrate shows measured current/average values (excluding
+    audio and container overhead), or a labelled nominal rate when unavailable;
+    the limit appears only for converted video. MiSTer output gives the core's
+    raster and effective de-flicker state, not the HDMI scaler's resolution.
+    Recent decoder issues are compared between samples; playback totals and
+    buffered sound are shown separately. OK or Back returns to More.
 - Over an intro or credits Jellyfin has marked (its media segments),
   **Skip intro** or **Skip credits** shows at the lower right for 20 seconds once playback reaches
   them, also after a resume or a seek into them. OK skips to their end; Back

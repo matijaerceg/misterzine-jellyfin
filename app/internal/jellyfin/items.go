@@ -11,42 +11,43 @@ import (
 // sees it. Field names follow the plex package where the meaning carries
 // over; the renames are listed in docs/JELLYFIN_API.md.
 type Item struct {
-	ID          string // Jellyfin item id (plex RatingKey)
-	Key         string // children listing (path and query) for Items/Page; "" for a leaf
-	Type        string // movie, show, season, episode, collection, folder
-	Subtype     string // what a collection holds, when the server says: movie or show
-	Title       string
-	SortTitle   string
-	Year        int
-	Duration    int // seconds
-	ViewOffset  int // seconds into it (resume point)
-	ViewCount   int
-	Played      bool
-	Summary     string
-	Thumb       string  // poster image ref (an episode's is its show's)
-	Art         string  // backdrop image ref
-	Theme       string  // theme song item id, when known
-	SeriesTitle string  // show title for episodes and seasons (plex GrandTitle)
-	SeriesID    string  // the show's id for episodes and seasons (plex GrandKey)
-	ParentID    string  // the season's id for episodes, the show's for seasons (plex ParentKey)
-	Children    int     // seasons of a show, items of a collection
-	Leaves      int     // episodes of a show or season
-	Viewed      int     // of which watched
-	Still       string  // an episode's own picture ref
-	Logo        string  // clear logo ref
-	Aspect      float64 // picture aspect of the first video stream, 0 unknown
-	Index       int     // episode number (season number for a season)
-	Season      int     // season number of an episode (plex Parent)
-	Rating      float64
-	Tagline     string
-	Genres      []string
-	Colors      [4]uint32  // poster corner colours from its blurhash (TL, TR, BR, BL), 0 if none
-	Markers     []Marker   // intro and credits (media segments), when fetched
-	SourceID    string     // the first media source (plex PartID), for PlaybackInfo
-	Audio       []Stream   // its audio streams
-	Subs        []Stream   // its subtitle streams
-	Library     string     // the library (view) id, when known
-	Trickplay   *Trickplay // the scrub preview sheets of SourceID, when the server made them
+	SourceStreams []MediaStream // original item metadata, never a transcoder response
+	ID            string        // Jellyfin item id (plex RatingKey)
+	Key           string        // children listing (path and query) for Items/Page; "" for a leaf
+	Type          string        // movie, show, season, episode, collection, folder
+	Subtype       string        // what a collection holds, when the server says: movie or show
+	Title         string
+	SortTitle     string
+	Year          int
+	Duration      int // seconds
+	ViewOffset    int // seconds into it (resume point)
+	ViewCount     int
+	Played        bool
+	Summary       string
+	Thumb         string  // poster image ref (an episode's is its show's)
+	Art           string  // backdrop image ref
+	Theme         string  // theme song item id, when known
+	SeriesTitle   string  // show title for episodes and seasons (plex GrandTitle)
+	SeriesID      string  // the show's id for episodes and seasons (plex GrandKey)
+	ParentID      string  // the season's id for episodes, the show's for seasons (plex ParentKey)
+	Children      int     // seasons of a show, items of a collection
+	Leaves        int     // episodes of a show or season
+	Viewed        int     // of which watched
+	Still         string  // an episode's own picture ref
+	Logo          string  // clear logo ref
+	Aspect        float64 // picture aspect of the first video stream, 0 unknown
+	Index         int     // episode number (season number for a season)
+	Season        int     // season number of an episode (plex Parent)
+	Rating        float64
+	Tagline       string
+	Genres        []string
+	Colors        [4]uint32  // poster corner colours from its blurhash (TL, TR, BR, BL), 0 if none
+	Markers       []Marker   // intro and credits (media segments), when fetched
+	SourceID      string     // the first media source (plex PartID), for PlaybackInfo
+	Audio         []Stream   // its audio streams
+	Subs          []Stream   // its subtitle streams
+	Library       string     // the library (view) id, when known
+	Trickplay     *Trickplay // the scrub preview sheets of SourceID, when the server made them
 }
 
 // Trickplay describes the server's preview sheets for a media source (GET
@@ -335,6 +336,7 @@ func (x *dto) item() *Item {
 		it.SourceID = ms.ID
 		streams = ms.MediaStreams
 	}
+	it.SourceStreams = append([]MediaStream(nil), streams...)
 	for _, st := range streams {
 		switch st.Type {
 		case "Video":
