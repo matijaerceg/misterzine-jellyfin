@@ -212,6 +212,7 @@ const InfoRefresh = time.Second
 func (p *Playing) openInfo(now time.Time) {
 	l := &listMode{kind: moreInfo, set: -1, step: -1}
 	l.items, l.vals = p.infoRows()
+	l.infoScrollHint()
 	l.infoAt = now
 	p.showList(l)
 }
@@ -228,6 +229,7 @@ func (p *Playing) refreshInfo(now time.Time) {
 		return
 	}
 	l.items, l.vals = items, vals
+	l.infoScrollHint()
 	l.cur = min(l.cur, len(items)-1)
 	l.window()
 	l.loaded = false
@@ -257,23 +259,34 @@ func (p *Playing) infoRows() (items, vals []string) {
 		videoMode, audioMode = "Original", "Original"
 	}
 	withMode := func(value, mode string) string {
-		if value == "" || mode == "" { return value }
-		return value + " · " + mode
+		if value == "" || mode == "" {
+			return value
+		}
+		return value + ", " + mode
 	}
+	format := ""
 	if w, h := num("width"), num("height"); w > 0 && h > 0 {
 		add("Video", withMode("H.264", videoMode))
-		add("Resolution", itoa(w)+"x"+itoa(h))
+		format = itoa(w) + "x" + itoa(h)
 	}
 	if fps, err := strconv.ParseFloat(st["fps"], 64); err == nil && fps > 0 {
-		add("Frame rate", strings.TrimRight(strings.TrimRight(strconv.FormatFloat(fps, 'f', 3, 64), "0"), ".")+" fps")
+		format = strings.TrimSpace(format + " / " + strings.TrimRight(strings.TrimRight(strconv.FormatFloat(fps, 'f', 3, 64), "0"), ".") + " fps")
 	}
+	add("Format", strings.TrimPrefix(format, "/ "))
 	rate := func(key string) string {
 		bps, err := strconv.ParseInt(st[key], 10, 64)
-		if err != nil || bps <= 0 { return "" }
+		if err != nil || bps <= 0 {
+			return ""
+		}
 		return strconv.FormatFloat(float64(bps)/1e6, 'f', 1, 64) + " Mbps"
 	}
-	add("Video now", rate("video_bitrate_recent"))
-	add("Video avg", rate("video_bitrate_average"))
+	nowRate, avgRate := rate("video_bitrate_recent"), rate("video_bitrate_average")
+	if nowRate != "" && avgRate != "" {
+		add("Video Mbps", strings.TrimSuffix(nowRate, " Mbps")+" now / "+strings.TrimSuffix(avgRate, " Mbps")+" avg")
+	} else {
+		add("Video now", nowRate)
+		add("Video avg", avgRate)
+	}
 	if rate("video_bitrate_average") == "" {
 		add("Video nominal", rate("video_bitrate"))
 	}
@@ -312,10 +325,14 @@ func (p *Playing) infoRows() (items, vals []string) {
 	add("Subtitles", sub)
 	if w, h := num("output_width"), num("output_height"); w > 0 && h > 0 {
 		scan := "p"
-		if num("output_interlaced") != 0 { scan = "i" }
+		if num("output_interlaced") != 0 {
+			scan = "i"
+		}
 		add("Core output", itoa(w)+"x"+itoa(h)+scan)
 	}
-	if p.conversionReason != nil { add("Conversion", p.conversionReason()) }
+	if p.conversionReason != nil {
+		add("Conversion reason", p.conversionReason())
+	}
 	if st != nil {
 		add("Late frames", itoa(num("late")))
 		add("Decode errors", itoa(num("errors")))
@@ -445,4 +462,12 @@ func listRowText(f fitter, x int, item, val string, arrowsW int) (string, string
 	}
 	val = f.Fit(val, listValW(x, f.Width(item))-arrowsW)
 	return f.Fit(item, listItemW(x, f.Width(val)+arrowsW)), val
+}
+
+// infoScrollHint makes overflow discoverable in both visual styles.
+func (l *listMode) infoScrollHint() {
+	l.hint = ""
+	if l.height() > OsdListH {
+		l.hint = "Up/Down"
+	}
 }

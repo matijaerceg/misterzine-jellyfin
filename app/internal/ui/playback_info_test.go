@@ -15,7 +15,7 @@ func TestPlaybackInfoSeparatesStreamsAndMeasuredRates(t *testing.T) {
  p.openInfo(time.Now())
  rows := map[string]string{}
  for i, key := range p.list.items { rows[key] = p.list.vals[i] }
- for key, want := range map[string]string{"Video":"H.264 · Original", "Audio":"AC3 5.1 · Transcoded", "Video now":"3.2 Mbps", "Video avg":"2.8 Mbps", "Core output":"720x480i", "Conversion":"Audio needs conversion"} {
+ for key, want := range map[string]string{"Video":"H.264, Original", "Audio":"AC3 5.1, Transcoded", "Video now":"3.2 Mbps", "Video avg":"2.8 Mbps", "Core output":"720x480i", "Conversion reason":"Audio needs conversion"} {
   if rows[key] != want { t.Errorf("%s=%q, want %q", key, rows[key], want) }
  }
  for _, key := range []string{"Source","Position","Bitrate cap","Video nominal"} {
@@ -41,4 +41,13 @@ func TestJellyfinStreamDecisionsAndReason(t *testing.T) {
  if v!="copy" || a!="transcode" { t.Fatalf("decisions %q/%q",v,a) }
  if got:=jellyfinConversionReason("/stream?TranscodeReasons=VideoCodecNotSupported&ApiKey=secret"); got!="Unsupported video codec" { t.Fatal(got) }
  if got:=jellyfinConversionReason("/stream?TranscodeReasons=unknown&ApiKey=secret"); got!="Server requires conversion" { t.Fatal(got) }
+}
+
+func TestPlaybackInfoScrollHint(t *testing.T) {
+ l := &listMode{items: make([]string, 9)}
+ l.infoScrollHint()
+ if l.hint != "" { t.Fatal("short info should not suggest scrolling") }
+ l.items = make([]string, 16)
+ l.infoScrollHint()
+ if l.hint != "Up/Down" { t.Fatal("overflow must explain scrolling") }
 }
