@@ -299,8 +299,8 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
         s.conversionReason = jellyfinConversionReason(src.TranscodingURL)
         if s.direct { s.conversionReason = "" } else if burn != "-1" {
             s.conversionReason = "Subtitle burn-in"
-        } else if force { s.conversionReason = "Decoder requested conversion"
-        } else if src.VideoCopy { s.conversionReason = "Audio needs conversion" }
+        } else if force { s.conversionReason = "Decoder compatibility"
+        } else if src.VideoCopy && (s.conversionReason == "" || s.conversionReason == "Server policy") { s.conversionReason = "Audio compatibility" }
 		s.mu.Unlock()
 		s.fullTimeline = !s.direct && hasFullTimelineHLS(src.TranscodingProtocol, src.TranscodingURL)
 		if s.direct {
@@ -1089,21 +1089,21 @@ func jellyfinConversionReason(raw string) string {
   if strings.EqualFold(key, "TranscodeReasons") && len(values) > 0 { reasons = values[0] }
  }
  names := map[string]string{
-  "VideoCodecNotSupported":"Unsupported video codec",
-  "AudioCodecNotSupported":"Unsupported audio codec",
-  "AudioChannelsNotSupported":"Audio channel conversion",
-  "VideoResolutionNotSupported":"Video exceeds resolution limit",
-  "VideoBitrateNotSupported":"Video exceeds bitrate limit",
-  "ContainerBitrateExceedsLimit":"Stream exceeds bitrate limit",
-  "VideoLevelNotSupported":"Unsupported video level",
-  "VideoProfileNotSupported":"Unsupported video profile",
-  "VideoBitDepthNotSupported":"Unsupported video bit depth",
+  "VideoCodecNotSupported":"Video codec",
+  "AudioCodecNotSupported":"Audio codec",
+  "AudioChannelsNotSupported":"Audio channels",
+  "VideoResolutionNotSupported":"Video resolution",
+  "VideoBitrateNotSupported":"Video bitrate",
+  "ContainerBitrateExceedsLimit":"Stream bitrate",
+  "VideoLevelNotSupported":"Video level",
+  "VideoProfileNotSupported":"Video profile",
+  "VideoBitDepthNotSupported":"Video bit depth",
   "SubtitleCodecNotSupported":"Subtitle burn-in",
  }
  for _, reason := range strings.Split(reasons, ",") {
   if name := names[strings.TrimSpace(reason)]; name != "" { return name }
  }
- if raw != "" { return "Server requires conversion" }
+ if raw != "" { return "Server policy" }
  return ""
 }
 
