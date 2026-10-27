@@ -64,7 +64,7 @@ func TestOptionsGroups(t *testing.T) {
 	under := groupNames(t, items, groups...)
 	for label, want := range map[string]string{
 		"Only show 4:3 media": "Playback", "Autoplay next episode": "Playback", "Skip intro and credits buttons": "Playback",
-		"Video bitrate":                    "Playback",
+		"Video bitrate": "Playback", "Direct play": "Playback",
 		"Video calibration (preview only)": "Picture", "Video crop": "Picture", "HDMI sound": "Picture",
 		"Theme music": "Sound",
 		"Sign out":    "Account",

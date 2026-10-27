@@ -92,6 +92,14 @@ type Playing struct {
 	heldAt     time.Time // since when
 	skip       *jellyfin.Marker
 	skipOff    bool // the skip button was dismissed for this marker
+	// epHold is the shoulder button held for the next (+1) or previous
+	// (-1) episode, since epHoldAt; 0 for none (episodeHold)
+	epHold int
+	// moreDirect is whether the stream was the file as stored when More's
+	// rows were made: the Video bitrate row says so, and is remade when
+	// that changes under an open More (a Direct play restart).
+	moreDirect bool
+	epHoldAt   time.Time
 	skipAt     time.Time
 	// the wait dot (waitdot.go): it runs in the middle while the picture
 	// is held up, from the start until the first frame and on any stall
@@ -280,6 +288,11 @@ const (
 	OsdLinger   = 3500 * time.Millisecond // how long the start strip stays over the picture
 	OsdBtnGap   = 30
 	SkipHold    = 20 * time.Second // the skip button stays this long once playback is in the marker
+	// EpisodeHold is how long L or R is held to go to the previous or
+	// next episode: long enough that a brushed shoulder button does not
+	// lose the place, short enough to feel direct. A pill shows the hold
+	// filling up meanwhile.
+	EpisodeHold = 2 * time.Second
 )
 
 var osdButtons = []string{"-10", "Pause", "+10", "Prev", "Next", "Audio", "Subs", "More"}
@@ -590,12 +603,13 @@ func (p *Playing) openMore() {
 	items = append(items, "Crop", "Downmix boost", "Subtitle size")
 	vals = append(vals, p.app.crop.Label(), p.boostLabel(), SubtitleSizes[p.app.Cfg.subtitleSizeIndex()].Label)
 	items, vals = p.moreRows(items, vals, -1)
+	p.moreDirect = p.isDirect()
 	p.showList(&listMode{kind: "More", items: items, vals: vals, set: -1, step: -1})
 }
 
 // choose acts on OK in a list: an audio or subtitle track is applied and
 // the stream restarted at the same position; in More, Autoplay next
-// toggles, Video bitrate applies its step and Playback info opens (the
+// and Direct play toggle, Video bitrate applies its step and Playback info opens (the
 // other rows change with Left and Right, so OK leaves them be).
 func (p *Playing) choose(l *listMode) {
 	switch l.kind {
@@ -603,6 +617,8 @@ func (p *Playing) choose(l *listMode) {
 		switch l.items[l.cur] {
 		case moreAutoplay:
 			p.toggleAutoplay(l)
+		case moreDirect:
+			p.setDirectPlay(l, !p.app.Cfg.DirectPlay())
 		case moreBitrate:
 			p.applyBitrate(l)
 		case moreInfo:
@@ -694,6 +710,10 @@ func (p *Playing) Key(ev input.Event, now time.Time) bool {
 		return false
 	}
 	if ev.Release {
+		if (ev.Key == input.JumpBack || ev.Key == input.JumpFwd) && p.epHold != 0 {
+			p.epHold = 0 // let go before its time: the pill goes, nothing else
+			p.dirty = true
+		}
 		if ev.Key == input.Left || ev.Key == input.Right {
 			if p.running(now) {
 				p.settle = true // the core has the dot: adopt its place next field
@@ -721,6 +741,9 @@ func (p *Playing) Key(ev input.Event, now time.Time) bool {
 			}
 		}
 		return false
+	}
+	if ev.Key == input.JumpBack || ev.Key == input.JumpFwd {
+		return p.episodeHold(ev, now)
 	}
 	if l := p.list; l != nil {
 		switch ev.Key {
@@ -929,6 +952,7 @@ func (p *Playing) Key(ev input.Event, now time.Time) bool {
 // runs once per field (field true) and right after a key (field false).
 func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	p.resizeCanvas(osd)
+	p.refreshMoreDirect()
 	if p.metadata != nil {
 		select {
 		case fresh := <-p.metadata:
@@ -1014,7 +1038,8 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	p.shake(osd, field)
 	peek := p.peeking(now)
 	skipBtn := p.skipShown(now)
-	if !p.visible && !skipBtn && !peek {
+	epBtn := p.epHold != 0
+	if !p.visible && !skipBtn && !peek && !epBtn {
 		// nothing else up: the drawn subtitles, if any are showing now
 		lines := p.subtitleLines(now)
 		if p.dirty {
@@ -1069,6 +1094,27 @@ func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	}
 	if field {
 		p.scrubTick++
+	}
+	if epBtn {
+		// the shoulder hold's pill, filling up: lower right for the next
+		// episode, lower left for the previous, in place of whatever else
+		// was up (the panel comes back on release)
+		osd.Dot(0, 0, 0, false)
+		osd.Bar(0, 0, 0, 0, 0, false)
+		fill := p.episodeFill(now)
+		x, y = p.safeX(), (p.osdBottom()-40)&^1
+		if p.epHold > 0 {
+			x = p.safeX() + p.safeW() - 240
+		}
+		key = "episode|" + itoa(p.epHold) + "|" + itoa(fill)
+		if key != p.last {
+			p.setJitter(osd, true)
+			p.last = key
+			p.composeEpisode(p.epHold, fill)
+			p.painter.show(osd, x, y, &gfx.Canvas{W: 240, H: 40, Pix: p.canvas.Pix[:240*40*4]}, p.alpha[:240*40])
+		}
+		p.dirty = false
+		return
 	}
 	if peek {
 		// the title, the bar and the times, along the bottom edge; the dot
@@ -1241,6 +1287,50 @@ func (p *Playing) panelKey() string {
 	p.panelFor = s
 	p.panelText = title + sub + "|" + itoa(int(p.pos)) + "|" + itoa(p.focus) + "|" + itoa(btoi(p.paused)) + "|" + itoa(btoi(p.scrub)) + "|" + itoa(int(p.scrubTo)) + p.bufferKey()
 	return p.panelText
+}
+
+// episodeHold takes a shoulder button during playback: L held EpisodeHold
+// goes to the previous episode, R to the next, as the panel's Prev and
+// Next do; a tap does nothing. The hold is timed by the key's repeats, so
+// the go happens on the first repeat past it. Nothing happens with a list
+// up or without an episode that way.
+func (p *Playing) episodeHold(ev input.Event, now time.Time) bool {
+	if p.list != nil {
+		return false
+	}
+	d := 1
+	if ev.Key == input.JumpBack {
+		d = -1
+	}
+	if !p.hasEpisode(d) {
+		return false
+	}
+	if !ev.Repeat {
+		p.epHold, p.epHoldAt = d, now
+		p.dirty = true
+		return false
+	}
+	if p.epHold == d && now.Sub(p.epHoldAt) >= EpisodeHold {
+		p.epHold = 0
+		p.Next = d
+		return true
+	}
+	return false
+}
+
+// hasEpisode reports whether the queue has an episode d (+1 or -1) away.
+func (p *Playing) hasEpisode(d int) bool {
+	if d < 0 {
+		return p.idx > 0
+	}
+	return p.idx+1 < len(p.queue)
+}
+
+// episodeFill is how far the shoulder hold has come, in pixels of the
+// pill's width: the pill's bottom line grows across it.
+func (p *Playing) episodeFill(now time.Time) int {
+	done := now.Sub(p.epHoldAt).Seconds() / EpisodeHold.Seconds()
+	return int(240 * max(0, min(done, 1)))
 }
 
 // skipKey describes the skip button.
@@ -1434,6 +1524,42 @@ func (p *Playing) composeSkip() {
 	c.Text(24, 8, f.Body, gfx.White, label)
 	chevronRight(c, 24+f.Body.Width(label)+18, 14, gfx.GreyLo)
 
+}
+
+// composeEpisode paints the shoulder hold's pill: "Next episode" with a
+// chevron on (d > 0), or "Previous episode", and a line along the bottom
+// fill pixels long that reaches the far edge as the hold completes.
+func (p *Playing) composeEpisode(d, fill int) {
+	c := &gfx.Canvas{W: 240, H: 40, Pix: p.canvas.Pix[:240*40*4]}
+	for i := range p.alpha[:240*40] {
+		p.alpha[i] = OsdAlpha
+	}
+	p.alphaDone = false
+	label := "Next episode"
+	if d < 0 {
+		label = "Previous episode"
+	}
+	if p.app.vcr() {
+		c.Fill(0, 0, c.W, c.H, vcrBlue)
+		label = strings.ToUpper(label)
+		f := vcrBig
+		if f.Width(label) > c.W-16 {
+			f = vcrSmall
+		}
+		c.PixelText((c.W-f.Width(label))/2, (c.H-4-f.Height())/2, f, vcrText, vcrShadow, label)
+		c.Fill(0, c.H-4, fill, 4, vcrText)
+		return
+	}
+	f := p.app.F
+	c.Fill(0, 0, c.W, c.H, gfx.Bg)
+	if d > 0 {
+		c.Text(24, 6, f.Body, gfx.White, label)
+		chevronRight(c, 24+f.Body.Width(label)+18, 12, gfx.GreyLo)
+	} else {
+		chevronLeft(c, 24, 12, gfx.GreyLo)
+		c.Text(24+18, 6, f.Body, gfx.White, label)
+	}
+	c.Fill(0, c.H-4, fill, 4, gfx.Purple)
 }
 
 // composeList paints an audio or subtitle list down the left, full height.

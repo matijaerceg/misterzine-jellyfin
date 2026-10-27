@@ -29,6 +29,9 @@ server conversion to stereo AAC. If video passes the checks above and no
 subtitle needs burning in, the app requests video copy in the offered HLS
 stream while requiring audio conversion. The worker still checks the original
 video's parameter sets and can fall back once to a bounded video transcode.
+
+With the **Direct play** setting off, none of this applies: every start asks
+the server for a transcode outright, within the Video bitrate.
 The audio conversion is triggered by capabilities, not a low bitrate target.
 The picture block budget permits shapes such as 968x722, but not 1280x722 or
 1920x1080; the block-rate limit is 108,000 per second with 1% rounding slack.

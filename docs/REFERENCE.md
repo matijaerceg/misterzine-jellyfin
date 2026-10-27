@@ -195,6 +195,11 @@ address stays for the next sign-in.
   then:
   - **Autoplay next**, for an episode: On or Off with Left, Right or OK. It is
     the Options setting, saved at once, and decides this playback's end.
+  - **Direct play**: On or Off with Left, Right or OK. It is the Options
+    setting, saved at once. A file playing as stored restarts at the same
+    position as a transcode when it goes Off; a transcode restarts when it
+    goes On, and plays as stored if the file qualifies. A transcode the
+    server made for another reason keeps playing.
   - **Video bitrate**: Left and Right pick a step of the Options ladder, OK
     saves it. A transcode restarts at the same position with the new cap; a
     direct play (marked on the row) keeps playing and uses it next time.
@@ -247,7 +252,7 @@ Options lists, in groups:
   purple star, and without a code covering it the row shows **Unlock
   forever** and OK opens the code entry. A look chosen earlier plays as
   Standard until a code covers it, and comes back once one does.
-- **Video bitrate** (see Sound and playback quality).
+- **Video bitrate** and **Direct play** (see Sound and playback quality).
 - **Show** and a library's name, one row per library: off leaves it out of
   Home, the menu and search. Shown once the libraries have loaded.
 - **Video calibration** and **Video crop** (see Display setup).
@@ -371,6 +376,14 @@ whose video is above the chosen bitrate is never streamed as stored; it is
 transcoded to that bitrate. Start low on Wi-Fi and raise it while playback
 stays smooth. The first run of a release with the decoder core sets it to the top value;
 change it afterwards and it stays.
+
+**Direct play** (on by default) is whether files the decoder can play are
+streamed as stored. Off has the server transcode everything, within the
+Video bitrate, for a file that stutters or looks wrong as stored: a transcode
+costs the server some work and the picture some detail, but is the same
+stream every other file gets. Playback info then gives "Direct play is off
+in the settings" as the reason. It is also in More during playback, where
+changing it restarts the stream at the same position.
 
 Sound is decoded on the MiSTer and folded to stereo. A plain fold of a
 surround track comes out noticeably quieter than a stereo track, so

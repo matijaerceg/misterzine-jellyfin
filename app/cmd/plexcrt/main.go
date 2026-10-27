@@ -159,7 +159,7 @@ func run() int {
 	// The ring stays mapped until the process ends: the pad poller and the
 	// watchdog may still be reading it as the app stops, and exiting unmaps it.
 	player := &ui.Player{Client: client, Binary: *playerPath, Fifo: "/tmp/jfplay.ctl", LogTo: filepath.Join(os.TempDir(), "jfplay.log"),
-		Status: "/tmp/jfplay.status", Kbps: cfg.BitrateKbps, Boost: cfg.AudioBoostValue, Hide: r.Hide}
+		Status: "/tmp/jfplay.status", Kbps: cfg.BitrateKbps, DirectPlay: cfg.DirectPlay, Boost: cfg.AudioBoostValue, Hide: r.Hide}
 	app := ui.New(client, r, player, lg)
 	player.Crop = app.VideoCrop
 	if r.GeometrySupported() {
