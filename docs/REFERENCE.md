@@ -445,15 +445,16 @@ and the uninstaller.
 
 ### Send a report
 
-**Options > Send a report** gathers what helps diagnose a problem into
-`/media/fat/misterzine-jellyfin/report.txt`: the app and launcher logs, the
-reasons for connection and update failures (including `updates/last-error.log`),
-the video settings read from the MiSTer INI, which MiSTer main is running and
-the framebuffer state. It can name media titles and playback details. Sign-in
-tokens, the server address and account files are left out, and beta access
-codes are redacted. Online upload is not available for this app: the screen
-says so and names the saved file, which you can attach to a problem report.
-**MisterZine-Jellyfin-Diagnostics** writes the same file.
+**Options > Send a report** gathers what helps diagnose a problem: the app,
+launcher and player logs, the reasons for connection and update failures
+(including `updates/last-error.log`), the video settings read from the MiSTer
+INI, which MiSTer main is running and the framebuffer state. It can name media
+titles and playback details. Sign-in tokens, the server address and account
+files are never included, and beta access codes are redacted. OK sends it and
+shows a code to post where you asked for help; the report is deleted after 30
+days. A copy stays at `/media/fat/misterzine-jellyfin/report.txt`, and if it
+cannot be sent the screen names that file instead, which you can attach to a
+problem report. **MisterZine-Jellyfin-Diagnostics** writes the same report.
 
 ### Showcase captures
 

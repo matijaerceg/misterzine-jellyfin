@@ -15,6 +15,8 @@
   header no longer judders. The player corrects the timing to the file's real
   frame rate before the core schedules pictures; a steady late-frame count on
   an otherwise smooth title was this.
+- Send a report now uploads the report and shows a short code to post where
+  you asked for help, as the Plex app does. A copy still stays on the card.
 - Reports include the H.264 stream headers as received, the demuxer's frame
   rates and the core's output changes, for diagnosing wrong output rates.
 

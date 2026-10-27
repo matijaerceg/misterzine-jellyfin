@@ -34,10 +34,10 @@ def installer_script(channel):
     return 'MisterZine-Jellyfin-Install-' + ('Public' if channel == 'public' else 'Beta')
 BOOT_START = '# BEGIN MISTERZINE JELLYFIN LAUNCHER'
 BOOT_END = '# END MISTERZINE JELLYFIN LAUNCHER'
-# Online report upload is off for MisterZine Jellyfin: reports are saved
-# locally, beside the app. send_report stays for a service set here, which
-# takes the plain-text report and answers with a short code. '' is off.
-REPORT_SERVICE = ''
+# The report service (shared with the Plex app): takes the plain-text report
+# and answers with a short code. '' switches sending off; reports are then
+# only saved beside the app.
+REPORT_SERVICE = 'https://api.misterzine.fyi'
 REPORT_MAGIC = 'MisterZine report v1'
 REPORT_MAX_BYTES = 256 * 1024
 REPORT_LOGS = ('misterzine-jellyfin-menu-run.log', 'misterzine-jellyfin-menu-run.log.1', 'misterzine-jellyfin-update-run.log',
@@ -1405,7 +1405,7 @@ class ReportError(RuntimeError):
 def send_report(text, version='unknown', opener=None):
     """POST the report; the code the service filed it under."""
     if not REPORT_SERVICE:
-        raise ReportError('Online report upload is unavailable for MisterZine Jellyfin. Use the saved local report.')
+        raise ReportError('Sending reports is switched off in this build.')
     import urllib.error
     req = urllib.request.Request(REPORT_SERVICE + '/reports', data=text.encode(), method='POST',
                                  headers={'Content-Type': 'text/plain; charset=utf-8',
@@ -1871,27 +1871,25 @@ def main():
     parser.add_argument('--card', type=Path, default=Path('/media/fat'))
     parser.add_argument('--package', type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument('--decoder-archive', type=Path, help='accepted for older menu scripts; the release bundles its decoder')
-    parser.add_argument('--no-upload', action='store_true', help='accepted for older menu scripts; reports are saved locally')
+    parser.add_argument('--no-upload', action='store_true', help='write the report without sending it')
     args = parser.parse_args()
     root = args.card / 'misterzine-jellyfin'
     try:
         if args.action in ('diagnostics', 'report'):
             # Reading logs needs no lock, so a report can be sent from the running app.
-            out, code, problem = diagnostics(root, upload=False)
+            out, code, problem = diagnostics(root, upload=not args.no_upload)
             if args.action == 'report':
                 # Lines the app parses.
                 print('saved: ' + str(out))
-                print('code: ' + code if code else 'error: Online report upload is unavailable for MisterZine Jellyfin; share the saved report manually.', flush=True)
+                print('code: ' + code if code else 'error: ' + problem, flush=True)
                 return 0
             print('Report saved as ' + str(out))
             if code:
                 print('Report sent. Post this code where you asked for help: ' + code)
             elif problem:
                 print('Not sent: ' + problem + ' You can send the saved file instead.')
-            else:
-                print('Online report upload is unavailable for MisterZine Jellyfin; share the saved file manually.')
             print('It can name media titles and playback details. Account files and tokens are never included.')
-            return 0
+            return 0 if code or args.no_upload else 1
         if args.action == 'maintain':
             sys.stdout = sys.stderr         # the log; stdout only tells the watcher when to go on
             return maintain(args.card, released=let_the_watcher_go)

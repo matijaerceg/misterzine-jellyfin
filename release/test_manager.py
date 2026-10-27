@@ -469,7 +469,7 @@ class ReportTests(unittest.TestCase):
         self.assertEqual((code, problem), ('', ''))
 
     def test_report_service_off_is_worded(self):
-        with self.assertRaisesRegex(manager.ReportError, 'unavailable for MisterZine Jellyfin'):
+        with self.assertRaisesRegex(manager.ReportError, 'switched off'):
             manager.send_report('x')
 
     def test_account_name_never_reaches_the_report(self):
