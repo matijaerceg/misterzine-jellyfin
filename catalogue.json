@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.6",
-      "version": "0.1.0-beta.6",
+      "id": "beta-0.1.0-beta.7",
+      "version": "0.1.0-beta.7",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.6\n\n- Playback Info fits in one wider, compact panel with no row selection.\n- Video and audio separately explain whether the server converted them.\n  Original and received formats are compared when the source details are known.\n- Plain-language conversion reasons explain format, channel, subtitle and\n  playback-limit requirements. Local stereo output is shown separately.\n- Measured current and average video bitrate, the applicable bitrate limit,\n  MiSTer output and effective de-flicker state are visible together.\n- Recent late frames and decoder errors are separated from playback totals;\n  the sound buffer is shown in seconds.\n- Arrow keys leave Playback Info open. Left/Right on its More-menu row has no\n  effect; OK and Back return from Info to More.\n- Original video whose file carries wrong or missing frame timing in its H.264\n  header no longer judders. The player corrects the timing to the file's real\n  frame rate before the core schedules pictures; a steady late-frame count on\n  an otherwise smooth title was this.\n- Send a report now uploads the report and shows a short code to post where\n  you asked for help, as the Plex app does. A copy still stays on the card.\n- Reports include the H.264 stream headers as received, the demuxer's frame\n  rates and the core's output changes, for diagnosing wrong output rates.\n\nUses the same qualified FPGA core as the preceding release. Existing settings,\ncalibration and saved access are preserved. Rollback restores the previous release.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-beta-0.1.0-beta.6.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.7\n\n- Direct play can be switched off in Options or the playback More menu to\n  ask the server to convert every video. Changing it during playback keeps\n  your position.\n- Hold L or R for two seconds during an episode to play the previous or next\n  episode. A progress indicator shows the hold; releasing early cancels it.\n- HTTPS is preferred for server discovery and sign-in. Plain HTTP is limited to\n  local destinations and requires a clear warning and approval for that server.\n  Existing unapproved HTTP sessions return to sign-in after updating.\n- Server identity is checked without credentials before a saved session is used.\n  Unsafe redirects are refused.\n- Video downloads now use the app's certificate and connection checks. The\n  decoder receives a temporary local URL rather than the Jellyfin token, and\n  external playlist destinations are refused. Update the app and playback worker\n  together. HTTPS servers need valid certificates and the MiSTer's clock set.\n- Verified HTTPS media uses the worker's optimized OpenSSL connection so the\n  security checks do not burden ARM playback with generic software encryption.\n  DE10 checks covered 720p H.264 direct play and HLS transcoding at 23.976 fps,\n  480i output, pause/resume, repeated seeks, Direct play changes and episode holds.\n\nKnown beta limitation: seeking and playback mode changes can land several seconds\nfrom the requested position at keyframes or stream segment boundaries.\n\nUses the same qualified FPGA core as beta 6. Settings and saved supporter access\nare preserved. Update through **Options > Updates**, or use the beta installer.\n\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-beta-0.1.0-beta.7.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14074309,
-      "sha256": "b0c0ad83f0a0b9a0f09a2bd284c824ef1899fc221d58bec742f628c3df3cbbcd",
+      "size": 14268724,
+      "sha256": "c76a5dc6e3ff7a0e2bfd6fcff5b0b9e1e53d633e447710a5ddb189b70c4031de",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip",
-        "size": 139008640,
-        "sha256": "bc4447ca5e9586db0b037854d1736ed83e020b55b7d9ccd9ecf068b18692cecc",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip",
+        "size": 139043861,
+        "sha256": "bc90a371eb4687ee0d8132f2c3ac353d998c0950a84b1fcf14b1b657da0da1af",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.6",
-      "version": "0.1.0-beta.6",
+      "id": "beta-0.1.0-beta.7",
+      "version": "0.1.0-beta.7",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.6\n\n- Playback Info fits in one wider, compact panel with no row selection.\n- Video and audio separately explain whether the server converted them.\n  Original and received formats are compared when the source details are known.\n- Plain-language conversion reasons explain format, channel, subtitle and\n  playback-limit requirements. Local stereo output is shown separately.\n- Measured current and average video bitrate, the applicable bitrate limit,\n  MiSTer output and effective de-flicker state are visible together.\n- Recent late frames and decoder errors are separated from playback totals;\n  the sound buffer is shown in seconds.\n- Arrow keys leave Playback Info open. Left/Right on its More-menu row has no\n  effect; OK and Back return from Info to More.\n- Original video whose file carries wrong or missing frame timing in its H.264\n  header no longer judders. The player corrects the timing to the file's real\n  frame rate before the core schedules pictures; a steady late-frame count on\n  an otherwise smooth title was this.\n- Send a report now uploads the report and shows a short code to post where\n  you asked for help, as the Plex app does. A copy still stays on the card.\n- Reports include the H.264 stream headers as received, the demuxer's frame\n  rates and the core's output changes, for diagnosing wrong output rates.\n\nUses the same qualified FPGA core as the preceding release. Existing settings,\ncalibration and saved access are preserved. Rollback restores the previous release.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-beta-0.1.0-beta.6.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.7\n\n- Direct play can be switched off in Options or the playback More menu to\n  ask the server to convert every video. Changing it during playback keeps\n  your position.\n- Hold L or R for two seconds during an episode to play the previous or next\n  episode. A progress indicator shows the hold; releasing early cancels it.\n- HTTPS is preferred for server discovery and sign-in. Plain HTTP is limited to\n  local destinations and requires a clear warning and approval for that server.\n  Existing unapproved HTTP sessions return to sign-in after updating.\n- Server identity is checked without credentials before a saved session is used.\n  Unsafe redirects are refused.\n- Video downloads now use the app's certificate and connection checks. The\n  decoder receives a temporary local URL rather than the Jellyfin token, and\n  external playlist destinations are refused. Update the app and playback worker\n  together. HTTPS servers need valid certificates and the MiSTer's clock set.\n- Verified HTTPS media uses the worker's optimized OpenSSL connection so the\n  security checks do not burden ARM playback with generic software encryption.\n  DE10 checks covered 720p H.264 direct play and HLS transcoding at 23.976 fps,\n  480i output, pause/resume, repeated seeks, Direct play changes and episode holds.\n\nKnown beta limitation: seeking and playback mode changes can land several seconds\nfrom the requested position at keyframes or stream segment boundaries.\n\nUses the same qualified FPGA core as beta 6. Settings and saved supporter access\nare preserved. Update through **Options > Updates**, or use the beta installer.\n\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-beta-0.1.0-beta.7.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14074309,
-      "sha256": "b0c0ad83f0a0b9a0f09a2bd284c824ef1899fc221d58bec742f628c3df3cbbcd",
+      "size": 14268724,
+      "sha256": "c76a5dc6e3ff7a0e2bfd6fcff5b0b9e1e53d633e447710a5ddb189b70c4031de",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip",
-        "size": 139008640,
-        "sha256": "bc4447ca5e9586db0b037854d1736ed83e020b55b7d9ccd9ecf068b18692cecc",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip",
+        "size": 139043861,
+        "sha256": "bc90a371eb4687ee0d8132f2c3ac353d998c0950a84b1fcf14b1b657da0da1af",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip"
       }
     }
   }
