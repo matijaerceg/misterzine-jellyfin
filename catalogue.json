@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.5",
-      "version": "0.1.0-beta.5",
+      "id": "beta-0.1.0-beta.6",
+      "version": "0.1.0-beta.6",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.5\n\n- Stronger OSD de-flicker for downscaled video, including 720-line video on\n  interlaced 480-line output. Off and native-size filtering are unchanged.\n- Scrubbing while paused keeps the picture and play icon steady. Press OK on\n  the playhead, Start, or the play button to resume at the selected position.\n- Playback Info shows separate video/audio conversion status, current and\n  average video bitrate, core output, and a concise conversion reason.\n  The compact layout removes duplicate position information and indicates scrolling.\n- Main and playback menus wrap from the first entry to the last and back.\n- Show themes use buffered audio to prevent distortion from underruns and play\n  at source volume with smooth fades.\n\nExisting settings, calibration and saved access are preserved. Rollback restores\nthe previous application and core.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.5/MisterZine-Jellyfin-beta-0.1.0-beta.5.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.6\n\n- Playback Info fits in one wider, compact panel with no row selection.\n- Video and audio separately explain whether the server converted them.\n  Original and received formats are compared when the source details are known.\n- Plain-language conversion reasons explain format, channel, subtitle and\n  playback-limit requirements. Local stereo output is shown separately.\n- Measured current and average video bitrate, the applicable bitrate limit,\n  MiSTer output and effective de-flicker state are visible together.\n- Recent late frames and decoder errors are separated from playback totals;\n  the sound buffer is shown in seconds.\n- Arrow keys leave Playback Info open. Left/Right on its More-menu row has no\n  effect; OK and Back return from Info to More.\n- Original video whose file carries wrong or missing frame timing in its H.264\n  header no longer judders. The player corrects the timing to the file's real\n  frame rate before the core schedules pictures; a steady late-frame count on\n  an otherwise smooth title was this.\n- Send a report now uploads the report and shows a short code to post where\n  you asked for help, as the Plex app does. A copy still stays on the card.\n- Reports include the H.264 stream headers as received, the demuxer's frame\n  rates and the core's output changes, for diagnosing wrong output rates.\n\nUses the same qualified FPGA core as the preceding release. Existing settings,\ncalibration and saved access are preserved. Rollback restores the previous release.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-beta-0.1.0-beta.6.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14062264,
-      "sha256": "7ff39b090c5680abf60b7ad12e35a353e63b3324af4de99cde9b583d01a36e31",
+      "size": 14074309,
+      "sha256": "b0c0ad83f0a0b9a0f09a2bd284c824ef1899fc221d58bec742f628c3df3cbbcd",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.5.zip",
-        "size": 138993417,
-        "sha256": "c3e04fef7c53d61ebd665319b5a968cced75a9aab55a428b4b11564cf5111fa5",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.5/MisterZine-Jellyfin-Source-beta-0.1.0-beta.5.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip",
+        "size": 139008640,
+        "sha256": "bc4447ca5e9586db0b037854d1736ed83e020b55b7d9ccd9ecf068b18692cecc",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.5",
-      "version": "0.1.0-beta.5",
+      "id": "beta-0.1.0-beta.6",
+      "version": "0.1.0-beta.6",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.5\n\n- Stronger OSD de-flicker for downscaled video, including 720-line video on\n  interlaced 480-line output. Off and native-size filtering are unchanged.\n- Scrubbing while paused keeps the picture and play icon steady. Press OK on\n  the playhead, Start, or the play button to resume at the selected position.\n- Playback Info shows separate video/audio conversion status, current and\n  average video bitrate, core output, and a concise conversion reason.\n  The compact layout removes duplicate position information and indicates scrolling.\n- Main and playback menus wrap from the first entry to the last and back.\n- Show themes use buffered audio to prevent distortion from underruns and play\n  at source volume with smooth fades.\n\nExisting settings, calibration and saved access are preserved. Rollback restores\nthe previous application and core.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.5/MisterZine-Jellyfin-beta-0.1.0-beta.5.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.6\n\n- Playback Info fits in one wider, compact panel with no row selection.\n- Video and audio separately explain whether the server converted them.\n  Original and received formats are compared when the source details are known.\n- Plain-language conversion reasons explain format, channel, subtitle and\n  playback-limit requirements. Local stereo output is shown separately.\n- Measured current and average video bitrate, the applicable bitrate limit,\n  MiSTer output and effective de-flicker state are visible together.\n- Recent late frames and decoder errors are separated from playback totals;\n  the sound buffer is shown in seconds.\n- Arrow keys leave Playback Info open. Left/Right on its More-menu row has no\n  effect; OK and Back return from Info to More.\n- Original video whose file carries wrong or missing frame timing in its H.264\n  header no longer judders. The player corrects the timing to the file's real\n  frame rate before the core schedules pictures; a steady late-frame count on\n  an otherwise smooth title was this.\n- Send a report now uploads the report and shows a short code to post where\n  you asked for help, as the Plex app does. A copy still stays on the card.\n- Reports include the H.264 stream headers as received, the demuxer's frame\n  rates and the core's output changes, for diagnosing wrong output rates.\n\nUses the same qualified FPGA core as the preceding release. Existing settings,\ncalibration and saved access are preserved. Rollback restores the previous release.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-beta-0.1.0-beta.6.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14062264,
-      "sha256": "7ff39b090c5680abf60b7ad12e35a353e63b3324af4de99cde9b583d01a36e31",
+      "size": 14074309,
+      "sha256": "b0c0ad83f0a0b9a0f09a2bd284c824ef1899fc221d58bec742f628c3df3cbbcd",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.5.zip",
-        "size": 138993417,
-        "sha256": "c3e04fef7c53d61ebd665319b5a968cced75a9aab55a428b4b11564cf5111fa5",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.5/MisterZine-Jellyfin-Source-beta-0.1.0-beta.5.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip",
+        "size": 139008640,
+        "sha256": "bc4447ca5e9586db0b037854d1736ed83e020b55b7d9ccd9ecf068b18692cecc",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.6/MisterZine-Jellyfin-Source-beta-0.1.0-beta.6.zip"
       }
     }
   }
