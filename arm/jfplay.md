@@ -60,16 +60,30 @@ This mode does not read or write the media worker's control FIFO or status file.
 ## Invocation
 
 ```
-jfplay [--rbf path] [--base SECONDS] [--start-in-file SECONDS] [--audio INDEX] [--headers "K: v\r\n..."] [--cafile path] [--fifo /tmp/jfplay.ctl] [--status /tmp/jfplay.status] [--hold] [--direct] [--volume 0-100] [--audio-boost 100-300] [--surround-source] [--analog-aspect 0-4] [--anti-twitter 0-2] [--geometry LEFT,TOP,RIGHT,BOTTOM,WIDTH] URL
+jfplay [--gateway] [--rbf path] [--base SECONDS] [--start-in-file SECONDS] [--audio INDEX] [--headers "K: v\r\n..."] [--cafile path] [--fifo /tmp/jfplay.ctl] [--status /tmp/jfplay.status] [--hold] [--direct] [--volume 0-100] [--audio-boost 100-300] [--surround-source] [--analog-aspect 0-4] [--anti-twitter 0-2] [--geometry LEFT,TOP,RIGHT,BOTTOM,WIDTH] URL
 ```
 
-`URL` is a direct-play file or an HLS master/media playlist.  `--headers` is
-passed to every FFmpeg HTTP open, including HLS children.  Without
-`--headers`, the environment variable `JFPLAY_HEADERS` supplies them; the app
-uses it, since the headers carry the token and a process's command line is
-readable by every other process.  `--cafile` enables
-TLS peer verification using that CA bundle.  The URL is never logged unless
-`JFPLAY_LOG_URLS=1` is in the environment.
+`URL` is a direct-play file or an HLS master/media playlist. App launches use
+`--gateway`: the URL and all nested opens must stay in the app's per-session
+loopback namespace. Only HTTP/TCP are allowed in this mode, and HLS persistent
+requests are disabled so every new URL passes through the worker's URL check.
+The app gateway handles verified HTTPS, refuses cross-origin redirects and
+external playlist destinations, and adds the Jellyfin token upstream. The decoder
+receives no server credentials; `--gateway` rejects supplied headers.
+
+The gateway also uses `jfplay --tls-connect HOST PORT` as a private stdio TLS
+connection. This mode does not open the FPGA or parse HTTP. OpenSSL verifies the
+system trust chain, expiry and DNS/IP subject alternative name before consuming
+stdin, with TLS 1.2 or later. It uses ARM-optimized crypto, avoiding the cost of
+generic Go AES-GCM on this CPU. Credentials travel through the private pipe,
+never command-line arguments or environment variables. Closing the gateway
+closes its connections and reaps these helpers.
+
+For manual diagnostic launches, `--headers` or `JFPLAY_HEADERS` still supplies
+FFmpeg headers. Peer verification is enabled; `--cafile` selects a CA bundle.
+These legacy direct-network launches do not provide the app gateway's hostname,
+redirect or local-network policy checks and should not be used with account
+credentials. The URL is never logged unless `JFPLAY_LOG_URLS=1` is set.
 
 `--audio INDEX` selects an absolute libavformat stream index.  Without it,
 FFmpeg's best audio stream is used, falling back to the first audio stream with

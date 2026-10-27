@@ -51,7 +51,7 @@ func TestTrickplaySheetRequest(t *testing.T) {
 	defer srv.Close()
 	store := &MemoryStore{}
 	store.SetCredentials(Credentials{Token: "TESTTOKEN", UserID: "user-1"})
-	c := New(srv.URL, t.TempDir(), "dev-1", store)
+	c := testClient(srv.URL, t.TempDir(), "dev-1", store)
 	data, err := c.TrickplaySheet(context.Background(), "item-1", "source-1", 320, 1)
 	if err != nil || string(data) != "jpeg" {
 		t.Fatalf("sheet = %q, %v", data, err)

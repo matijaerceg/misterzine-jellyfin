@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Sign-in replaces the plex.tv side (PIN link, server list, Home users):
@@ -45,6 +46,9 @@ type authResult struct {
 }
 
 func (c *Client) finishAuth(a *authResult) (Credentials, error) {
+	if c.expectedID != "" && a.ServerID != "" && a.ServerID != c.expectedID {
+		return Credentials{}, ErrServerIdentity
+	}
 	if a.AccessToken == "" || a.User.ID == "" {
 		return Credentials{}, errors.New("sign-in answer has no token")
 	}
@@ -208,8 +212,8 @@ func NormalizeHost(s string) (string, error) {
 
 // HostCandidates is the base URLs to probe, in order, for what the user
 // typed: NormalizeHost's, then for an address with neither scheme nor port
-// also Jellyfin's plain HTTP port, so jellyfin.example.com reaches a server
-// with no reverse proxy at http://jellyfin.example.com:8096.
+// also Jellyfin's plain HTTP port for local destinations only. Credentials
+// still require explicit consent; every HTTP socket rechecks the destination.
 func HostCandidates(s string) ([]string, error) {
 	host, err := NormalizeHost(s)
 	if err != nil {
@@ -221,6 +225,11 @@ func HostCandidates(s string) ([]string, error) {
 	}
 	u, err := url.Parse("http://" + s)
 	if err != nil || u.Port() != "" || strings.HasSuffix(u.Host, ":") {
+		return []string{host}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if _, err := localAddresses(ctx, u.Hostname()); err != nil {
 		return []string{host}, nil
 	}
 	u.Host += ":8096"

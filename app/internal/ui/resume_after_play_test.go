@@ -72,7 +72,7 @@ func newResumeRig(t *testing.T, stopAt float64, serverAt, laterAt int) *resumeRi
 	})
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	status := dir + "/status"

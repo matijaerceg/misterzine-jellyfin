@@ -30,6 +30,8 @@
 #include <libswresample/swresample.h>
 
 #include "h264ring.h"
+#include "gateway_policy.h"
+#include "tls_bridge.h"
 #include "audio_boost.h"
 #include "h264_idr.h"
 #include "film_speed.h"
@@ -69,6 +71,7 @@ enum playback_state { STATE_OPENING, STATE_PLAYING, STATE_PAUSED,
 
 struct config {
     const char *url, *rbf, *headers, *cafile, *fifo, *status;
+    int gateway;
     double base, start_in_file;
     int audio_index, hold, volume, audio_boost, surround_source, direct;
     int analog_aspect, analog_aspect_set;
@@ -249,7 +252,7 @@ static int parse_int(const char *s, int lo, int hi, int *out)
 static void usage(void)
 {
     fprintf(stderr, "usage: jfplay [--rbf path] [--base SECONDS] [--start-in-file SECONDS] [--audio INDEX] "
-            "[--headers TEXT] [--cafile path] [--fifo path] [--status path] "
+            "[--gateway] [--headers TEXT] [--cafile path] [--fifo path] [--status path] "
             "[--hold] [--direct] [--volume 0-100] [--audio-boost 100-300] [--surround-source] "
             "[--analog-aspect 0-4] [--anti-twitter 0-2] "
             "[--geometry LEFT,TOP,RIGHT,BOTTOM,WIDTH] URL\n");
@@ -266,6 +269,7 @@ static int parse_args(int argc, char **argv, struct config *c)
         else if (!strcmp(argv[i], "--direct")) c->direct = 1;
         else if (!strcmp(argv[i], "--rbf") && ++i < argc) c->rbf = argv[i];
         else if (!strcmp(argv[i], "--headers") && ++i < argc) c->headers = argv[i];
+        else if (!strcmp(argv[i], "--gateway")) c->gateway = 1;
         else if (!strcmp(argv[i], "--cafile") && ++i < argc) c->cafile = argv[i];
         else if (!strcmp(argv[i], "--fifo") && ++i < argc) c->fifo = argv[i];
         else if (!strcmp(argv[i], "--status") && ++i < argc) c->status = argv[i];
@@ -297,13 +301,13 @@ static int parse_args(int argc, char **argv, struct config *c)
         } else if (argv[i][0] == '-' || c->url) return -1;
         else c->url = argv[i];
     }
-    /* The app passes the headers (they carry the token) in the environment:
-     * /proc/<pid>/cmdline is readable by every process, environ only by the
-     * owner. --headers stays for runs by hand. */
+    /* Legacy/manual launches may supply headers through the environment.
+     * App launches use --gateway, which never accepts server credentials. */
     if (!c->headers) {
         const char *env = getenv("JFPLAY_HEADERS");
         if (env && *env) c->headers = env;
     }
+    if (c->gateway && (!gateway_url_allowed(c->url, c->url) || c->headers)) return -1;
     return c->url ? 0 : -1;
 }
 
@@ -325,8 +329,13 @@ static void net_options(const struct config *c, AVDictionary **d)
     av_dict_set(d, "reconnect", "1", 0);
     av_dict_set(d, "reconnect_on_network_error", "1", 0);
     if (c->headers) av_dict_set(d, "headers", c->headers, 0);
+    av_dict_set(d, "tls_verify", "1", 0);
+    if (c->gateway) {
+        av_dict_set(d, "protocol_whitelist", "http,tcp", 0);
+        /* HLS keep-alive can open its next URL without calling io_open. */
+        av_dict_set(d, "http_persistent", "0", 0);
+    }
     if (c->cafile) {
-        av_dict_set(d, "tls_verify", "1", 0);
         av_dict_set(d, "cafile", c->cafile, 0);
     }
 }
@@ -335,6 +344,7 @@ static int io_open(AVFormatContext *s, AVIOContext **pb, const char *url,
                    int flags, AVDictionary **options)
 {
     struct config *c = s->opaque;
+    if (c->gateway && !gateway_url_allowed(c->url, url)) return AVERROR(EACCES);
     net_options(c, options);
     return avio_open2(pb, url, flags, &s->interrupt_callback, options);
 }
@@ -2015,6 +2025,8 @@ static void cleanup(struct player *p, int reader_started)
 
 int main(int argc, char **argv)
 {
+    if (argc >= 2 && !strcmp(argv[1], "--tls-connect"))
+        return argc == 4 ? tls_bridge_main(argv[2], argv[3]) : EX_ARGS;
     if (argc >= 2 && !strcmp(argv[1], "--menu-audio")) {
         if (argc == 2) return menu_audio_main(NULL);
         if (argc == 4 && !strcmp(argv[2], "--core-name") && argv[3][0])

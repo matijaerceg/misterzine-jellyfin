@@ -48,7 +48,7 @@ func TestPlayerLaunchesAndReports(t *testing.T) {
 			defer srv.Close()
 			store := &jellyfin.MemoryStore{}
 			store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-			client := jellyfin.New(srv.URL, "", "device", store)
+			client := testJellyfinClient(srv.URL, "", "device", store)
 			client.SetHTTPClient(srv.Client())
 			dir := t.TempDir()
 			status := dir + "/status"
@@ -81,8 +81,11 @@ func TestPlayerLaunchesAndReports(t *testing.T) {
 					headers = v
 				}
 			}
-			if !strings.HasPrefix(headers, "Authorization: ") || !strings.Contains(headers, "synthetic-token") || !strings.HasSuffix(headers, "\r\n") {
-				t.Fatalf("JFPLAY_HEADERS = %q, want the Authorization header with the token", headers)
+			if headers != "" {
+				t.Fatalf("worker received credentials: %q", headers)
+			}
+			if !strings.Contains(joined, "--gateway http://127.0.0.1:") {
+				t.Fatal("worker bypasses gateway")
 			}
 			if !strings.Contains(joined, "--analog-aspect 4") {
 				t.Fatalf("missing crop argument: %s", joined)
@@ -141,7 +144,7 @@ func TestHLSFullTimelineSeekUsesInFileOffsetAndZeroBase(t *testing.T) {
 	defer srv.Close()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	status := dir + "/status"
@@ -265,7 +268,7 @@ func TestPlayerTrackChangeRequestsNewDirectStreamAndSelectsAudioIndex(t *testing
 	defer srv.Close()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	status := dir + "/status"
@@ -410,7 +413,7 @@ func lifecyclePlayer(t *testing.T) (*Player, *atomic.Int32, *atomic.Int32, *atom
 	}))
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	// the first worker never answers stop: a short grace keeps the tests quick
@@ -518,7 +521,7 @@ func TestPlayerStopReportsFinalPositionAfterGracefulExit(t *testing.T) {
 	defer srv.Close()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	fifo, status, ready := dir+"/fifo", dir+"/status", dir+"/ready"
@@ -571,7 +574,7 @@ func TestPlayerToggleReportsIntendedStateWhenStatusUpdatesImmediately(t *testing
 	defer srv.Close()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	status := t.TempDir() + "/status"
 	if err := os.WriteFile(status, []byte("state=playing\nposition=12\n"), 0o600); err != nil {
@@ -614,7 +617,7 @@ func TestPlayerStartAsyncCanBeCanceledDuringPlaybackInfo(t *testing.T) {
 	}()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	p := &Player{Client: client, Binary: "jfplay", Fifo: dir + "/fifo", Status: dir + "/status", LogTo: dir + "/log"}
@@ -690,7 +693,7 @@ func TestPlayerImmediateSeekWaitsForInitialStartup(t *testing.T) {
 	}()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	status := dir + "/status"
@@ -788,7 +791,7 @@ func TestPlayerUISeekAndStopDoNotWaitForDelayedReports(t *testing.T) {
 	}()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	status := dir + "/status"

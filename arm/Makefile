@@ -18,10 +18,10 @@ LIBS := $(ROOT)/build/arm/libh264ring.a \
 all: jfplay
 
 # Every host test: none needs the ARM toolchain or a device.
-test: video-bitrate-test menu-click-test contract-test core-owner-test audio-boost-test seek-cache-test seek-protocol-test h264-idr-test \
+test: gateway-policy-test video-bitrate-test menu-click-test contract-test core-owner-test audio-boost-test seek-cache-test seek-protocol-test h264-idr-test \
 	film-speed-test direct-check-test video-geometry-test packet-pacing-test vui-timing-test pal-diagnostic-test
 
-jfplay: jfplay.c video_bitrate.h menu_audio.h menu_click.h menu_tone.h audio_boost.h film_speed.h h264_idr.h seek_cache.h seek_protocol.h video_geometry.h core_owner.h \
+jfplay: jfplay.c gateway_policy.h tls_bridge.h video_bitrate.h menu_audio.h menu_click.h menu_tone.h audio_boost.h film_speed.h h264_idr.h seek_cache.h seek_protocol.h video_geometry.h core_owner.h \
 		direct_check.h packet_pacing.h lag_watch.h vui_timing.h pal_diagnostic.h $(H264CHECK)/h264check.c $(H264CHECK)/h264check.h $(ROOT)/build/arm/libh264ring.a
 
 	$(CC) $(CFLAGS) -o $@ $< $(H264CHECK)/h264check.c $(LIBS)
@@ -91,3 +91,8 @@ vui-timing-test:
 pal-diagnostic-test:
 	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -g -o /tmp/jfplay-pal-diagnostic-test test_pal_diagnostic.c
 	/tmp/jfplay-pal-diagnostic-test
+
+.PHONY: gateway-policy-test
+gateway-policy-test:
+	$(HOSTCC) -std=c11 -Wall -Wextra -Werror -O2 -o /tmp/jfplay-gateway-policy-test test_gateway_policy.c
+	/tmp/jfplay-gateway-policy-test

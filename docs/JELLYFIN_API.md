@@ -21,7 +21,9 @@ record; otherwise the app opens on the sign-in screen.
 **Signing in** (`login.go`). Servers on the local network are found by
 `Discover` (Jellyfin's UDP discovery). A found or typed address goes through
 `HostCandidates` and each candidate is probed with `PublicInfo` (a bare name
-tries https, then http on port 8096). The server's listed users come from
+tries HTTPS, then HTTP on port 8096 only for local destinations).
+Local HTTP requires per-server consent before signing in. Discovered and saved
+identities are checked without credentials. The server's listed users come from
 `PublicUsers`. Then Quick Connect (`QuickConnectEnabled`, `Start`,
 `Check`, `Finish`) or a user name and password (`SignIn`). The resulting
 `Credentials` are saved in the settings (`Config.SetCredentials`), which is
@@ -56,8 +58,9 @@ and revokes the token in the background (`SignOut`).
 `PlaybackInfo`: the device profile, the chosen audio and subtitle streams and
 the start point (see [PLAYBACK.md](PLAYBACK.md) for the decision). `player.go`
 turns the answer into a URL with `StreamURL` (a transcode) or
-`DirectStreamURL` (the file as stored), hands it to the player with
-`AuthHeader()` so the token stays out of the URL, and reports the session with
+`DirectStreamURL` (the file as stored). `NewGateway` checks remote TLS, redirects
+and local HTTP policy, then gives the worker a temporary loopback URL. Tokens
+stay in the app, including for HLS child requests. The app reports the session with
 `ReportStart`, `ReportProgress` (every 10 s) and `ReportStopped`. Jellyfin has
 no per-file default track, so the app keeps the audio and subtitle choice per
 movie or show in its settings (`Config.Streams`) and sends it with every
@@ -86,7 +89,8 @@ c.Art / Logo / ArtData / LogoData (ctx, ref, w, h)  c.ImageURL(ref, ImageQuery) 
 c.PlaybackInfo(ctx, id, PlaybackRequest)  c.StreamURL / DirectStreamURL
 c.SubtitleText(ctx, itemID, sourceID, index)  // a text subtitle track as SRT
 c.ReportStart / ReportProgress / ReportStopped(ctx, PlayState)
-c.AuthHeader()  // for the player: same header on the stream request
+c.NewGateway(ctx) // checked streaming connection; close it when playback ends
+c.AuthHeader()  // used inside the gateway, never passed to the worker
 jellyfin.ErrUnauthorized, *jellyfin.HTTPError, Fold, LangName, Ticks, Seconds
 ```
 
@@ -145,8 +149,8 @@ Authorization: MediaBrowser Client="MisterZine", Device="MiSTer CRT", DeviceId="
 (Jellyfin keys sessions and Quick Connect on it); the app passes the
 `ClientID` from its settings. The token is never put in a URL: Jellyfin 12
 refuses `?api_key=` on the `/socket` websocket (REST still accepts it, but URLs
-end up in logs and in `ps`). `AuthHeader()` is exported so the player sends
-the same.
+end up in logs and in `ps`). `AuthHeader()` is used by the app and its playback
+gateway. `/System/Info/Public` always omits the token, even on a signed-in client.
 
 ### Endpoint map
 
@@ -228,7 +232,7 @@ for logos. The tag changes when the picture does, so the disk cache key
 `PlaybackInfo` passes the device profile through as raw JSON (the UI builds it;
 see [PLAYBACK.md](PLAYBACK.md)). The answer's `MediaSources[].TranscodingUrl` is a server path
 **with the session token embedded as `ApiKey=`**; `StreamURL` strips it so
-the player sends `AuthHeader()` instead. `DirectStreamURL` builds
+the gateway sends `AuthHeader()` instead. `DirectStreamURL` builds
 `/Videos/{id}/stream.{container}?static=true&mediaSourceId=...` for sources
 that `SupportsDirectStream`. Audio/subtitle choices are stream indexes
 (`Stream.ID`), sent per play in `PlaybackInfo` and in the reports. A subtitle
@@ -279,4 +283,5 @@ never sends one.
   `Reach`/`LocalNameBlocked`) have no counterpart; servers are found by
   Jellyfin's UDP discovery (`Discover`, port 7359). Sign-in is the server
   address -> `HostCandidates` + `PublicInfo` (a bare name tries https, then
-  http on port 8096); user/password -> `SignIn` or Quick Connect.
+  HTTP on port 8096 for local destinations only); explicit local HTTP consent;
+  user/password -> `SignIn` or Quick Connect.

@@ -2,7 +2,10 @@ package ui
 
 import (
 	"errors"
+	"net"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -22,19 +25,21 @@ import (
 // gen so a step left since cannot be changed by them. Options > Switch user
 // opens it at the users of the server on record (NewSwitchUser).
 type Login struct {
-	app   *App
-	step  loginStep
-	pad   *keyPad
-	stat  string // what is going on, for the status line
-	err   string
-	gen   atomic.Int64 // bumped on every change of step so stale answers stand down
-	at    time.Time
-	host  string // the normalized address, once probed
-	info  *jellyfin.PublicInfo
-	quick bool                  // the server offers Quick Connect
-	users []jellyfin.PublicUser // the users the server lists, often none
-	cur   int                   // the method list's cursor
-	user  string                // as the server has it: folded only to draw
+	app           *App
+	step          loginStep
+	pad           *keyPad
+	stat          string // what is going on, for the status line
+	err           string
+	gen           atomic.Int64 // bumped on every change of step so stale answers stand down
+	at            time.Time
+	expectedID    string
+	plainAccepted bool
+	host          string // the normalized address, once probed
+	info          *jellyfin.PublicInfo
+	quick         bool                  // the server offers Quick Connect
+	users         []jellyfin.PublicUser // the users the server lists, often none
+	cur           int                   // the method list's cursor
+	user          string                // as the server has it: folded only to draw
 	// picked is a user taken from the server's list: only the password is
 	// typed, and Back from it returns to the list
 	picked bool
@@ -59,6 +64,7 @@ const (
 	stepUser                      // typing the user name
 	stepPassword                  // typing the password
 	stepFind                      // looking for servers on the local network
+	stepPlain                     // consent before credentials go over local HTTP
 	stepServers                   // the servers found, or typing an address
 )
 
@@ -146,6 +152,7 @@ func (l *Login) otherServer() {
 func NewSwitchUser(app *App) *Login {
 	l := &Login{app: app, at: time.Now(), step: stepMethod, host: app.Cfg.ServerURL, switching: true}
 	l.pad = newKeyPad(l.host, "Connect >", false)
+	l.expectedID = app.Cfg.ServerID
 	l.connect([]string{l.host})
 	return l
 }
@@ -198,12 +205,25 @@ func (l *Login) open() bool {
 // A bare name also tries Jellyfin's plain HTTP port when the first answer
 // fails.
 func (l *Login) probe() {
-	hosts, err := jellyfin.HostCandidates(l.pad.text)
-	if err != nil {
+	if _, err := jellyfin.NormalizeHost(l.pad.text); err != nil {
 		l.err = "Enter the server's address, such as jellyfin.example.com or 192.0.2.10:8096."
 		return
 	}
-	l.connect(hosts)
+	l.gen.Add(1)
+	gen, address := l.gen.Load(), l.pad.text
+	l.busy, l.err, l.stat = true, "", "Checking the server address..."
+	go func() {
+		hosts, err := jellyfin.HostCandidates(address)
+		l.later(gen, func() {
+			l.busy = false
+			if err != nil {
+				l.err = "Enter the server's address, such as jellyfin.example.com or 192.0.2.10:8096."
+				return
+			}
+			l.expectedID = ""
+			l.connect(hosts)
+		})
+	}()
 }
 
 // connect tries the addresses in turn until one answers as a Jellyfin
@@ -212,6 +232,7 @@ func (l *Login) probe() {
 func (l *Login) connect(hosts []string) {
 	l.gen.Add(1)
 	gen := l.gen.Load()
+	expectedID := l.expectedID
 	l.err, l.busy, l.stat = "", true, "Connecting to "+hosts[0]+"..."
 	go func() {
 		var (
@@ -222,13 +243,18 @@ func (l *Login) connect(hosts []string) {
 		)
 		for _, h := range hosts {
 			c := jellyfin.New(h, "", l.app.Cfg.ClientID, nil)
+			c.AllowLocalHTTP(true) // public, credential-free probe; dial still enforces local addresses
 			i, err := c.PublicInfo(bg())
+			if err == nil && expectedID != "" && i.ID != expectedID {
+				err = jellyfin.ErrServerIdentity
+			}
 			if err == nil {
+				c.ExpectServer(i.ID)
 				host, client, info = h, c, i
 				break
 			}
 			l.app.Log.Printf("sign-in: %s: %v", h, err)
-			if ferr == nil {
+			if ferr == nil || errors.Is(err, jellyfin.ErrPlainHTTP) || errors.Is(err, jellyfin.ErrServerIdentity) {
 				first, ferr = h, err
 			}
 		}
@@ -252,7 +278,13 @@ func (l *Login) connect(hosts []string) {
 			}
 			l.host, l.info, l.quick, l.users, l.client = host, info, quick, users, client
 			l.cur = 0
-			l.to(stepMethod)
+			l.plainAccepted = l.app.Cfg.PlainHTTPServer == host
+			client.AllowLocalHTTP(l.plainAccepted)
+			if strings.HasPrefix(host, "http://") && !l.plainAccepted {
+				l.to(stepPlain)
+			} else {
+				l.to(stepMethod)
+			}
 		})
 	}()
 }
@@ -261,6 +293,8 @@ func (l *Login) connect(hosts []string) {
 func (l *Login) probeFailure(host string, err error) string {
 	var he *jellyfin.HTTPError
 	switch {
+	case errors.Is(err, jellyfin.ErrPlainHTTP), errors.Is(err, jellyfin.ErrServerIdentity):
+		return err.Error()
 	case errors.As(err, &he) && he.Status == http.StatusNotFound:
 		return "No Jellyfin server at " + host + ". Check the address."
 	case unreachable(err):
@@ -431,6 +465,10 @@ func (l *Login) save(cr jellyfin.Credentials) {
 	if next.UserID != "" && next.UserID != cr.UserID {
 		next.HiddenLibraries, next.Streams, next.RecentSearches = nil, nil, nil
 	}
+	next.PlainHTTPServer = ""
+	if l.plainAccepted && strings.HasPrefix(l.host, "http://") {
+		next.PlainHTTPServer = l.host
+	}
 	next.ServerURL, next.ServerName = l.host, l.info.ServerName
 	if cr.ServerID == "" {
 		cr.ServerID = l.info.ID
@@ -490,6 +528,13 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 		return
 	}
 	switch l.step {
+	case stepPlain:
+		if ev.Key == input.Enter && !ev.Repeat {
+			l.plainAccepted = true
+			l.client.AllowLocalHTTP(true)
+			l.app.Log.Printf("sign-in: local HTTP approved; password and session token are unencrypted")
+			l.to(stepMethod)
+		}
 	case stepFind:
 		if ev.Key == input.Enter && !ev.Repeat {
 			l.to(stepAddress) // no waiting: the address is typed
@@ -509,9 +554,18 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 				l.to(stepAddress)
 				return
 			}
-			// the address it gave, probed as if typed
-			l.pad = newKeyPad(l.servers[l.scur].Address, "Connect >", false)
-			l.probe()
+			// Prefer TLS, but never rewrite an explicitly advertised HTTPS URL.
+			found := l.servers[l.scur]
+			l.expectedID = found.ID
+			hosts := []string{found.Address}
+			if u, err := url.Parse(found.Address); err == nil && u.Scheme == "http" {
+				u.Scheme = "https"
+				if u.Port() == "8096" {
+					u.Host = net.JoinHostPort(u.Hostname(), "8920")
+				}
+				hosts = append([]string{u.String()}, hosts...)
+			}
+			l.connect(hosts)
 		}
 	case stepAddress, stepUser, stepPassword:
 		if l.pad.Key(ev) == padDone {
@@ -564,6 +618,8 @@ func (l *Login) Key(ev input.Event, now time.Time) {
 // Switching user, the methods return to the session untouched.
 func (l *Login) Back() bool {
 	switch l.step {
+	case stepPlain:
+		l.to(stepAddress)
 	case stepFind:
 		l.app.Push(NewOptions(l.app)) // the search goes on behind
 	case stepAddress, stepServers:
@@ -601,6 +657,16 @@ func (l *Login) Draw(c *gfx.Canvas, now time.Time) bool {
 	y := SafeY + 44
 	anim := false
 	switch l.step {
+	case stepPlain:
+		l.app.text(c, SafeX, y, f.Big, gfx.White, "Unencrypted local connection")
+		y += 34
+		l.app.text(c, SafeX, y, f.Small, gfx.GreyLo, f.Small.Fit(l.host, SafeW))
+		y += 30
+		for _, line := range wrapAll(f.Body, "This server uses plain HTTP. People able to monitor your network can read your password and session token. Quick Connect also exposes its session token. Continue only on a network you trust. Use HTTPS for protection.", SafeW) {
+			l.app.text(c, SafeX, y, f.Body, gfx.GreyHi, line)
+			y += f.Body.Height() + 6
+		}
+		l.app.text(c, SafeX, y+16, f.Body, gfx.White, "OK: allow for this server   Back: cancel")
 	case stepAddress:
 		l.app.text(c, SafeX, y, f.Big, gfx.Grey, "Sign in to Jellyfin")
 		y += f.Big.Height() + 8

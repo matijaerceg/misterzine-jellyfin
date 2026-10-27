@@ -62,6 +62,7 @@ type Session struct {
 	state                                  jellyfin.PlayState
 	direct, fullTimeline, started, closing bool
 	pausePending                           bool
+	gateway                                *jellyfin.Gateway
 	url                                    string
 	writeCommand                           func(string)
 	Done                                   chan error
@@ -380,7 +381,27 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 			args = append(args, "--geometry", geometry)
 		}
 	}
-	args = append(args, s.url)
+	if s.gateway != nil {
+		s.gateway.Close()
+		s.gateway = nil
+	}
+	gateway, err := p.Client.NewGateway(ctx, p.Binary)
+	if err != nil {
+		return err
+	}
+	workerURL, err := gateway.URL(s.url)
+	if err != nil {
+		gateway.Close()
+		return err
+	}
+	s.gateway = gateway
+	launched := false
+	defer func() {
+		if !launched {
+			gateway.Close()
+		}
+	}()
+	args = append(args, "--gateway", workerURL)
 	_ = os.Remove(p.Status)
 	run := p.exec
 	if run == nil {
@@ -389,10 +410,10 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	cmd := run(p.Binary, args...)
 	output := &safelog.Writer{Out: s.lf, Secrets: []string{p.Client.Store.Credentials().Token}}
 	cmd.Stdout, cmd.Stderr = output, output
-	// The headers carry the token, so they go in the environment (readable by
-	// this user only), not on the command line (readable by every process).
+	// Credentials stay in the gateway. Clear any inherited legacy header
+	// variable so the worker cannot accidentally forward an old token.
 	cmd.Env = append(os.Environ(), "MISTERZINE_JFPLAY_OWNER="+filepath.Clean(p.Binary),
-		"JFPLAY_HEADERS=Authorization: "+p.Client.AuthHeader()+"\r\n")
+		"JFPLAY_HEADERS=")
 	s.mu.Lock()
 	if ctx.Err() != nil || s.closing || s.stopRequested {
 		s.mu.Unlock()
@@ -402,6 +423,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		s.mu.Unlock()
 		return err
 	}
+	launched = true
 	s.cmd = cmd
 	done := make(chan struct{})
 	s.cmdDone = done
@@ -1012,6 +1034,10 @@ func (s *Session) runUICommands() {
 }
 
 func (s *Session) stopProcessLocked() {
+	if s.gateway != nil {
+		s.gateway.Close()
+		s.gateway = nil
+	}
 	s.mu.Lock()
 	cmd := s.cmd
 	done := s.cmdDone
@@ -1077,6 +1103,10 @@ func (s *Session) finishLocked(err error) {
 	} else {
 		_ = s.p.Client.ReportStopped(context.Background(), ps)
 		close(s.reported)
+	}
+	if s.gateway != nil {
+		s.gateway.Close()
+		s.gateway = nil
 	}
 	_ = s.lf.Close()
 	s.doneOnce.Do(func() { s.Done <- err })

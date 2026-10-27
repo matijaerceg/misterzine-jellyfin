@@ -27,6 +27,25 @@ track in a large MKV.
 
 Check the lowest bitrate steps on Wi-Fi.
 
+Play an eligible file with Direct play on, then turn it off in More and back
+on. Check Playback Info identifies each method, the position is retained, and
+pause/resume and forward/backward seeks work in both modes. Compare startup,
+seek recovery, sound buffer, late frames and decoder errors with the preceding
+release using the same file, bitrate and network. Allow a warm-up before
+comparing steady playback.
+
+During a middle episode, tap L and R and check the episode does not change.
+Hold each for two seconds and check the progress indicator leads to the previous
+or next episode. Release early to cancel. At a season boundary, the unavailable
+direction should do nothing.
+
+Check HTTPS sign-in and playback with a valid certificate. A wrong server name,
+untrusted certificate, changed server identity or unsafe redirect must fail
+without sending credentials to the other destination. A local HTTP server must
+show the unencrypted-connection warning before sign-in and remain playable after
+approval; public HTTP must be refused. Use disposable fixture credentials for
+these failure checks. Include direct streams and nested HLS playlist requests.
+
 Check sign-in right after power-on, while the network and clock are still
 settling, and that a revoked session returns to sign-in with the address kept.
 

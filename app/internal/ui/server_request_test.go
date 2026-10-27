@@ -122,7 +122,7 @@ func TestOpenItemCancelsStalledHTTP(t *testing.T) {
 	}))
 	defer srv.Close()
 	a, root := outageTestApp()
-	a.Client = jellyfin.New(srv.URL, "", "test-device", nil)
+	a.Client = testJellyfinClient(srv.URL, "", "test-device", nil)
 	a.Open(&jellyfin.Item{ID: "film", Type: "movie"}, false)
 	// If Open still waits for HTTP, this test never reaches Back.
 	select {
@@ -147,7 +147,7 @@ func TestMenuDoesNotFetchMissingLibraries(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); http.Error(w, "offline", 503) }))
 	defer srv.Close()
 	a, _ := outageTestApp()
-	a.Client = jellyfin.New(srv.URL, "", "test-device", nil)
+	a.Client = testJellyfinClient(srv.URL, "", "test-device", nil)
 	a.F = appFonts()
 	a.Mark = NewWordmark()
 	a.T = gfx.NewTextCache(1, a.Wake)

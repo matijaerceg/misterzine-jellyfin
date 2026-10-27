@@ -152,6 +152,20 @@ tested on a native Linux or WSL host without the ARM toolchain or device:
 make -C arm test
 ```
 
+The native TLS connection has an integration test using disposable local
+certificates. On a Linux host with OpenSSL development headers/libraries:
+
+```sh
+cc -O2 -Wall -Wextra -Werror arm/test_tls_bridge.c -lssl -lcrypto -o /tmp/jfplay-tls-test
+cd app
+MISTERZINE_TEST_TLS_BRIDGE=/tmp/jfplay-tls-test go test ./internal/jellyfin -run 'Test(NativeTLSBridge|TLSBridgeClose)'
+```
+
+On the device, cross-build that Go test package with `go test -c` and point
+`MISTERZINE_TEST_TLS_BRIDGE` at the newly built `jfplay`. These tests cover
+certificate and hostname rejection before credentials, media/range transfer,
+redirect and playlist restrictions, deadlines, and helper cleanup.
+
 The geometry test reads the shared expected rectangles in
 `tools/testdata/fit_cases.txt` and checks NTSC/PAL alignment, crop and fit
 behavior, and invalid inputs.

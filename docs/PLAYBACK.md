@@ -56,10 +56,18 @@ It uses the first media source returned:
   A requested resume position does not mean the returned playlist starts there.
   The worker uses the movie's timeline without adding the resume offset again.
 
-The app passes its authorization header to `jfplay` for stream requests and
-redacts the account token from the playback log. It hides the app overlay while
+The app downloads media through a checked local gateway and gives `jfplay` a
+temporary loopback URL. The decoder receives no token; remote certificate validation,
+redirect rules and local HTTP consent apply to direct streams and HLS alike.
+The decoder rejects URLs outside that gateway session. It hides the app overlay while
 the video is playing. The worker status file supplies playback position and
 state; the app reports start, periodic progress, and stop to Jellyfin.
+
+For HTTPS media, the gateway uses the worker's OpenSSL in a separate, private
+stdio connection. This avoids expensive generic encryption on ARMv7. It checks
+the certificate chain, expiry and DNS/IP subject alternative name before sending
+HTTP bytes, using the system trust store and TLS 1.2 or later. The app still owns
+HTTP redirects and playlist validation; this helper never touches the decoder.
 
 ## Controls and seek
 

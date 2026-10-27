@@ -38,7 +38,8 @@ animation or separate loading screen runs.
 Use the D-pad to navigate, OK to select, and Back to return. During playback,
 OK opens the controls. The first Back closes whatever is on screen; Back with
 nothing on screen stops playback. Choose **Exit to MiSTer menu** to leave the
-app.
+app. Hold L or R for two seconds during an episode to play the previous or
+next episode; releasing early cancels the change.
 
 Start with the core OSD's **480i60** output, **Refresh Rate Match: Off**, and
 **240p Playback: Off**. Use **576i50** only with a PAL-capable display.
@@ -84,7 +85,10 @@ can take tens of seconds to resume.
 
 Files the decoder supports play directly. Others are transcoded from the
 start. If a direct stream falls behind, playback switches to a transcode once
-at the same position.
+at the same position. **Direct play** in Options or playback **More** can be
+switched off to ask the server to convert every video. Seeking and playback
+mode changes can land several seconds from the requested position because
+streams resume at keyframes or segment boundaries.
 
 This is beta software. Playback updates watched state and resume positions in
 your Jellyfin library. Network interruptions, server behavior and different
@@ -105,9 +109,13 @@ network, or in a container without host networking, may not answer either way.
 Choose **Enter address** and type the address instead.
 
 To type it, enter the server's address as you would in a web browser. A bare
-name such as `jellyfin.example.com` is tried over HTTPS first and then as
-`http://jellyfin.example.com:8096`; type `http://` in front for any other
-plain HTTP port. What the screen says next:
+name such as `jellyfin.example.com` is tried over HTTPS first. Only local
+servers can fall back to plain HTTP on port 8096; type `http://` for another
+local HTTP port. Plain HTTP sends sign-in details and media unencrypted and
+requires your approval for that server. Public HTTP addresses are refused.
+Existing HTTP sessions without approval return to sign-in after this update.
+HTTPS needs a valid server certificate and the correct time on your MiSTer.
+What the screen says next:
 
 - **No Jellyfin server at** the address: something answered, but not
   Jellyfin. Check the address, port and any path your reverse proxy uses.
@@ -190,8 +198,8 @@ the reasons for connection and update failures (including `last-error.log`),
 the video settings read from the MiSTer INI, which MiSTer main is running and
 the framebuffer state. It can name media titles and playback details; sign-in
 tokens, the server address and account files are never included. This app
-cannot upload reports: the screen says so and names the saved file, which you
-attach yourself. There is no report code to post.
+uploads the report and shows a short code to post where you asked for help.
+A copy remains on the card; if upload fails, attach that file yourself.
 
 If the app does not start, **MisterZine-Jellyfin-Diagnostics** in MiSTer
 Scripts writes the same file.

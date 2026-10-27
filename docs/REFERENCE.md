@@ -16,21 +16,35 @@ USB keyboard, goes to the address without waiting. Discovery needs the server's
 auto discovery setting (on by default) and UDP port 7359 open on the server.
 
 The address is typed on the on-screen keyboard or a USB keyboard. The app
-checks that a Jellyfin server answers there before going on; a server chosen
-from the list is checked the same way, at the address it gave.
+checks the server without sending a saved token. Discovered and saved server
+IDs must match before credentials are sent. This catches a changed server;
+an ID is not cryptographic proof of identity on an unencrypted connection.
 
-- An address with `http://` or `https://` is used as typed, including any path
-  after the name (a server behind a reverse proxy at
-  `https://example.com/jellyfin`, say).
-- An address without either uses HTTPS, except one that ends in `:8096`,
-  Jellyfin's plain HTTP port, which uses HTTP.
-- A bare name or IP address with no port, such as `jellyfin.example.com`, is
-  tried as `https://jellyfin.example.com` first and then as
-  `http://jellyfin.example.com:8096`. The first that answers as a Jellyfin
-  server is kept. When neither does, the message names the first address
-  tried.
-- Any other port without a scheme, such as `192.0.2.10:8920`, is tried over
-  HTTPS only. Type `http://` in front for a plain HTTP port.
+- HTTPS is the default. Certificate trust, expiry and the server name are
+  checked. Cross-origin redirects and HTTPS-to-HTTP redirects are refused.
+- A bare name or IP with no port tries HTTPS first. Only a name resolving
+  entirely to private, loopback or link-local addresses may fall back to HTTP
+  on port 8096. Each new HTTP socket uses a checked IP, preventing a DNS change
+  from redirecting credentials onto the public internet. HTTP proxies are not used.
+- Explicit `http://` addresses and addresses ending in `:8096` still require a
+  local destination. Remote HTTP is refused even when explicitly typed.
+- Discovery tries HTTPS before an advertised HTTP address (port 8920 when the
+  advertised HTTP port is 8096). Explicit HTTPS addresses never fall back.
+- Before signing in over local HTTP, **Unencrypted local connection** explains
+  that network observers can read the password and session token. Quick Connect
+  also exposes its secret and token over HTTP. OK allows this exact address;
+  Back cancels. Approval is saved with the successful sign-in. Signing out clears it.
+- Existing HTTP sessions without this approval return to sign-in. Enter a verified
+  HTTPS address for protection, or explicitly approve the local HTTP warning.
+- Reverse-proxy paths such as `https://example.com/jellyfin` are preserved.
+
+Playback downloads use the same checked connection as browsing. A temporary
+loopback gateway streams video to the decoder without giving it the server token.
+HLS playlists, segments, keys and initialization URLs must stay on the selected
+server's origin; external media hosts and redirects to other origins are refused.
+The worker accepts only its session's loopback URLs in this mode. Both the app
+and worker must be updated together. HTTPS needs a valid system CA bundle and
+clock; missing trust roots do not disable verification.
 
 The server's name then shows with the ways to sign in:
 

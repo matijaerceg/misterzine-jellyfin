@@ -158,6 +158,9 @@ func probed(t *testing.T, a *App, l *Login, address string) {
 	l.pad.text = address
 	l.typed()
 	pump(t, a, "the probe", func() bool { return !l.busy })
+	if l.step == stepPlain {
+		l.Key(input.Event{Key: input.Enter}, time.Now())
+	}
 	if l.step != stepMethod {
 		t.Fatalf("after the probe the screen is at step %d: %q", l.step, l.err)
 	}
@@ -426,6 +429,7 @@ func signedInApp(t *testing.T, s *signInServer) *App {
 	if err := a.Cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
+	a.Cfg.PlainHTTPServer = a.Cfg.ServerURL
 	a.Client = NewClient(a.Cfg, t.TempDir())
 	a.pagers = map[string]*Pager{}
 	a.stack = []Screen{&splashTestScreen{}, NewOptions(a)}
@@ -549,6 +553,9 @@ func TestSignInServersFound(t *testing.T) {
 	}
 	l.Key(input.Event{Key: input.Enter}, time.Now())
 	pump(t, a, "the probe", func() bool { return !l.busy })
+	if l.step == stepPlain {
+		l.Key(input.Event{Key: input.Enter}, time.Now())
+	}
 	if l.step != stepMethod || l.host != s.URL || l.info.ServerName != "test-server" {
 		t.Fatalf("picking a server: step %d at %q, %q", l.step, l.host, l.err)
 	}
@@ -612,6 +619,7 @@ func TestUnauthorizedReturnsToSignIn(t *testing.T) {
 	if err := a.Cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
+	a.Cfg.PlainHTTPServer = a.Cfg.ServerURL
 	a.Client = NewClient(a.Cfg, t.TempDir())
 	a.stack = []Screen{&splashTestScreen{}}
 	a.loadSections()

@@ -147,7 +147,7 @@ func newFallbackServer(t *testing.T, direct string) *fallbackServer {
 	t.Cleanup(f.srv.Close)
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	f.client = jellyfin.New(f.srv.URL, "", "device", store)
+	f.client = testJellyfinClient(f.srv.URL, "", "device", store)
 	f.client.SetHTTPClient(f.srv.Client())
 	return f
 }

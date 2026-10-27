@@ -121,7 +121,7 @@ func TestSessionBitrateRestartsWithTheNewCap(t *testing.T) {
 	defer srv.Close()
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(jellyfin.Credentials{UserID: "user", Token: "synthetic-token"})
-	client := jellyfin.New(srv.URL, "", "device", store)
+	client := testJellyfinClient(srv.URL, "", "device", store)
 	client.SetHTTPClient(srv.Client())
 	dir := t.TempDir()
 	status := dir + "/status"

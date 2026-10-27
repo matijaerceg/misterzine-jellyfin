@@ -122,7 +122,7 @@ func newFake(t *testing.T) (*fake, *Client) {
 		}
 	}))
 	t.Cleanup(srv.Close)
-	c := New(srv.URL, t.TempDir(), "dev-1", nil)
+	c := testClient(srv.URL, t.TempDir(), "dev-1", nil)
 	c.Backoff = time.Millisecond
 	return f, c
 }
@@ -210,9 +210,10 @@ func TestNormalizeHost(t *testing.T) {
 
 func TestHostCandidates(t *testing.T) {
 	for in, want := range map[string]string{
-		"jellyfin.example.com":            "https://jellyfin.example.com http://jellyfin.example.com:8096",
-		"192.0.2.10/jellyfin/":            "https://192.0.2.10/jellyfin http://192.0.2.10:8096/jellyfin",
-		"[2001:db8::1]":                   "https://[2001:db8::1] http://[2001:db8::1]:8096",
+		"jellyfin.example.com":            "https://jellyfin.example.com",
+		"127.0.0.1":                       "https://127.0.0.1 http://127.0.0.1:8096",
+		"192.0.2.10/jellyfin/":            "https://192.0.2.10/jellyfin",
+		"[2001:db8::1]":                   "https://[2001:db8::1]",
 		"192.0.2.10:8096":                 "http://192.0.2.10:8096",
 		"jellyfin.example.com:8920":       "https://jellyfin.example.com:8920",
 		"https://jellyfin.example.com":    "https://jellyfin.example.com",
@@ -331,7 +332,7 @@ func TestPaging(t *testing.T) {
 		json.NewEncoder(w).Encode(map[string]any{"Items": items, "TotalRecordCount": total, "StartIndex": start})
 	}))
 	defer srv.Close()
-	c := New(srv.URL, t.TempDir(), "dev-1", &MemoryStore{})
+	c := testClient(srv.URL, t.TempDir(), "dev-1", &MemoryStore{})
 	c.Store.SetCredentials(Credentials{UserID: testUser, Token: "TESTTOKEN"})
 	ctx := context.Background()
 	all, err := c.all(ctx, "/Items?parentId=lib", nil)
@@ -368,7 +369,7 @@ func TestErrors(t *testing.T) {
 		w.WriteHeader(status)
 	}))
 	defer srv.Close()
-	c := New(srv.URL, t.TempDir(), "dev-1", nil)
+	c := testClient(srv.URL, t.TempDir(), "dev-1", nil)
 	c.Store.SetCredentials(Credentials{UserID: testUser, Token: "revoked"})
 	c.Backoff = time.Millisecond
 	ctx := context.Background()
@@ -425,7 +426,7 @@ func TestPlaybackInfoErrorCode(t *testing.T) {
 		w.Write([]byte(`{"MediaSources":[],"ErrorCode":"NotAllowed"}`))
 	}))
 	defer srv.Close()
-	c := New(srv.URL, t.TempDir(), "dev-1", nil)
+	c := testClient(srv.URL, t.TempDir(), "dev-1", nil)
 	c.Store.SetCredentials(Credentials{UserID: testUser, Token: "t"})
 	_, err := c.PlaybackInfo(context.Background(), "1", PlaybackRequest{})
 	if err == nil || !strings.Contains(err.Error(), "NotAllowed") {
@@ -435,7 +436,7 @@ func TestPlaybackInfoErrorCode(t *testing.T) {
 
 func TestImageURL(t *testing.T) {
 	ref := "f17e0000000000000000000000000005/Primary/f17e0000000000000000000000000006"
-	c := New("https://jf.example/base/", t.TempDir(), "dev-1", nil)
+	c := testClient("https://jf.example/base/", t.TempDir(), "dev-1", nil)
 	c.Store.SetCredentials(Credentials{Token: "secret"})
 	got, err := c.ImageURL(ref, ImageQuery{FillWidth: 240, FillHeight: 360, Quality: 90})
 	want := "https://jf.example/base/Items/f17e0000000000000000000000000005/Images/Primary?fillHeight=360&fillWidth=240&quality=90&tag=f17e0000000000000000000000000006"
@@ -711,4 +712,11 @@ func TestItemKeepsSourceAudioChannelsAndDefaultSelection(t *testing.T) {
 	if len(item.Audio) != 1 || item.Audio[0].Channels != 6 || !item.Audio[0].Selected {
 		t.Fatalf("source audio stream = %+v", item.Audio)
 	}
+}
+
+// Existing endpoint tests explicitly opt in to their loopback HTTP fixture.
+func testClient(host, cache, device string, store TokenStore) *Client {
+	c := New(host, cache, device, store)
+	c.AllowLocalHTTP(true)
+	return c
 }

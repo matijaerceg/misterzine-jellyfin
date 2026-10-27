@@ -57,8 +57,9 @@ vvp /tmp/sync_gen_240_tb
 
 Hardware-dependent changes also need a MiSTer test. Verify direct streaming and
 transcoding, continuous audio/video, pause/resume, repeated seeking, stop/restart,
-and Jellyfin's saved position. Confirm that only one `jfplay` runs during playback
-and none remain after stop. Test crop on an analog display when changing it.
+and Jellyfin's saved position. Confirm that only one `jfplay` decoder runs during playback, that its HTTPS
+helper processes belong to the active playback session, and that none remain
+after stop. Test crop on an analog display when changing it.
 
 Playback can update watched state. Keep raw test journals, credentials, deployment
 logs, and session notes in a private directory outside Git. Public docs should

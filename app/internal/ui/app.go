@@ -957,9 +957,15 @@ func (a *App) Start() {
 // read the Config the UI thread edits; the sign-in screen saves a new
 // session into the Config (its TokenStore) before this is called.
 func NewClient(cfg *Config, cacheDir string) *jellyfin.Client {
+	if strings.HasPrefix(cfg.ServerURL, "http://") && cfg.PlainHTTPServer != cfg.ServerURL {
+		return nil
+	}
 	store := &jellyfin.MemoryStore{}
 	store.SetCredentials(cfg.Credentials())
-	return jellyfin.New(cfg.ServerURL, cacheDir, cfg.ClientID, store)
+	c := jellyfin.New(cfg.ServerURL, cacheDir, cfg.ClientID, store)
+	c.AllowLocalHTTP(cfg.PlainHTTPServer == cfg.ServerURL)
+	c.ExpectServer(cfg.ServerID)
+	return c
 }
 
 // Connect switches to the server in the config (after sign-in) and

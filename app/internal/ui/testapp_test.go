@@ -45,7 +45,7 @@ func (nopOSD) Bar(int, int, int, int, uint32, bool) {}
 // testClient is a client of the test server at host, signed in with token
 // as user "u" (an empty token: signed out).
 func testClient(host, token, cacheDir string) *jellyfin.Client {
-	c := jellyfin.New(host, cacheDir, "test-device", nil)
+	c := testJellyfinClient(host, cacheDir, "test-device", nil)
 	// the client retries a 5xx itself (Retries, Backoff); the tests count the
 	// requests the UI makes and time its own retries, so one ask is one request
 	c.Retries = 0
@@ -67,4 +67,11 @@ func jfPage(w io.Writer, r *http.Request, items ...string) {
 	start = min(max(start, 0), len(items))
 	end := min(len(items), start+max(limit, 0))
 	fmt.Fprintf(w, `{"Items":[%s],"TotalRecordCount":%d}`, strings.Join(items[start:end], ","), len(items))
+}
+
+// Endpoint fixtures are explicitly approved local HTTP servers.
+func testJellyfinClient(host, cache, device string, store jellyfin.TokenStore) *jellyfin.Client {
+	c := jellyfin.New(host, cache, device, store)
+	c.AllowLocalHTTP(true)
+	return c
 }

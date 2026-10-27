@@ -3,7 +3,7 @@
 // watched state and playback reporting, all as JSON over the server's REST
 // API. It is the UI's only server client (docs/JELLYFIN_API.md).
 //
-// Every request carries the token in the Authorization header
+// Authenticated requests carry the token in the Authorization header
 // (MediaBrowser ..., Token="..."), never in a URL: Jellyfin 12 refuses the
 // ?api_key= form on its websocket, and a URL ends up in logs. Nothing here
 // logs a token or a request query.
@@ -95,9 +95,14 @@ type Client struct {
 	Store      TokenStore
 	Logf       func(string, ...any) // optional; never handed a token or a query
 
-	http    *http.Client
-	slow    *http.Client // the home rows, which a large library answers slowly
-	refused atomic.Bool  // the server has answered this client 401 (Refused)
+	plainHTTP        atomic.Bool
+	expectedID       string
+	identityMu       sync.Mutex
+	identityChecked  bool
+	identityRequired bool
+	http             *http.Client
+	slow             *http.Client // the home rows, which a large library answers slowly
+	refused          atomic.Bool  // the server has answered this client 401 (Refused)
 
 	// Retries and Backoff govern idempotent requests that fail on the
 	// network or with a 5xx: Retries more attempts, waiting Backoff, then
@@ -119,15 +124,20 @@ func New(host, cacheDir, deviceID string, store TokenStore) *Client {
 	if store == nil {
 		store = &MemoryStore{}
 	}
-	return &Client{Host: strings.TrimRight(host, "/"), CacheDir: cacheDir, DeviceID: deviceID,
+	c := &Client{Host: strings.TrimRight(host, "/"), CacheDir: cacheDir, DeviceID: deviceID,
 		DeviceName: "MiSTer CRT", Store: store,
 		http:    &http.Client{Timeout: 10 * time.Second},
 		slow:    &http.Client{Timeout: 30 * time.Second},
 		Retries: 2, Backoff: 250 * time.Millisecond}
+	c.http = c.checkedClient(c.http)
+	c.slow = c.checkedClient(c.slow)
+	return c
 }
 
 // SetHTTPClient replaces both transports (tests, a custom TLS config).
-func (c *Client) SetHTTPClient(h *http.Client) { c.http, c.slow = h, h }
+func (c *Client) SetHTTPClient(h *http.Client) {
+	c.http, c.slow = c.checkedClient(h), c.checkedClient(h)
+}
 
 // UserID is the signed-in user, "" before sign-in.
 func (c *Client) UserID() string { return c.Store.Credentials().UserID }
@@ -151,7 +161,7 @@ func quote(s string) string {
 }
 
 // AuthHeader is the Authorization header value, with the token when there
-// is one. Exported for the playback launcher, which must send the same.
+// is one. The playback gateway uses it; the decoder never receives it.
 func (c *Client) AuthHeader() string {
 	h := fmt.Sprintf(`MediaBrowser Client="%s", Device="%s", DeviceId="%s", Version="%s"`,
 		quote(Product), quote(c.DeviceName), quote(c.DeviceID), quote(Version))
@@ -234,7 +244,15 @@ func (c *Client) once(ctx context.Context, cl *http.Client, method, path string,
 	if err != nil {
 		return nil, err, false
 	}
-	r.Header.Set("Authorization", c.AuthHeader())
+	if path == "/System/Info/Public" {
+		public := Client{DeviceName: c.DeviceName, DeviceID: c.DeviceID, Store: &MemoryStore{}}
+		r.Header.Set("Authorization", public.AuthHeader())
+	} else {
+		if err := c.ensureIdentity(ctx); err != nil {
+			return nil, err, false
+		}
+		r.Header.Set("Authorization", c.AuthHeader())
+	}
 	r.Header.Set("Accept", "application/json")
 	if len(payload) > 0 {
 		r.Header.Set("Content-Type", "application/json")

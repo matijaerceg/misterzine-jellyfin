@@ -50,12 +50,13 @@ type Config struct {
 	ClientID string `json:"client_id"`
 	// The server and the session on it (Credentials). The address stays
 	// after a sign-out, so signing in again starts from it.
-	ServerURL   string `json:"server_url"`   // the server's base address
-	ServerToken string `json:"server_token"` // the session's access token
-	ServerName  string `json:"server_name"`
-	ServerID    string `json:"server_id,omitempty"` // the server's id, from its public info
-	UserID      string `json:"user_id,omitempty"`
-	UserName    string `json:"user_name,omitempty"`
+	PlainHTTPServer string `json:"plain_http_server,omitempty"` // explicit consent, scoped to this exact address
+	ServerURL       string `json:"server_url"`                  // the server's base address
+	ServerToken     string `json:"server_token"`                // the session's access token
+	ServerName      string `json:"server_name"`
+	ServerID        string `json:"server_id,omitempty"` // the server's id, from its public info
+	UserID          string `json:"user_id,omitempty"`
+	UserName        string `json:"user_name,omitempty"`
 	// Streams are the audio and subtitle tracks chosen, by movie or show
 	// id: Jellyfin keeps no per-file default, so the app keeps the choice
 	// and passes it with each play (streamChoiceKey).
@@ -295,6 +296,7 @@ func (c *Config) SetCredentials(cr jellyfin.Credentials) {
 // address and name stay, for the next sign-in to start from.
 func (c *Config) SignOut() error {
 	next := c.snapshot()
+	next.PlainHTTPServer = ""
 	next.RecentSearches = nil
 	next.HiddenLibraries = nil // the keys belong to the session forgotten here
 	next.Streams = nil         // so do the item ids
