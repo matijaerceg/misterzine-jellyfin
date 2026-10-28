@@ -11,8 +11,9 @@ import (
 
 // listFields are the optional fields every listing asks for: enough for the
 // poster wall, the info panel and the picture aspect, without the media
-// sources (large, and only needed when an item is opened).
-const listFields = "SortName,Overview,Taglines,Genres,ChildCount,RecursiveItemCount,ParentId,Width,Height"
+// sources (large, and only needed when an item is opened), but with their
+// count (an item with versions asks which to play).
+const listFields = "SortName,Overview,Taglines,Genres,ChildCount,RecursiveItemCount,ParentId,Width,Height,MediaSourceCount"
 
 // itemFields are those of a single item: everything a pre-play page shows,
 // and the scrub preview sheets the playback overlay uses.
@@ -159,7 +160,9 @@ func SectionListing(section, kind, view string) (string, url.Values) {
 }
 
 // Item fetches one item in full: media sources and streams, and its intro
-// and credits markers when the server has found them.
+// and credits markers when the server has found them. An item with
+// versions on a server that keeps each one's resume point has them read,
+// and its own is the first version's (versionOffsets).
 func (c *Client) Item(ctx context.Context, id string) (*Item, error) {
 	q := c.userQuery()
 	q.Set("fields", itemFields)
@@ -171,6 +174,11 @@ func (c *Client) Item(ctx context.Context, id string) (*Item, error) {
 		return nil, fmt.Errorf("item %s not found", id)
 	}
 	it := x.item()
+	if len(it.Versions) > 1 && it.Versions[0].Detailed() && c.ownResumePoints(ctx) {
+		if err := c.versionOffsets(ctx, it); errors.Is(err, ErrUnauthorized) {
+			return nil, err
+		}
+	}
 	if it.Playable() {
 		// markers are a nicety: a server without segments still plays
 		if m, err := c.Markers(ctx, id); err == nil {

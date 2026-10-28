@@ -29,8 +29,8 @@ import (
 // Product is what the server sees this client as (the Client= field).
 const Product = "MisterZine"
 
-// Version is the client version sent in the Authorization header.
-var Version = "0.1"
+// ClientVersion is the client version sent in the Authorization header.
+var ClientVersion = "0.1"
 
 // TicksPerSecond is Jellyfin's time unit: one tick is 100 ns.
 const TicksPerSecond = 10_000_000
@@ -103,6 +103,8 @@ type Client struct {
 	http             *http.Client
 	slow             *http.Client // the home rows, which a large library answers slowly
 	refused          atomic.Bool  // the server has answered this client 401 (Refused)
+	versionMu        sync.Mutex
+	serverMajor      int // the server's major version (ownResumePoints): 0 unread, -1 unknown
 
 	// Retries and Backoff govern idempotent requests that fail on the
 	// network or with a 5xx: Retries more attempts, waiting Backoff, then
@@ -164,7 +166,7 @@ func quote(s string) string {
 // is one. The playback gateway uses it; the decoder never receives it.
 func (c *Client) AuthHeader() string {
 	h := fmt.Sprintf(`MediaBrowser Client="%s", Device="%s", DeviceId="%s", Version="%s"`,
-		quote(Product), quote(c.DeviceName), quote(c.DeviceID), quote(Version))
+		quote(Product), quote(c.DeviceName), quote(c.DeviceID), quote(ClientVersion))
 	if tok := c.Store.Credentials().Token; tok != "" {
 		h += `, Token="` + quote(tok) + `"`
 	}

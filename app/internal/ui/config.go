@@ -60,19 +60,43 @@ type Config struct {
 	// Streams are the audio and subtitle tracks chosen, by movie or show
 	// id: Jellyfin keeps no per-file default, so the app keeps the choice
 	// and passes it with each play (streamChoiceKey).
-	Streams     map[string]StreamChoice `json:"streams,omitempty"`
-	LoadWarning string                  `json:"-"`
-	LoadError   error                   `json:"-"`
+	Streams map[string]StreamChoice `json:"streams,omitempty"`
+	// Versions are the versions that last started or were chosen, by movie
+	// or episode id (the newest VersionsKept): a server before 12 keeps one
+	// resume point for all of an item's versions and no word of which
+	// played, so a resume plays this one unasked. Finishing the item or
+	// marking it watched forgets it.
+	Versions    map[string]VersionChoice `json:"versions,omitempty"`
+	LoadWarning string                   `json:"-"`
+	LoadError   error                    `json:"-"`
 	path        string
 	saver       *saver // shared by the copies (snapshot): one writer for the file
 }
 
 // StreamChoice is a chosen audio track and subtitle track, as Jellyfin
 // stream indexes; "" is the server's default, and Subtitle "-1" is off.
+// An index counts within one file, so the track's language goes with it
+// where the server names one: another file's track at that index in
+// another language is not the one chosen (applyStreams).
 type StreamChoice struct {
-	Audio    string `json:"audio,omitempty"`
-	Subtitle string `json:"subtitle,omitempty"`
+	Audio        string `json:"audio,omitempty"`
+	Subtitle     string `json:"subtitle,omitempty"`
+	AudioLang    string `json:"audio_lang,omitempty"`
+	SubtitleLang string `json:"subtitle_lang,omitempty"`
+	// VersionKind is the kind (jellyfin.Version.Kind) of the version a
+	// show's episode last started with: the next episodes play the same kind.
+	VersionKind string `json:"version_kind,omitempty"`
 }
+
+// VersionChoice is an item's version (jellyfin.Version.ID) and when it was
+// started or chosen (Unix seconds), for keeping the newest.
+type VersionChoice struct {
+	Media string `json:"media"`
+	At    int64  `json:"at"`
+}
+
+// VersionsKept is how many items' versions the settings keep.
+const VersionsKept = 300
 
 // snapshot is a copy to put back when a save fails. The extras' settings
 // map is copied too, so a failed save leaves them as they were as well.
@@ -80,6 +104,7 @@ func (c *Config) snapshot() Config {
 	s := *c
 	s.Premium = maps.Clone(c.Premium)
 	s.Streams = maps.Clone(c.Streams)
+	s.Versions = maps.Clone(c.Versions)
 	return s
 }
 

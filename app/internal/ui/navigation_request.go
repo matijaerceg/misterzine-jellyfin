@@ -72,16 +72,33 @@ func (a *App) openItem(original *jellyfin.Item, at string) {
 	})
 }
 
+// markItem marks an item watched or not, and each of its versions: on a
+// server that keeps each version's resume point, a version's own would
+// otherwise stay.
 func (a *App) markItem(it *jellyfin.Item, watched bool, done func()) {
 	client, key := a.Client, it.ID
+	ids := []string{key}
+	for _, v := range it.Versions {
+		if v.Detailed() && v.ID != key {
+			ids = append(ids, v.ID)
+		}
+	}
 	a.requestServer(func(ctx context.Context) (func(), error) {
-		if err := client.Scrobble(ctx, key, watched); err != nil {
-			return nil, err
+		for _, id := range ids {
+			if err := client.Scrobble(ctx, id, watched); err != nil {
+				return nil, err
+			}
 		}
 		fresh, err := client.Item(ctx, key)
 		if err != nil {
 			return nil, err
 		}
-		return func() { a.takeFresh(it, fresh); done() }, nil
+		return func() {
+			a.takeFresh(it, fresh)
+			if watched {
+				a.forgetVersion(it) // its next play is from the start
+			}
+			done()
+		}, nil
 	})
 }

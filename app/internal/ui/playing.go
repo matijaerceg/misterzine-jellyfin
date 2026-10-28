@@ -32,6 +32,7 @@ type Playing struct {
 	sourceInfo             func() playbackSource
 	conversionReason       func() string
 	streamModes            func() (string, string)
+	version                func() (string, bool) // the session's version (Session.Version); nil for none
 	app                    *App
 	item                   *jellyfin.Item
 	metadata               chan *jellyfin.Item // fetched off-thread, applied by Tick on the UI thread
@@ -323,6 +324,18 @@ func NewPlaying(app *App, it *jellyfin.Item, queue []*jellyfin.Item, idx int, se
 		}()
 	}
 	return p
+}
+
+// versionSettled reports whether the version the item plays is known: for
+// a listing's item the start settles (Session.settleVersion), once the
+// session has, and the item then takes it.
+func (p *Playing) versionSettled() bool {
+	if p.item.VersionID != "" || len(p.item.Versions) < 2 || p.version == nil {
+		return true
+	}
+	id, settled := p.version()
+	p.item.VersionID = id
+	return settled
 }
 
 func (p *Playing) canvasWidth() int {
@@ -953,9 +966,14 @@ func (p *Playing) Key(ev input.Event, now time.Time) bool {
 func (p *Playing) Tick(now time.Time, osd OSD, field bool) {
 	p.resizeCanvas(osd)
 	p.refreshMoreDirect()
-	if p.metadata != nil {
+	if p.metadata != nil && p.versionSettled() {
 		select {
 		case fresh := <-p.metadata:
+			// the record has its first version in force: the source,
+			// previews and tracks must be the playing version's
+			if len(fresh.Versions) > 1 && fresh.UseVersion(p.item.VersionID) {
+				p.item.Versions = fresh.Versions
+			}
 			p.item.Markers, p.item.SourceID, p.item.Trickplay = fresh.Markers, fresh.SourceID, fresh.Trickplay
 			p.item.Audio, p.item.Subs = fresh.Audio, fresh.Subs
 			p.app.applyStreams(p.item)

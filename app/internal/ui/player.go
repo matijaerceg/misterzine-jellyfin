@@ -52,6 +52,12 @@ type Session struct {
 	videoCopy                    bool   // original video in a server-generated audio-conversion stream
 	p                            *Player
 	item                         *jellyfin.Item
+	// rule settles the item's version once the start has read its record
+	// (settleVersion), nil when the app settled it; versionWhy is how the
+	// start did, versionSettled whether the version is known by now.
+	rule           *versionRule
+	versionWhy     string
+	versionSettled bool
 	// opMu serializes player lifecycle changes and status reports. mu only
 	// protects fields shared with readers such as UI state.
 	opMu                                   sync.Mutex
@@ -153,7 +159,7 @@ func (p *Player) Start(item *jellyfin.Item, offset int) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot open playback log: %w", err)
 	}
-	s := &Session{p: p, item: copyPlaybackItem(item), lf: lf, Done: make(chan error, 1), reported: make(chan struct{}), ctx: context.Background()}
+	s := &Session{p: p, item: copyPlaybackItem(item), lf: lf, Done: make(chan error, 1), reported: make(chan struct{}), ctx: context.Background(), versionSettled: true}
 	if err := s.startContext(offset, false, s.ctx); err != nil {
 		lf.Close()
 		return nil, err
@@ -166,6 +172,13 @@ func (p *Player) Start(item *jellyfin.Item, offset int) (*Session, error) {
 // once so the caller can keep drawing its starting screen while Jellyfin
 // prepares a transcode or a slow server answers PlaybackInfo.
 func (p *Player) StartAsync(item *jellyfin.Item, offset int) (*Session, error) {
+	return p.StartAsyncSettling(item, offset, nil)
+}
+
+// StartAsyncSettling is StartAsync for an item whose version rule settles
+// once the start has read its record (settleVersion); a negative offset is
+// then the settled version's resume point.
+func (p *Player) StartAsyncSettling(item *jellyfin.Item, offset int, rule *versionRule) (*Session, error) {
 	if p.Access != nil {
 		if err := p.Access(); err != nil {
 			return nil, err
@@ -174,7 +187,7 @@ func (p *Player) StartAsync(item *jellyfin.Item, offset int) (*Session, error) {
 	if p.Client == nil {
 		return nil, fmt.Errorf("playback has no Jellyfin client")
 	}
-	if offset < 0 {
+	if offset < 0 && rule == nil {
 		offset = item.ViewOffset
 	}
 	lf, err := os.OpenFile(p.LogTo, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
@@ -182,7 +195,8 @@ func (p *Player) StartAsync(item *jellyfin.Item, offset int) (*Session, error) {
 		return nil, fmt.Errorf("cannot open playback log: %w", err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &Session{p: p, item: copyPlaybackItem(item), lf: lf, Done: make(chan error, 1), reported: make(chan struct{}), async: true, ctx: ctx, cancel: cancel, uiWake: make(chan struct{}, 1)}
+	s := &Session{p: p, item: copyPlaybackItem(item), lf: lf, Done: make(chan error, 1), reported: make(chan struct{}), async: true, ctx: ctx, cancel: cancel, uiWake: make(chan struct{}, 1),
+		rule: rule, versionSettled: rule == nil}
 	_ = os.Remove(p.Status) // never let a canceled start consume an old session's position.
 	p.startReporter()
 	// Reserve the lifecycle before publishing the session to command callers.
@@ -190,6 +204,7 @@ func (p *Player) StartAsync(item *jellyfin.Item, offset int) (*Session, error) {
 	s.opMu.Lock()
 	go s.runUICommands()
 	go func() {
+		offset := s.settleVersion(ctx, offset)
 		err := s.startContext(offset, false, ctx)
 		s.opMu.Unlock()
 		if err != nil {
@@ -208,7 +223,95 @@ func copyPlaybackItem(item *jellyfin.Item) *jellyfin.Item {
 	copy.Audio = append([]jellyfin.Stream(nil), item.Audio...)
 	copy.Subs = append([]jellyfin.Stream(nil), item.Subs...)
 	copy.Markers = append([]jellyfin.Marker(nil), item.Markers...)
+	copy.Versions = append([]jellyfin.Version(nil), item.Versions...)
 	return &copy
+}
+
+// settleVersion reads, for a start with a version rule, the item's record
+// and puts in force the version the rule prefers (preferVersion): its
+// source, tracks (the chosen ones marked) and, where it keeps its own,
+// resume point. A record that cannot be read leaves the server's first.
+// It logs the version of an item with several, and returns the offset to
+// start at: a negative one is the item's resume point.
+func (s *Session) settleVersion(ctx context.Context, offset int) int {
+	if r := s.rule; r != nil {
+		fresh, err := s.p.Client.Item(ctx, s.item.ID)
+		if err != nil {
+			s.logf("versions: %v", err)
+		} else if len(fresh.Versions) > 1 && fresh.Versions[0].Detailed() {
+			i, why := preferVersion(fresh.Versions, r.remembered, r.kind, versionPlays(s.capKbps(), s.p.directPlay()))
+			fresh.UseVersion(fresh.Versions[i].ID)
+			if ch := r.streams; ch != nil {
+				markChoice(fresh.Audio, ch.Audio, ch.AudioLang)
+				markChoice(fresh.Subs, ch.Subtitle, ch.SubtitleLang)
+			}
+			s.mu.Lock()
+			it := s.item
+			it.Versions, it.VersionID, it.SourceID, it.SourceStreams = fresh.Versions, fresh.VersionID, fresh.SourceID, fresh.SourceStreams
+			it.Audio, it.Subs, it.Trickplay, it.Aspect, it.ViewOffset = fresh.Audio, fresh.Subs, fresh.Trickplay, fresh.Aspect, fresh.ViewOffset
+			s.versionWhy = why
+			s.mu.Unlock()
+		}
+		s.mu.Lock()
+		s.versionSettled = true
+		s.mu.Unlock()
+	}
+	if offset < 0 {
+		offset = s.item.ViewOffset
+	}
+	s.logVersion()
+	return offset
+}
+
+// logVersion names the version the session plays when its item has
+// several, and how the start chose it when it did.
+func (s *Session) logVersion() {
+	s.mu.Lock()
+	vs, id, why := s.item.Versions, s.item.VersionID, s.versionWhy
+	s.mu.Unlock()
+	if len(vs) < 2 {
+		return
+	}
+	if id == "" {
+		s.logf("version of %d: the server's first", len(vs))
+		return
+	}
+	line := versionLine(vs, id)
+	if why != "" {
+		line += ", chosen: " + why
+	}
+	s.logf("%s", line)
+}
+
+// Version is the version the session plays (jellyfin.Version.ID), and
+// whether it is settled: an item whose start settles it (settleVersion)
+// has none until then, and "" for good when its record could not be read.
+func (s *Session) Version() (id string, settled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.item.VersionID, s.versionSettled
+}
+
+// Versions are the versions of the session's item, as its start read them.
+func (s *Session) Versions() []jellyfin.Version {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]jellyfin.Version(nil), s.item.Versions...)
+}
+
+// capKbps is the video cap a start asks for: More's choice for this
+// session, else the setting.
+func (s *Session) capKbps() int {
+	kbps := 0
+	if s.p.Kbps != nil {
+		kbps = s.p.Kbps()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.kbps > 0 {
+		kbps = s.kbps
+	}
+	return kbps
 }
 
 func (p *Player) startReporter() {
@@ -278,14 +381,8 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	audio, subtitle := selectedStreams(s.item)
 	base, inFile := offset, 0
 	if !reuseDirect {
-		kbps := 0
-		if p.Kbps != nil {
-			kbps = p.Kbps()
-		}
+		kbps := s.capKbps()
 		s.mu.Lock()
-		if s.kbps > 0 {
-			kbps = s.kbps
-		}
 		force := s.forceTranscode || !p.directPlay()
 		s.mu.Unlock()
 		burn := s.burnedSubtitle(subtitle)

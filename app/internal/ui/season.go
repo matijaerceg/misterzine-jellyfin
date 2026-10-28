@@ -252,6 +252,9 @@ func (s *Season) rebuild() {
 	if len(it.Subs) > 0 {
 		s.actions = append(s.actions, streamLabel("Subtitles", it.Subs))
 	}
+	if row := versionRow(it); row != "" {
+		s.actions = append(s.actions, row)
+	}
 	if s.view != nil && s.view.direct {
 		// opened without the season picker (one season, Continue Watching,
 		// search): Back leaves the show, so the picker gets an action
@@ -297,11 +300,21 @@ func (s *Season) wantTracks(now time.Time) {
 	}(it)
 }
 
-// streamsArrived fills in an episode's tracks from its full record. Audio and
-// Subtitles go in before Forget my progress, so the cursor keeps
-// its action rather than its place in the row.
+// streamsArrived fills in an episode's tracks, and its versions with the
+// one it plays in force, from its full record: where a version keeps its
+// own resume point (the listing has the episode's), the episode's is that
+// one's. Audio, Subtitles and Version go in before Forget my progress, so
+// the cursor keeps its action rather than its place in the row.
 func (s *Season) streamsArrived(it, fresh *jellyfin.Item) {
+	s.app.applyVersion(fresh, it.VersionID)
 	it.SourceID, it.Audio, it.Subs = fresh.SourceID, fresh.Audio, fresh.Subs
+	if len(fresh.Versions) > 1 {
+		it.Versions, it.VersionID, it.SourceStreams = fresh.Versions, fresh.VersionID, fresh.SourceStreams
+		it.Trickplay, it.Aspect = fresh.Trickplay, fresh.Aspect
+		if v := fresh.Version(); v != nil && v.Offset >= 0 {
+			it.ViewOffset = fresh.ViewOffset
+		}
+	}
 	s.app.applyStreams(it)
 	if s.focused() == it {
 		kind := actionKind(s.actions, s.act)
@@ -501,6 +514,13 @@ func (s *Season) do(a string) {
 		return
 	case strings.HasPrefix(a, "Subtitles"):
 		s.app.chooseStream(it, "Subtitles", s.rebuild)
+		return
+	case strings.HasPrefix(a, "Version"):
+		s.app.chooseVersion(it, func() {
+			s.rebuild() // the version's own tracks, and resume point where it keeps one
+			s.act = restoreAction(s.actions, "Version")
+			s.keepActVisible(time.Now())
+		})
 		return
 	case strings.HasPrefix(a, "Resume"):
 		s.app.PlayQueue(it, it.ViewOffset, s.eps, s.cur, played)

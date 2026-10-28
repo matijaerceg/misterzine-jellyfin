@@ -127,9 +127,24 @@ func (a *App) notePlayed(it *jellyfin.Item, sess *Session, finished bool) {
 		return // never started: the server keeps the old point
 	}
 	done := finished || (it.Duration > 0 && pos >= 0.9*float64(it.Duration))
+	if id, _ := sess.Version(); id != "" {
+		// a version the start settled (quietVersion): the item, with the
+		// versions the start read, and its record take it (the overlay may
+		// have put it on the item already: Playing.versionSettled)
+		if len(it.Versions) == 0 || !it.Versions[0].Detailed() {
+			it.Versions = sess.Versions()
+		}
+		if id != it.VersionID {
+			a.useVersion(it, id)
+		}
+		if !done && a.rememberedVersion(it) != id {
+			a.noteVersion(it, id)
+		}
+	}
 	if done {
 		it.ViewOffset, it.Played = 0, true
 		it.ViewCount++ // as the server counts a play
+		a.forgetVersion(it)
 	} else {
 		it.ViewOffset = int(pos)
 	}

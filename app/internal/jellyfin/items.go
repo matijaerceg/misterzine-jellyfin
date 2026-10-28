@@ -35,7 +35,7 @@ type Item struct {
 	Viewed        int     // of which watched
 	Still         string  // an episode's own picture ref
 	Logo          string  // clear logo ref
-	Aspect        float64 // picture aspect of the first video stream, 0 unknown
+	Aspect        float64 // picture aspect of the source's first video stream, 0 unknown
 	Index         int     // episode number (season number for a season)
 	Season        int     // season number of an episode (plex Parent)
 	Rating        float64
@@ -43,11 +43,16 @@ type Item struct {
 	Genres        []string
 	Colors        [4]uint32  // poster corner colours from its blurhash (TL, TR, BR, BL), 0 if none
 	Markers       []Marker   // intro and credits (media segments), when fetched
-	SourceID      string     // the first media source (plex PartID), for PlaybackInfo
+	SourceID      string     // the media source in force (plex PartID): the chosen version's, else the first
 	Audio         []Stream   // its audio streams
 	Subs          []Stream   // its subtitle streams
 	Library       string     // the library (view) id, when known
 	Trickplay     *Trickplay // the scrub preview sheets of SourceID, when the server made them
+	// Versions are the item's media sources when it has two or more (see
+	// Version); VersionID is the one in force (UseVersion), "" for the
+	// record's first.
+	Versions  []Version
+	VersionID string
 }
 
 // Trickplay describes the server's preview sheets for a media source (GET
@@ -103,6 +108,7 @@ type Marker struct {
 type Stream struct {
 	ID       string
 	Title    string
+	Language string // the server's language code, "" unknown
 	Selected bool
 	Channels int // source audio channels; zero for subtitle tracks or unknown
 	// Text marks a text subtitle track (SRT, ASS, WebVTT ...) the server
@@ -191,10 +197,17 @@ type dto struct {
 	Width        int                                `json:"Width"`
 	Height       int                                `json:"Height"`
 	Trickplay    map[string]map[string]trickplayDTO `json:"Trickplay"`
+	// MediaSourceCount is how many versions the item has, in listings,
+	// which carry no MediaSources; the server leaves it out for one.
+	MediaSourceCount int `json:"MediaSourceCount"`
 }
 
 type mediaSource struct {
 	ID           string        `json:"Id"`
+	Name         string        `json:"Name"`
+	Path         string        `json:"Path"`
+	Container    string        `json:"Container"`
+	Bitrate      int           `json:"Bitrate"` // bits per second
 	MediaStreams []MediaStream `json:"MediaStreams"`
 }
 
@@ -337,29 +350,39 @@ func (x *dto) item() *Item {
 		streams = ms.MediaStreams
 	}
 	it.SourceStreams = append([]MediaStream(nil), streams...)
-	for _, st := range streams {
-		switch st.Type {
-		case "Video":
-			if it.Aspect == 0 {
-				it.Aspect = aspect(st.AspectRatio, st.Width, st.Height)
-			}
-		case "Audio", "Subtitle":
-			s := Stream{ID: strconv.Itoa(st.Index), Title: streamTitle(st), Selected: st.IsDefault, Channels: st.Channels,
-				Text: st.Type == "Subtitle" && st.IsTextSubtitleStream && st.SupportsExternalStream}
-			if st.Type == "Audio" {
-				it.Audio = append(it.Audio, s)
-			} else {
-				it.Subs = append(it.Subs, s)
-			}
-		}
-	}
+	it.Aspect, it.Audio, it.Subs = tracks(streams)
 	if it.Playable() && len(x.Trickplay) > 0 {
 		it.Trickplay = trickplay(x.Trickplay, it.SourceID)
 	}
 	if it.Aspect == 0 && x.Width > 0 && x.Height > 0 && it.Playable() {
 		it.Aspect = aspect("", x.Width, x.Height)
 	}
+	if it.Playable() {
+		it.Versions = x.versions()
+	}
 	return it
+}
+
+// tracks are a source's picture aspect (of its first video stream, 0
+// unknown) and its audio and subtitle tracks, the server's defaults marked.
+func tracks(streams []MediaStream) (asp float64, audio, subs []Stream) {
+	for _, st := range streams {
+		switch st.Type {
+		case "Video":
+			if asp == 0 {
+				asp = aspect(st.AspectRatio, st.Width, st.Height)
+			}
+		case "Audio", "Subtitle":
+			s := Stream{ID: strconv.Itoa(st.Index), Title: streamTitle(st), Language: st.Language, Selected: st.IsDefault,
+				Channels: st.Channels, Text: st.Type == "Subtitle" && st.IsTextSubtitleStream && st.SupportsExternalStream}
+			if st.Type == "Audio" {
+				audio = append(audio, s)
+			} else {
+				subs = append(subs, s)
+			}
+		}
+	}
+	return asp, audio, subs
 }
 
 // streamTitle is the server's display title, folded; a title in a script

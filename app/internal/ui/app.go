@@ -126,6 +126,7 @@ type App struct {
 	// show it as a spinner); zero otherwise.
 	Starting  time.Time
 	shuffling *shuffleWait // a shuffle's episodes are being listed
+	reading   *versionRead // a start is reading its item's versions
 	// Mark is the app's wordmark, rendered once.
 	Mark  *Wordmark
 	marks map[string]*gfx.Image // the BETA and UPDATE marks, by text
@@ -318,8 +319,9 @@ func (a *App) PlayAt(it *jellyfin.Item, offset int) { a.PlayQueue(it, offset, ni
 // drives the overlay until playback ends. Then after, if given, learns
 // the item the queue stopped on (it, when nothing played) and whether
 // that one finished (Playing.finished), so a season page can move on to
-// the episode after it. A playback held for the beta code calls after
-// once the code is in and it has run; never, if the code entry is left.
+// the episode after it. A playback held for the beta code or the version
+// chooser (firstVersion) calls after once the code is in or the version
+// picked and it has run; never, if the code entry or the chooser is left.
 func (a *App) PlayQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, idx int, after func(last *jellyfin.Item, finished bool)) {
 	a.playQueue(it, offset, queue, idx, after, false)
 }
@@ -388,6 +390,13 @@ func startOf(it *jellyfin.Item, shuffled bool) int {
 }
 
 func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, idx int, after func(last *jellyfin.Item, finished bool), shuffled bool) {
+	a.playSettled(it, offset, queue, idx, after, shuffled, "")
+}
+
+// playSettled is playQueue once the first item's version is settled, why
+// saying how; "" settles it first (firstVersion), which may hold the play
+// for the version chooser as the beta code entry holds it.
+func (a *App) playSettled(it *jellyfin.Item, offset int, queue []*jellyfin.Item, idx int, after func(last *jellyfin.Item, finished bool), shuffled bool, why string) {
 	last, finished, held := it, false, false
 	if after != nil {
 		// deferred first, so it runs last: after the theme and Home
@@ -400,7 +409,7 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 	if a.Player == nil {
 		return
 	}
-	if !a.requirePlaybackAccess(func() { a.playQueue(it, offset, queue, idx, after, shuffled) }) {
+	if !a.requirePlaybackAccess(func() { a.playSettled(it, offset, queue, idx, after, shuffled, why) }) {
 		held = true
 		return
 	}
@@ -413,9 +422,20 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 			return
 		}
 	}
+	if why == "" {
+		// a pick plays it, then calls after; Back plays nothing
+		if why, held = a.firstVersion(it, offset, shuffled, func(why string) {
+			a.playSettled(it, offset, queue, idx, after, shuffled, why)
+		}); held {
+			return
+		}
+	}
 	if os.Getenv("PLEXCRT_NOPLAY") != "" {
 		// scripted walks: show the starting state for a moment, play nothing
 		a.Log.Printf("would play %s (%s) at %d", it.Title, it.ID, offset)
+		if len(it.Versions) > 1 {
+			a.Log.Print(versionLog(it, why))
+		}
 		a.Starting = time.Now()
 		for time.Since(a.Starting) < 1500*time.Millisecond {
 			a.redraw()
@@ -446,7 +466,8 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 			a.osd = r.Overlay()
 		}
 	}
-	a.flushSettings() // a track just chosen, say: on the card before the play
+	a.startingVersion(it, why)
+	a.flushSettings() // a track or version just chosen, say: on the card before the play
 	a.theme.Stop()    // Finish the theme before handing audio to playback.
 	defer a.syncTheme()
 	a.menuAudioHeld = true
@@ -467,7 +488,7 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 		if backdrop, ok := a.osd.(interface{ SetOpaque(bool) }); ok {
 			backdrop.SetOpaque(true)
 		}
-		sess, err := a.Player.StartAsync(it, offset)
+		sess, err := a.Player.StartAsyncSettling(it, offset, a.versionRule(it))
 		if err != nil {
 			if backdrop, ok := a.osd.(interface{ SetOpaque(bool) }); ok {
 				backdrop.SetOpaque(false)
@@ -481,6 +502,7 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 		ctl.streamModes = sess.StreamModes
 		ctl.conversionReason = sess.ConversionReason
 		ctl.sourceInfo = sess.PlaybackSource
+		ctl.version = sess.Version
 		ctl.pos = float64(offset)
 		if offset < 0 {
 			ctl.pos = float64(it.ViewOffset)
@@ -507,6 +529,10 @@ func (a *App) playQueue(it *jellyfin.Item, offset int, queue []*jellyfin.Item, i
 		idx += next
 		it = queue[idx]
 		offset = startOf(it, shuffled)
+		a.startingVersion(it, a.quietVersion(it)) // never asks along a queue
+		if !shuffled && len(it.Versions) > 1 && it.VersionID == "" {
+			offset = -1 // the resume point of the version its start settles
+		}
 	}
 	a.Starting = time.Time{}
 	a.dirty = true
@@ -1083,30 +1109,38 @@ func (a *App) applyStreams(it *jellyfin.Item) {
 	if !ok {
 		return
 	}
-	mark := func(streams []jellyfin.Stream, id string) {
-		if id == "" {
-			return
-		}
-		found := false
-		for _, s := range streams {
-			found = found || s.ID == id
-		}
-		if !found && id != "-1" {
-			return // another file's track: keep the server's default
-		}
-		for k := range streams {
-			streams[k].Selected = streams[k].ID == id
-		}
+	markChoice(it.Audio, ch.Audio, ch.AudioLang)
+	markChoice(it.Subs, ch.Subtitle, ch.SubtitleLang)
+}
+
+// markChoice marks a chosen track (a StreamChoice's index and language) on
+// a file's tracks, when the file has it.
+func markChoice(streams []jellyfin.Stream, id, lang string) {
+	if id == "" {
+		return
 	}
-	mark(it.Audio, ch.Audio)
-	mark(it.Subs, ch.Subtitle)
+	found := false
+	for _, s := range streams {
+		// the index in another language is another track of another file
+		// (a version, an episode): not the one chosen
+		found = found || s.ID == id && (lang == "" || s.Language == "" || s.Language == lang)
+	}
+	if !found && id != "-1" {
+		return // another file's track: keep the server's default
+	}
+	for k := range streams {
+		streams[k].Selected = streams[k].ID == id
+	}
 }
 
 // takeFresh replaces an item with its fresh record, which marks the
-// server's default tracks, and marks the chosen ones again. Every other
+// server's default tracks and has its first version in force, and puts in
+// force again the version it had and marks the chosen tracks. Every other
 // copy of the item (forEachItem) takes its watch state.
 func (a *App) takeFresh(it, fresh *jellyfin.Item) {
+	keep := it.VersionID
 	*it = *fresh
+	a.applyVersion(it, keep)
 	a.applyStreams(it)
 	a.forEachItem(it.ID, func(c *jellyfin.Item) {
 		if c != it {
@@ -1124,9 +1158,9 @@ func (a *App) selectStream(it *jellyfin.Item, kind string, i int) {
 	if kind == "Subtitles" {
 		streams = it.Subs
 	}
-	id := "-1"
+	id, lang := "-1", ""
 	if i >= 0 && i < len(streams) {
-		id = streams[i].ID
+		id, lang = streams[i].ID, streams[i].Language
 	} else if kind != "Subtitles" {
 		return
 	}
@@ -1139,9 +1173,9 @@ func (a *App) selectStream(it *jellyfin.Item, kind string, i int) {
 	key := streamChoiceKey(it)
 	ch := a.Cfg.Streams[key]
 	if kind == "Subtitles" {
-		ch.Subtitle = id
+		ch.Subtitle, ch.SubtitleLang = id, lang
 	} else {
-		ch.Audio = id
+		ch.Audio, ch.AudioLang = id, lang
 	}
 	if a.Cfg.Streams == nil {
 		a.Cfg.Streams = map[string]StreamChoice{}
@@ -1422,10 +1456,11 @@ func (a *App) key(ev input.Event, now time.Time) {
 	if a.wake(ev, now) {
 		return
 	}
-	if a.shuffling != nil {
-		// a shuffle is listing its episodes: Back gives up, nothing else acts
+	if a.shuffling != nil || a.reading != nil {
+		// a shuffle is listing its episodes, or a start reading its item's
+		// versions: Back gives up, nothing else acts
 		if ev.Key == input.Back && !ev.Repeat && !ev.Release {
-			a.shuffling, a.Starting = nil, time.Time{}
+			a.shuffling, a.reading, a.Starting = nil, nil, time.Time{}
 			a.dirty = true
 		}
 		return
