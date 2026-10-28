@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.7",
-      "version": "0.1.0-beta.7",
+      "id": "beta-0.1.0-beta.8",
+      "version": "0.1.0-beta.8",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.7\n\n- Direct play can be switched off in Options or the playback More menu to\n  ask the server to convert every video. Changing it during playback keeps\n  your position.\n- Hold L or R for two seconds during an episode to play the previous or next\n  episode. A progress indicator shows the hold; releasing early cancels it.\n- HTTPS is preferred for server discovery and sign-in. Plain HTTP is limited to\n  local destinations and requires a clear warning and approval for that server.\n  Existing unapproved HTTP sessions return to sign-in after updating.\n- Server identity is checked without credentials before a saved session is used.\n  Unsafe redirects are refused.\n- Video downloads now use the app's certificate and connection checks. The\n  decoder receives a temporary local URL rather than the Jellyfin token, and\n  external playlist destinations are refused. Update the app and playback worker\n  together. HTTPS servers need valid certificates and the MiSTer's clock set.\n- Verified HTTPS media uses the worker's optimized OpenSSL connection so the\n  security checks do not burden ARM playback with generic software encryption.\n  DE10 checks covered 720p H.264 direct play and HLS transcoding at 23.976 fps,\n  480i output, pause/resume, repeated seeks, Direct play changes and episode holds.\n\nKnown beta limitation: seeking and playback mode changes can land several seconds\nfrom the requested position at keyframes or stream segment boundaries.\n\nUses the same qualified FPGA core as beta 6. Settings and saved supporter access\nare preserved. Update through **Options > Updates**, or use the beta installer.\n\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-beta-0.1.0-beta.7.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.8\n\n- Failure reports now show which playback startup stage stalled and how long\n  it took. The most recent failed playback log survives playing another video\n  before sending a report. This improves diagnosis; it is not a confirmed fix\n  for server stream-opening timeouts.\n\n- Movies and episodes stored as several files now ask which version to play\n  when you start from the beginning. The version best suited to the MiSTer is\n  selected: the largest that plays directly, otherwise the smallest of at\n  least 720p. Jellyfin 12 and later keep each version's own resume point, and\n  Resume plays the version in progress without asking. With older servers the\n  app remembers the version last played on this MiSTer and asks when it\n  cannot tell.\n- The next episode, the L/R episode hold and Shuffle never ask: they play the\n  version the show last played, or the one best suited to the MiSTer.\n- A Version row beside Audio and Subtitles changes the version for the next\n  play, Playback Info names the version playing, and Mark watched marks every\n  version.\n- A saved audio or subtitle choice carries over to another file only when the\n  track's language matches.\n\nUses the same qualified FPGA core as beta 7, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-beta-0.1.0-beta.8.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14268724,
-      "sha256": "c76a5dc6e3ff7a0e2bfd6fcff5b0b9e1e53d633e447710a5ddb189b70c4031de",
+      "size": 14284535,
+      "sha256": "511eb29d5c52b8fb98dc6e6120de6e4f54c56f2286c1e0f6ff5aeb3b5eac74a3",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip",
-        "size": 139043861,
-        "sha256": "bc90a371eb4687ee0d8132f2c3ac353d998c0950a84b1fcf14b1b657da0da1af",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip",
+        "size": 139063407,
+        "sha256": "6aa9d257d926256eeac065c1886a8cbf9cb65c5b9c2a7cab2f51aef30eff5c3c",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.7",
-      "version": "0.1.0-beta.7",
+      "id": "beta-0.1.0-beta.8",
+      "version": "0.1.0-beta.8",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.7\n\n- Direct play can be switched off in Options or the playback More menu to\n  ask the server to convert every video. Changing it during playback keeps\n  your position.\n- Hold L or R for two seconds during an episode to play the previous or next\n  episode. A progress indicator shows the hold; releasing early cancels it.\n- HTTPS is preferred for server discovery and sign-in. Plain HTTP is limited to\n  local destinations and requires a clear warning and approval for that server.\n  Existing unapproved HTTP sessions return to sign-in after updating.\n- Server identity is checked without credentials before a saved session is used.\n  Unsafe redirects are refused.\n- Video downloads now use the app's certificate and connection checks. The\n  decoder receives a temporary local URL rather than the Jellyfin token, and\n  external playlist destinations are refused. Update the app and playback worker\n  together. HTTPS servers need valid certificates and the MiSTer's clock set.\n- Verified HTTPS media uses the worker's optimized OpenSSL connection so the\n  security checks do not burden ARM playback with generic software encryption.\n  DE10 checks covered 720p H.264 direct play and HLS transcoding at 23.976 fps,\n  480i output, pause/resume, repeated seeks, Direct play changes and episode holds.\n\nKnown beta limitation: seeking and playback mode changes can land several seconds\nfrom the requested position at keyframes or stream segment boundaries.\n\nUses the same qualified FPGA core as beta 6. Settings and saved supporter access\nare preserved. Update through **Options > Updates**, or use the beta installer.\n\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-beta-0.1.0-beta.7.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.8\n\n- Failure reports now show which playback startup stage stalled and how long\n  it took. The most recent failed playback log survives playing another video\n  before sending a report. This improves diagnosis; it is not a confirmed fix\n  for server stream-opening timeouts.\n\n- Movies and episodes stored as several files now ask which version to play\n  when you start from the beginning. The version best suited to the MiSTer is\n  selected: the largest that plays directly, otherwise the smallest of at\n  least 720p. Jellyfin 12 and later keep each version's own resume point, and\n  Resume plays the version in progress without asking. With older servers the\n  app remembers the version last played on this MiSTer and asks when it\n  cannot tell.\n- The next episode, the L/R episode hold and Shuffle never ask: they play the\n  version the show last played, or the one best suited to the MiSTer.\n- A Version row beside Audio and Subtitles changes the version for the next\n  play, Playback Info names the version playing, and Mark watched marks every\n  version.\n- A saved audio or subtitle choice carries over to another file only when the\n  track's language matches.\n\nUses the same qualified FPGA core as beta 7, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-beta-0.1.0-beta.8.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14268724,
-      "sha256": "c76a5dc6e3ff7a0e2bfd6fcff5b0b9e1e53d633e447710a5ddb189b70c4031de",
+      "size": 14284535,
+      "sha256": "511eb29d5c52b8fb98dc6e6120de6e4f54c56f2286c1e0f6ff5aeb3b5eac74a3",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip",
-        "size": 139043861,
-        "sha256": "bc90a371eb4687ee0d8132f2c3ac353d998c0950a84b1fcf14b1b657da0da1af",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.7/MisterZine-Jellyfin-Source-beta-0.1.0-beta.7.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip",
+        "size": 139063407,
+        "sha256": "6aa9d257d926256eeac065c1886a8cbf9cb65c5b9c2a7cab2f51aef30eff5c3c",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip"
       }
     }
   }
