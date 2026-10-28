@@ -1,5 +1,10 @@
 # MisterZine Jellyfin 0.1.0-beta.8
 
+- Failure reports now show which playback startup stage stalled and how long
+  it took. The most recent failed playback log survives playing another video
+  before sending a report. This improves diagnosis; it is not a confirmed fix
+  for server stream-opening timeouts.
+
 - Movies and episodes stored as several files now ask which version to play
   when you start from the beginning. The version best suited to the MiSTer is
   selected: the largest that plays directly, otherwise the smallest of at
@@ -15,7 +20,7 @@
 - A saved audio or subtitle choice carries over to another file only when the
   track's language matches.
 
-Uses the same qualified FPGA core and playback worker as beta 7. Settings and
+Uses the same qualified FPGA core as beta 7, with an updated playback worker. Settings and
 saved supporter access are preserved. Update through **Options > Updates**, or
 use the beta installer.
 

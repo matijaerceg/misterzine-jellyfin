@@ -483,6 +483,13 @@ days. A copy stays at `/media/fat/misterzine-jellyfin/report.txt`, and if it
 cannot be sent the screen names that file instead, which you can attach to a
 problem report. **MisterZine-Jellyfin-Diagnostics** writes the same report.
 
+Player startup logs distinguish opening the stream, reading its track information,
+and seeking within a directly played file, with elapsed times for each stage.
+The last 64 KiB of the most recent failed playback log is kept separately until
+another playback fails or the device restarts, so playing another video does not
+erase that evidence. Reports include this saved failure alongside the current log.
+
+
 ### Showcase captures
 
 Select **Version** at the foot of Options and press OK three times in quick

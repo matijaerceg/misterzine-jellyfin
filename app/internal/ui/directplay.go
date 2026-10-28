@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"plexcrt/internal/jellyfin"
 )
@@ -135,6 +136,7 @@ const (
 // was a transcode at the probe's cap or an ineligible direct stream.
 func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, subtitle string, force bool) (*jellyfin.PlaybackInfo, error) {
 	p := s.p
+	s.logf("playback request: offset=%d s cap=%d kbit/s force_transcode=%t", offset, kbps, force)
 	req := jellyfin.PlaybackRequest{StartSeconds: float64(offset), AudioStream: audio, SubtitleStream: subtitle, MediaSourceID: s.item.SourceID, AlwaysBurnInSubtitleWhenTranscoding: subtitle != "-1"}
 	key := audio + "|" + subtitle
 	s.mu.Lock()
@@ -149,7 +151,9 @@ func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, sub
 			return nil, err
 		}
 		probe.DeviceProfile, probe.MaxStreamingBitrate = profile, directProbeBitrate
+		decisionStart := time.Now()
 		info, err := p.Client.PlaybackInfo(ctx, s.item.ID, probe)
+		s.logf("playback decision: stage=probe elapsed_ms=%d success=%t", time.Since(decisionStart).Milliseconds(), err == nil)
 		if err != nil {
 			return nil, err
 		}
@@ -201,7 +205,9 @@ func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, sub
 		return nil, err
 	}
 	req.DeviceProfile, req.MaxStreamingBitrate, req.ForceTranscode = profile, playbackDeviceProfile(kbps).MaxStreamingBitrate, true
+	decisionStart := time.Now()
 	info, err := p.Client.PlaybackInfo(ctx, s.item.ID, req)
+	s.logf("playback decision: stage=transcode elapsed_ms=%d success=%t", time.Since(decisionStart).Milliseconds(), err == nil)
 	if err != nil {
 		return nil, err
 	}

@@ -427,6 +427,17 @@ class ReportTests(unittest.TestCase):
         self.assertIn('a line of playback', text)
         self.assertIn('watch: header wiped', text)
 
+    def test_report_includes_and_redacts_preserved_playback_failure(self):
+        (self.tmp / 'jfplay.log.failed').write_text(
+            'startup stage=open-input elapsed_ms=66000 result=-110\n'
+            'https://x.invalid/y?api_key=TESTtoken\n')
+        (self.tmp / 'jfplay.log').write_text('later successful playback\n')
+        text = self.report()
+        self.assertIn('== LOG jfplay.log.failed', text)
+        self.assertIn('startup stage=open-input elapsed_ms=66000 result=-110', text)
+        self.assertIn('later successful playback', text)
+        self.assertNotIn('TESTtoken', text)
+
     @mock.patch.object(manager, 'REPORT_SERVICE', 'https://reports.invalid')
     def test_send_report_reads_the_code_and_words_failures(self):
         import io

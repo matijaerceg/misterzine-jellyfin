@@ -42,7 +42,7 @@ REPORT_MAGIC = 'MisterZine report v1'
 REPORT_MAX_BYTES = 256 * 1024
 REPORT_LOGS = ('misterzine-jellyfin-menu-run.log', 'misterzine-jellyfin-menu-run.log.1', 'misterzine-jellyfin-update-run.log',
                'misterzine-jellyfin-update-run.log.1', 'misterzine-jellyfin.log', 'misterzine-jellyfin.log.1',
-               'misterzine-jellyfin-menu.log', 'misterzine-jellyfin-maintain.log', 'jfplay.log')
+               'misterzine-jellyfin-menu.log', 'misterzine-jellyfin-maintain.log', 'jfplay.log', 'jfplay.log.failed')
 
 # The code running now. Entry checks stand down once the installed manager
 # differs from it (a recovery or rollback put another release's in place).
