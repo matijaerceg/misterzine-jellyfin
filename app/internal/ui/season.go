@@ -318,6 +318,9 @@ func (s *Season) streamsArrived(it, fresh *jellyfin.Item) {
 	s.app.applyStreams(it)
 	if s.focused() == it {
 		kind := actionKind(s.actions, s.act)
+		if kind == "Play" && s.act == 0 {
+			kind = "Resume" // the version's own resume point (the listing had none): Resume takes Play's place
+		}
 		s.rebuild()
 		s.act = restoreAction(s.actions, kind)
 		s.keepActVisible(time.Now())

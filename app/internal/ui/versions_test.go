@@ -412,6 +412,62 @@ func TestFreshRecordKeepsTheVersion(t *testing.T) {
 	}
 }
 
+// Continue Watching names a title by its version in progress, the library
+// by its first: either finds the title's one record.
+func TestVersionRecordUnderAnyVersionsID(t *testing.T) {
+	a := newVersionRig(t, 300).a
+	vs := []jellyfin.Version{{ID: "film"}, {ID: "film-12"}, {ID: "film-13"}}
+	resumed, library := &jellyfin.Item{ID: "film-13", Versions: vs}, &jellyfin.Item{ID: "film", Versions: vs}
+	a.noteVersion(resumed, "film-13")
+	if got := a.rememberedVersion(library); got != "film-13" {
+		t.Fatalf("the library's item remembered %q", got)
+	}
+	a.noteVersion(library, "film-12")
+	if len(a.Cfg.Versions) != 1 || a.rememberedVersion(resumed) != "film-12" {
+		t.Fatalf("records %v", a.Cfg.Versions)
+	}
+	listed := &jellyfin.Item{ID: "film-13", Versions: make([]jellyfin.Version, 3)}
+	if r := a.versionRule(listed); r == nil || versionRecord(r.records, library) != "film-12" {
+		t.Fatalf("rule %+v", r)
+	}
+	a.forgetVersion(resumed)
+	if len(a.Cfg.Versions) != 0 {
+		t.Fatalf("records after forgetting %v", a.Cfg.Versions)
+	}
+}
+
+// A listed episode shows no resume point when its version in progress is
+// not its first: once the record brings that version's, the cursor on Play
+// stays first, on Resume.
+func TestSeasonCursorTakesTheVersionsResume(t *testing.T) {
+	r := newVersionRig(t, 300)
+	r.offsets["ep2-12"] = 200
+	listed := r.listing(t)[1]
+	s := &Season{app: r.a, seasons: []*jellyfin.Item{{Key: "/Shows/show/Episodes?seasonId=season"}}, eps: []*jellyfin.Item{listed}, acts: true}
+	s.rebuild()
+	if s.actions[0] != "Play" {
+		t.Fatalf("listed actions %q", s.actions)
+	}
+	s.streamsArrived(listed, r.item(t, "ep2"))
+	if s.act != 0 || s.actions[0] != "Resume "+clock(200) || listed.VersionID != "ep2-12" {
+		t.Fatalf("cursor %d on %q, version %q", s.act, s.actions, listed.VersionID)
+	}
+}
+
+// Continue Watching names an episode by its version in progress; the
+// season lists it by its first, at the same number.
+func TestListedEpisode(t *testing.T) {
+	eps := []*jellyfin.Item{{ID: "ep1", Index: 1}, {ID: "ep2", Index: 2}}
+	for _, tc := range []struct {
+		it   jellyfin.Item
+		want string
+	}{{jellyfin.Item{ID: "ep2", Index: 2}, "ep2"}, {jellyfin.Item{ID: "ep2-13", Index: 2}, "ep2"}, {jellyfin.Item{ID: "other"}, "other"}} {
+		if got := listedEpisode(eps, &tc.it); got != tc.want {
+			t.Errorf("listedEpisode(%s) = %s, want %s", tc.it.ID, got, tc.want)
+		}
+	}
+}
+
 // The movie page's Version row changes the version for the next play and
 // records it.
 func TestPreplayVersionRow(t *testing.T) {

@@ -3,6 +3,7 @@ package ui
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -52,11 +53,37 @@ func (a *App) rememberedVersion(it *jellyfin.Item) string {
 	if a.Cfg == nil {
 		return ""
 	}
-	ch, ok := a.Cfg.Versions[it.ID]
-	if !ok || jellyfin.VersionIndex(it.Versions, ch.Media) < 0 {
+	id := versionRecord(a.Cfg.Versions, it)
+	if jellyfin.VersionIndex(it.Versions, id) < 0 {
 		return ""
 	}
-	return ch.Media
+	return id
+}
+
+// versionRecord is the version recorded for an item in records, "" for
+// none. Jellyfin names a title by any of its versions' items (Continue
+// Watching by the one in progress, the library by the first), so the
+// record may be under any of them: the newest counts.
+func versionRecord(records map[string]VersionChoice, it *jellyfin.Item) string {
+	var newest VersionChoice
+	for _, k := range versionKeys(it) {
+		if ch, ok := records[k]; ok && (newest.Media == "" || ch.At > newest.At) {
+			newest = ch
+		}
+	}
+	return newest.Media
+}
+
+// versionKeys are the ids an item's record may be under: its own and, once
+// its record is read, its versions' (a version's item id is its source id).
+func versionKeys(it *jellyfin.Item) []string {
+	keys := []string{it.ID}
+	for _, v := range it.Versions {
+		if v.ID != "" && v.ID != it.ID {
+			keys = append(keys, v.ID)
+		}
+	}
+	return keys
 }
 
 // versionKind is the kind of version an episode's show last started with,
@@ -90,7 +117,7 @@ func preferVersion(vs []jellyfin.Version, remembered, kind string, plays func(je
 func (a *App) preferredVersion(it *jellyfin.Item) (int, string) {
 	remembered := ""
 	if a.Cfg != nil {
-		remembered = a.Cfg.Versions[it.ID].Media
+		remembered = versionRecord(a.Cfg.Versions, it)
 	}
 	return preferVersion(it.Versions, remembered, a.versionKind(it), a.versionPlays())
 }
@@ -127,6 +154,9 @@ func (a *App) noteVersion(it *jellyfin.Item, id string) {
 	if a.Cfg.Versions == nil {
 		a.Cfg.Versions = map[string]VersionChoice{}
 	}
+	for _, k := range versionKeys(it) {
+		delete(a.Cfg.Versions, k) // one record a title
+	}
 	a.Cfg.Versions[it.ID] = VersionChoice{Media: id, At: time.Now().Unix()}
 	if over := len(a.Cfg.Versions) - VersionsKept; over > 0 {
 		keys := make([]string, 0, len(a.Cfg.Versions))
@@ -160,8 +190,14 @@ func (a *App) forgetVersion(it *jellyfin.Item) {
 	if a.Cfg == nil {
 		return
 	}
-	if _, ok := a.Cfg.Versions[it.ID]; ok {
-		delete(a.Cfg.Versions, it.ID)
+	dropped := false
+	for _, k := range versionKeys(it) {
+		if _, ok := a.Cfg.Versions[k]; ok {
+			delete(a.Cfg.Versions, k)
+			dropped = true
+		}
+	}
+	if dropped {
 		a.saveSettings()
 	}
 }
@@ -264,11 +300,12 @@ func (a *App) quietVersion(it *jellyfin.Item) string {
 }
 
 // versionRule is what a start goes by to settle the version of an item
-// whose versions the app could not judge (quietVersion): the app's records
-// for it, taken on the UI thread (Session.settleVersion).
+// whose versions the app could not judge (quietVersion): the app's records,
+// taken on the UI thread (Session.settleVersion).
 type versionRule struct {
-	remembered, kind string
-	streams          *StreamChoice // the tracks chosen for its movie or show, nil for none
+	records map[string]VersionChoice // the recorded versions (versionRecord finds the item's once its versions are read)
+	kind    string
+	streams *StreamChoice // the tracks chosen for its movie or show, nil for none
 }
 
 // versionRule is the rule for an item's start, nil when its version is
@@ -279,7 +316,7 @@ func (a *App) versionRule(it *jellyfin.Item) *versionRule {
 	}
 	r := &versionRule{kind: a.versionKind(it)}
 	if a.Cfg != nil {
-		r.remembered = a.Cfg.Versions[it.ID].Media
+		r.records = maps.Clone(a.Cfg.Versions)
 		if ch, ok := a.Cfg.Streams[streamChoiceKey(it)]; ok {
 			r.streams = &ch
 		}

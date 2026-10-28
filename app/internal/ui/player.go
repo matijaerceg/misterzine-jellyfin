@@ -239,7 +239,7 @@ func (s *Session) settleVersion(ctx context.Context, offset int) int {
 		if err != nil {
 			s.logf("versions: %v", err)
 		} else if len(fresh.Versions) > 1 && fresh.Versions[0].Detailed() {
-			i, why := preferVersion(fresh.Versions, r.remembered, r.kind, versionPlays(s.capKbps(), s.p.directPlay()))
+			i, why := preferVersion(fresh.Versions, versionRecord(r.records, fresh), r.kind, versionPlays(s.capKbps(), s.p.directPlay()))
 			fresh.UseVersion(fresh.Versions[i].ID)
 			if ch := r.streams; ch != nil {
 				markChoice(fresh.Audio, ch.Audio, ch.AudioLang)

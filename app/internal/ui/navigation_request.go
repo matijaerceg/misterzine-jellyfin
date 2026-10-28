@@ -62,6 +62,13 @@ func (a *App) openItem(original *jellyfin.Item, at string) {
 				si = i
 			}
 		}
+		if it.Type == "episode" && len(it.Versions) > 1 {
+			// Continue Watching names an episode by the version in progress,
+			// the season by its first: open at the season's own
+			if eps, err := client.Items(ctx, seasons[si].Key, nil, 500); err == nil {
+				episodeKey = listedEpisode(eps, it)
+			}
+		}
 		return func() {
 			if seasonKey != "" || len(seasons) == 1 {
 				a.Push(NewShowInSeason(a, show, seasons, si, episodeKey))
@@ -70,6 +77,23 @@ func (a *App) openItem(original *jellyfin.Item, at string) {
 			}
 		}, nil
 	})
+}
+
+// listedEpisode is the id a season's listing gives an episode: its own, or
+// the listed one of the same number when the episode came by another
+// version's (its id is then not listed).
+func listedEpisode(eps []*jellyfin.Item, it *jellyfin.Item) string {
+	for _, e := range eps {
+		if e.ID == it.ID {
+			return e.ID
+		}
+	}
+	for _, e := range eps {
+		if it.Index > 0 && e.Index == it.Index {
+			return e.ID
+		}
+	}
+	return it.ID
 }
 
 // markItem marks an item watched or not, and each of its versions: on a
