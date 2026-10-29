@@ -125,7 +125,13 @@ func workerNeedsTranscode(code int) bool {
 const (
 	workerExitRefused        = 5 // the core refused the stream
 	workerExitNeedsTranscode = 7 // the pre-check or the watchdog said transcode
+	workerExitOpenTimeout    = 8 // the stream sent nothing while it was being opened
 )
+
+// A transcode started at an offset is given openTimeout to send its first
+// bytes before the resume ladder asks differently. A healthy transcoder
+// answers in seconds; the socket's own limit (60 s) stays for the rest.
+const openTimeout = 20 * time.Second
 
 // playbackInfo asks Jellyfin how to play the session's item. Unless a
 // transcode is already required (a subtitle to burn in, or force), the first
@@ -311,6 +317,49 @@ func (s *Session) fallbackLocked(err error) bool {
 	_ = os.Remove(s.p.Status)
 	// startContext takes whole seconds: round to nearest rather than truncate
 	if err := s.startContext(int(math.Round(ps.Position)), false, s.sessionContext()); err != nil {
+		s.finishLocked(s.suppressStopCancellation(err))
+	}
+	return true
+}
+
+// resumeLadderLocked retries a transcode that sent nothing while it was
+// being opened (jfplay exit 8) when it was started at an offset: once more
+// at the same place (a fresh PlaybackInfo, so a fresh transcode), then from
+// the beginning, which a server that cannot seek this file still plays.
+// Each rung is logged for the report; a third timeout ends playback with the
+// worker's error. It reports whether it took over the worker's exit; opMu
+// is held.
+func (s *Session) resumeLadderLocked(err error) bool {
+	code := -1
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		code = ee.ExitCode()
+	}
+	if code != workerExitOpenTimeout {
+		return false
+	}
+	s.mu.Lock()
+	if s.direct || s.videoCopy || s.lastOffset <= 0 || s.resumeRetries >= 2 || s.closing || s.stopRequested {
+		s.mu.Unlock()
+		return false
+	}
+	s.resumeRetries++
+	rung, offset := s.resumeRetries, s.lastOffset
+	target := offset
+	if rung == 2 {
+		target = 0
+		s.notice = "Resume failed: from the start" // fits the panel's subtitle room
+	}
+	s.started = false
+	s.cmd, s.cmdDone = nil, nil
+	s.mu.Unlock()
+	if rung == 1 {
+		s.logf("stream open timed out at %d s (jfplay exit %d); asking again", offset, code)
+	} else {
+		s.logf("stream open timed out again at %d s (jfplay exit %d); starting from the beginning", offset, code)
+	}
+	_ = os.Remove(s.p.Status)
+	if err := s.startContext(target, false, s.sessionContext()); err != nil {
 		s.finishLocked(s.suppressStopCancellation(err))
 	}
 	return true

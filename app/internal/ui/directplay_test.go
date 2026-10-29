@@ -171,7 +171,11 @@ func (f *fallbackServer) player(t *testing.T, codes []int, position string) *Pla
 		if n < len(codes) {
 			code = codes[n]
 		}
-		script := "printf 'state=playing\\nposition=" + position + "\\nduration=300\\n' > '" + status + "'; sleep 0.4; exit " + strconv.Itoa(code)
+		state := "playing"
+		if code == workerExitOpenTimeout {
+			state = "opening" // the stream never came: no picture was played
+		}
+		script := "printf 'state=" + state + "\\nposition=" + position + "\\nduration=300\\n' > '" + status + "'; sleep 0.4; exit " + strconv.Itoa(code)
 		return exec.Command("sh", "-c", script)
 	}
 	return p
@@ -335,5 +339,109 @@ func TestTallDirectSourceUsesWorkerChecks(t *testing.T) {
 	defer f.mu.Unlock()
 	if len(f.bodies) != 1 || !hasArg(f.launches[0], "--direct") {
 		t.Fatal("tall eligible source did not use checked direct playback")
+	}
+}
+
+// ineligibleDirect is a source the core cannot play as stored (HEVC): the
+// probe's answer sends the session to a transcode.
+const ineligibleDirect = `{"Id":"source","Container":"mkv","SupportsDirectStream":true,"MediaStreams":[{"Type":"Video","Codec":"hevc","Profile":"Main","Level":40,"BitDepth":8,"Width":1280,"Height":720,"RealFrameRate":23.976,"BitRate":4000000}]}`
+
+// transcodeStarts is the StartTimeTicks of every PlaybackInfo that asked
+// for a transcode, in seconds, in order.
+func (f *fallbackServer) transcodeStarts() []float64 {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []float64
+	for _, b := range f.bodies {
+		if b["EnableDirectPlay"] == false {
+			ticks, _ := b["StartTimeTicks"].(float64)
+			out = append(out, ticks/float64(jellyfin.TicksPerSecond))
+		}
+	}
+	return out
+}
+
+// A transcode started at an offset whose worker sees no stream (exit 8) is
+// asked for again, then from the beginning; the start that plays is
+// reported as usual.
+func TestResumeLadderRetriesThenFromStart(t *testing.T) {
+	f := newFallbackServer(t, ineligibleDirect)
+	p := f.player(t, []int{workerExitOpenTimeout, workerExitOpenTimeout, 0}, "1")
+	s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 375)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := waitDone(t, s); err != nil {
+		t.Fatalf("playback ended with %v after the ladder", err)
+	}
+	f.mu.Lock()
+	l := append([][]string(nil), f.launches...)
+	reports := append([]string(nil), f.reports...)
+	f.mu.Unlock()
+	if len(l) != 3 {
+		t.Fatalf("launches = %d, want three rungs: %v", len(l), l)
+	}
+	for i, want := range []struct{ base, timeout string }{{"375", "20"}, {"375", "20"}, {"0", ""}} {
+		if !containsArgPair(l[i], "--base", want.base) || hasArg(l[i], "--direct") {
+			t.Fatalf("rung %d base: %v", i, l[i])
+		}
+		if hasArg(l[i], "--open-timeout") != (want.timeout != "") || (want.timeout != "" && !containsArgPair(l[i], "--open-timeout", want.timeout)) {
+			t.Fatalf("rung %d open timeout: %v", i, l[i])
+		}
+	}
+	if starts := f.transcodeStarts(); len(starts) != 3 || starts[0] != 375 || starts[1] != 375 || starts[2] != 0 {
+		t.Fatalf("transcode starts %v, want 375, 375, 0", starts)
+	}
+	if n := s.TakeNotice(); n == "" {
+		t.Fatal("no notice for the start from the beginning")
+	}
+	want := []string{"/Sessions/Playing transcode-session", "/Sessions/Playing/Stopped transcode-session"}
+	if strings.Join(reports, ",") != strings.Join(want, ",") {
+		t.Fatalf("reports = %v, want %v", reports, want)
+	}
+}
+
+// A third timeout ends playback with the worker's error.
+func TestResumeLadderGivesUpAfterTwoRetries(t *testing.T) {
+	f := newFallbackServer(t, ineligibleDirect)
+	p := f.player(t, []int{workerExitOpenTimeout, workerExitOpenTimeout, workerExitOpenTimeout}, "1")
+	s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 375)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if waitDone(t, s) == nil {
+		t.Fatal("third timeout did not end playback with an error")
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.launches) != 3 {
+		t.Fatalf("launches = %d, want 3", len(f.launches))
+	}
+}
+
+// Only a transcode started at an offset climbs the ladder: a start from the
+// beginning has nowhere lower to go, and a direct stream's timeout is a
+// network fault, not the server's seek.
+func TestResumeLadderOnlyForOffsetTranscodes(t *testing.T) {
+	for name, tc := range map[string]struct {
+		source string
+		offset int
+	}{"from-start": {ineligibleDirect, 0}, "direct": {eligibleDirect, 10}} {
+		t.Run(name, func(t *testing.T) {
+			f := newFallbackServer(t, tc.source)
+			p := f.player(t, []int{workerExitOpenTimeout}, "1")
+			s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, tc.offset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if waitDone(t, s) == nil {
+				t.Fatal("timeout was not reported")
+			}
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if len(f.launches) != 1 || hasArg(f.launches[0], "--open-timeout") {
+				t.Fatalf("launches %v", f.launches)
+			}
+		})
 	}
 }
