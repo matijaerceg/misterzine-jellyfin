@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"errors"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -396,5 +396,50 @@ func TestOpenTimeoutEndsPlaybackWithNoVideoError(t *testing.T) {
 				t.Fatalf("open timeout: %v", f.launches[0])
 			}
 		})
+	}
+}
+
+// Jellyfin numbers a subtitle file beside the video before the file's own
+// streams, so the selected audio track's Jellyfin index is one more than its
+// index in the file; jfplay is asked for the file's. A source without
+// external files passes the index through; an external audio track cannot
+// play from the direct stream.
+func TestDirectAudioIndexDiscountsExternalStreams(t *testing.T) {
+	streams := []jellyfin.MediaStream{
+		{Type: "Subtitle", Index: 0, IsExternal: true, Codec: "subrip"},
+		{Type: "Video", Index: 1, Codec: "h264"},
+		{Type: "Audio", Index: 2, Codec: "aac", IsDefault: true},
+		{Type: "Audio", Index: 3, Codec: "ac3"},
+		{Type: "Audio", Index: 4, Codec: "aac", IsExternal: true},
+	}
+	for _, tc := range []struct {
+		index, want int
+		fails       bool
+	}{{2, 1, false}, {3, 2, false}, {4, 0, true}, {1, 0, true}, {9, 9, false}} {
+		got, err := fileAudioIndex(streams, tc.index)
+		if (err != nil) != tc.fails || got != tc.want {
+			t.Errorf("fileAudioIndex(%d) = %d, %v; want %d, fails=%v", tc.index, got, err, tc.want, tc.fails)
+		}
+	}
+	if got, err := fileAudioIndex(streams[1:4], 2); err != nil || got != 2 {
+		t.Errorf("without external streams: %d, %v", got, err)
+	}
+
+	f := newFallbackServer(t, eligibleDirect)
+	p := f.player(t, nil, "1")
+	item := &jellyfin.Item{ID: "item", SourceID: "source", SourceStreams: streams,
+		Audio: []jellyfin.Stream{{ID: "2", Selected: true}, {ID: "3"}}}
+	s, err := p.Start(item, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitDone(t, s)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.launches) != 1 || !containsArgPair(f.launches[0], "--audio", "1") {
+		t.Fatalf("direct launch %v, want --audio 1 for Jellyfin stream 2", f.launches)
+	}
+	if len(f.bodies) != 1 || f.bodies[0]["AudioStreamIndex"] != 2.0 {
+		t.Fatalf("PlaybackInfo bodies %v, want AudioStreamIndex 2", f.bodies)
 	}
 }

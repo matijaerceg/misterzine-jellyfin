@@ -323,6 +323,37 @@ func (s *Session) fallbackLocked(err error) bool {
 	return true
 }
 
+// fileAudioIndex is the index jfplay opens for Jellyfin audio stream index
+// of a source played as stored. Jellyfin numbers a source's streams itself:
+// subtitle (and audio) files found beside the video go in front of the
+// file's own streams and the whole list is renumbered from zero, so with
+// one subtitle file beside it the file's audio stream 1 is Jellyfin's
+// stream 2, and asking jfplay for stream 2 plays no audio at all. The
+// file's index is the Jellyfin index less the external streams numbered
+// before it. A stream the source does not list passes through unchanged;
+// a track that is itself a separate file cannot come from the direct stream.
+func fileAudioIndex(streams []jellyfin.MediaStream, index int) (int, error) {
+	external := 0
+	for _, st := range streams {
+		if st.IsExternal && st.Index < index {
+			external++
+		}
+	}
+	for _, st := range streams {
+		if st.Index != index {
+			continue
+		}
+		if st.IsExternal {
+			return 0, fmt.Errorf("audio track %d is a separate file, which the direct stream cannot carry", index)
+		}
+		if !strings.EqualFold(st.Type, "Audio") {
+			return 0, fmt.Errorf("Jellyfin stream %d is not an audio track", index)
+		}
+		return index - external, nil
+	}
+	return index, nil
+}
+
 // openTimeoutError words a worker exit for a stream that sent nothing while
 // it was being opened (jfplay exit 8): the server took the request and
 // answered with no video. The playback log says so for the report; the

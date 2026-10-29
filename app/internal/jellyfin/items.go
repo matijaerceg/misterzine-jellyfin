@@ -221,10 +221,13 @@ type MediaStream struct {
 	Language     string `json:"Language"`
 	Codec        string `json:"Codec"`
 	IsDefault    bool   `json:"IsDefault"`
-	AspectRatio  string `json:"AspectRatio"`
-	Width        int    `json:"Width"`
-	Height       int    `json:"Height"`
-	Channels     int    `json:"Channels"`
+	// IsExternal marks a track Jellyfin found as a file beside the video
+	// (a subtitle or audio file); the video file itself does not hold it.
+	IsExternal  bool   `json:"IsExternal"`
+	AspectRatio string `json:"AspectRatio"`
+	Width       int    `json:"Width"`
+	Height      int    `json:"Height"`
+	Channels    int    `json:"Channels"`
 	// Video details Jellyfin probed; zero when the server does not know.
 	Profile          string  `json:"Profile"`
 	Level            float64 `json:"Level"`

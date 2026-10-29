@@ -445,13 +445,20 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		args = append(args, "--start-in-file", strconv.Itoa(inFile))
 	}
 	if s.direct && audio != "" {
-		// Jellyfin's MediaStreams.Index is the absolute stream index in the
-		// source, which jfplay accepts as --audio for a direct stream.
+		// jfplay takes --audio as the stream's index in the file it opens;
+		// Jellyfin's index counts external files too (fileAudioIndex).
 		index, err := strconv.Atoi(audio)
 		if err != nil || index < 0 {
 			return fmt.Errorf("invalid Jellyfin audio stream index %q", audio)
 		}
-		args = append(args, "--audio", strconv.Itoa(index))
+		file, err := fileAudioIndex(s.item.SourceStreams, index)
+		if err != nil {
+			return err
+		}
+		if file != index {
+			s.logf("direct audio: Jellyfin stream %d is the file's stream %d (external subtitle or audio files are numbered first)", index, file)
+		}
+		args = append(args, "--audio", strconv.Itoa(file))
 	}
 	if paused {
 		args = append(args, "--hold")

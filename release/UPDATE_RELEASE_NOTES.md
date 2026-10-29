@@ -1,5 +1,11 @@
 # MisterZine Jellyfin 0.1.0-beta.9
 
+- Videos with a subtitle file beside them (an .srt next to the episode, for
+  example) played without sound when played as stored. Jellyfin numbers such
+  files before the video's own tracks, and the app handed that number to the
+  player as the track's position in the file, which pointed past the audio.
+  The app now asks for the right track, and the playback log notes the
+  mapping.
 - A resume, a seek or Skip intro that the server never answers now fails
   after 20 seconds instead of a minute, and says what happened: the server
   accepted the request but sent no video. The playback log carries the same
