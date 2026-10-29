@@ -12,26 +12,8 @@
   line for Send a report. Playing from the start is unaffected. (Seen with a
   Plex server whose hardware-accelerated conversion stalls on a seek into
   10-bit HEVC; the same guard applies here.)
-- Failure reports now show which playback startup stage stalled and how long
-  it took. The most recent failed playback log survives playing another video
-  before sending a report.
 
-- Movies and episodes stored as several files now ask which version to play
-  when you start from the beginning. The version best suited to the MiSTer is
-  selected: the largest that plays directly, otherwise the smallest of at
-  least 720p. Jellyfin 12 and later keep each version's own resume point, and
-  Resume plays the version in progress without asking. With older servers the
-  app remembers the version last played on this MiSTer and asks when it
-  cannot tell.
-- The next episode, the L/R episode hold and Shuffle never ask: they play the
-  version the show last played, or the one best suited to the MiSTer.
-- A Version row beside Audio and Subtitles changes the version for the next
-  play, Playback Info names the version playing, and Mark watched marks every
-  version.
-- A saved audio or subtitle choice carries over to another file only when the
-  track's language matches.
-
-Uses the same qualified FPGA core as beta 7, with an updated playback worker. Settings and
+Uses the same qualified FPGA core as beta 8, with an updated playback worker. Settings and
 saved supporter access are preserved. Update through **Options > Updates**, or
 use the beta installer.
 
