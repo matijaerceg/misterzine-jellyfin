@@ -114,6 +114,7 @@ module emu (
 
 	output        CLK_VIDEO,
 	output        CE_PIXEL,
+	output        CLK_VIDEO_DV,  // H264-FORK (dv27): 27 MHz for sys_top's HDMI transmitter on direct_video (h264/vid_pll.sv)
 
 	input         CLK_AUDIO,
 	output        LOCKED
@@ -139,11 +140,12 @@ sys_pll sys_pll (
 	.outclk_3 (clk_dec),
 	.locked   (locked)
 );
-wire clk_vid, vid_locked;
+wire clk_vid, clk_vid_dv, vid_locked;
 vid_pll vid_pll (
 	.refclk   (CLK_50M),
 	.rst      (1'b0),
 	.outclk_0 (clk_vid),
+	.outclk_1 (clk_vid_dv),
 	.locked   (vid_locked)
 );
 
@@ -156,6 +158,7 @@ wire reset_n = locked & ~RESET & user_rst_qn;
 assign CLK_SYS   = clk_sys;
 assign CLK_MEM   = clk_mem;
 assign CLK_VIDEO = clk_vid;      // 81 MHz (hd_raster): CE_PIXEL marks the dots, one clock in three at 27 MHz
+assign CLK_VIDEO_DV = clk_vid_dv; // 27 MHz, direct_video's HDMI transmitter clock (dv27, h264/vid_pll.sv)
 assign LOCKED    = locked & vid_locked;
 
 // =========================================================================
