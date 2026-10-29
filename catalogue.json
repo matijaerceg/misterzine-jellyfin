@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.8",
-      "version": "0.1.0-beta.8",
+      "id": "beta-0.1.0-beta.9",
+      "version": "0.1.0-beta.9",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.8\n\n- Failure reports now show which playback startup stage stalled and how long\n  it took. The most recent failed playback log survives playing another video\n  before sending a report. This improves diagnosis; it is not a confirmed fix\n  for server stream-opening timeouts.\n\n- Movies and episodes stored as several files now ask which version to play\n  when you start from the beginning. The version best suited to the MiSTer is\n  selected: the largest that plays directly, otherwise the smallest of at\n  least 720p. Jellyfin 12 and later keep each version's own resume point, and\n  Resume plays the version in progress without asking. With older servers the\n  app remembers the version last played on this MiSTer and asks when it\n  cannot tell.\n- The next episode, the L/R episode hold and Shuffle never ask: they play the\n  version the show last played, or the one best suited to the MiSTer.\n- A Version row beside Audio and Subtitles changes the version for the next\n  play, Playback Info names the version playing, and Mark watched marks every\n  version.\n- A saved audio or subtitle choice carries over to another file only when the\n  track's language matches.\n\nUses the same qualified FPGA core as beta 7, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-beta-0.1.0-beta.8.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.9\n\n- Videos with a subtitle file beside them (an .srt next to the episode, for\n  example) played without sound when played as stored. Jellyfin numbers such\n  files before the video's own tracks, and the app handed that number to the\n  player as the track's position in the file, which pointed past the audio.\n  The app now asks for the right track, and the playback log notes the\n  mapping.\n- A resume, a seek or Skip intro that the server never answers now fails\n  after 20 seconds instead of a minute, and says what happened: the server\n  accepted the request but sent no video. The playback log carries the same\n  line for Send a report. Playing from the start is unaffected. (Seen with a\n  Plex server whose hardware-accelerated conversion stalls on a seek into\n  10-bit HEVC; the same guard applies here.)\n\nUses the same qualified FPGA core as beta 8, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-beta-0.1.0-beta.9.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14284535,
-      "sha256": "511eb29d5c52b8fb98dc6e6120de6e4f54c56f2286c1e0f6ff5aeb3b5eac74a3",
+      "size": 14286251,
+      "sha256": "1dfb2cdf9bb971842365cc9805a0a519fa6ee0c6b647c14cd144bf4c0d1072f0",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip",
-        "size": 139063407,
-        "sha256": "6aa9d257d926256eeac065c1886a8cbf9cb65c5b9c2a7cab2f51aef30eff5c3c",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip",
+        "size": 139069742,
+        "sha256": "d24ec373cde723cddde4975ac8ccd00a4e777202f38207e1590be1e4110c42de",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.8",
-      "version": "0.1.0-beta.8",
+      "id": "beta-0.1.0-beta.9",
+      "version": "0.1.0-beta.9",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.8\n\n- Failure reports now show which playback startup stage stalled and how long\n  it took. The most recent failed playback log survives playing another video\n  before sending a report. This improves diagnosis; it is not a confirmed fix\n  for server stream-opening timeouts.\n\n- Movies and episodes stored as several files now ask which version to play\n  when you start from the beginning. The version best suited to the MiSTer is\n  selected: the largest that plays directly, otherwise the smallest of at\n  least 720p. Jellyfin 12 and later keep each version's own resume point, and\n  Resume plays the version in progress without asking. With older servers the\n  app remembers the version last played on this MiSTer and asks when it\n  cannot tell.\n- The next episode, the L/R episode hold and Shuffle never ask: they play the\n  version the show last played, or the one best suited to the MiSTer.\n- A Version row beside Audio and Subtitles changes the version for the next\n  play, Playback Info names the version playing, and Mark watched marks every\n  version.\n- A saved audio or subtitle choice carries over to another file only when the\n  track's language matches.\n\nUses the same qualified FPGA core as beta 7, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-beta-0.1.0-beta.8.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.9\n\n- Videos with a subtitle file beside them (an .srt next to the episode, for\n  example) played without sound when played as stored. Jellyfin numbers such\n  files before the video's own tracks, and the app handed that number to the\n  player as the track's position in the file, which pointed past the audio.\n  The app now asks for the right track, and the playback log notes the\n  mapping.\n- A resume, a seek or Skip intro that the server never answers now fails\n  after 20 seconds instead of a minute, and says what happened: the server\n  accepted the request but sent no video. The playback log carries the same\n  line for Send a report. Playing from the start is unaffected. (Seen with a\n  Plex server whose hardware-accelerated conversion stalls on a seek into\n  10-bit HEVC; the same guard applies here.)\n\nUses the same qualified FPGA core as beta 8, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-beta-0.1.0-beta.9.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14284535,
-      "sha256": "511eb29d5c52b8fb98dc6e6120de6e4f54c56f2286c1e0f6ff5aeb3b5eac74a3",
+      "size": 14286251,
+      "sha256": "1dfb2cdf9bb971842365cc9805a0a519fa6ee0c6b647c14cd144bf4c0d1072f0",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip",
-        "size": 139063407,
-        "sha256": "6aa9d257d926256eeac065c1886a8cbf9cb65c5b9c2a7cab2f51aef30eff5c3c",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.8/MisterZine-Jellyfin-Source-beta-0.1.0-beta.8.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip",
+        "size": 139069742,
+        "sha256": "d24ec373cde723cddde4975ac8ccd00a4e777202f38207e1590be1e4110c42de",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip"
       }
     }
   }
