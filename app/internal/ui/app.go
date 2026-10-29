@@ -503,7 +503,6 @@ func (a *App) playSettled(it *jellyfin.Item, offset int, queue []*jellyfin.Item,
 		ctl.conversionReason = sess.ConversionReason
 		ctl.sourceInfo = sess.PlaybackSource
 		ctl.version = sess.Version
-		ctl.notice = sess.TakeNotice
 		ctl.pos = float64(offset)
 		if offset < 0 {
 			ctl.pos = float64(it.ViewOffset)

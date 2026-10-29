@@ -129,8 +129,9 @@ const (
 )
 
 // A transcode started at an offset is given openTimeout to send its first
-// bytes before the resume ladder asks differently. A healthy transcoder
-// answers in seconds; the socket's own limit (60 s) stays for the rest.
+// bytes; a server that takes the request and sends nothing (a seek its
+// hardware decoder never finishes) ends playback then (openTimeoutError)
+// rather than at the socket's own limit (60 s), which stays for the rest.
 const openTimeout = 20 * time.Second
 
 // playbackInfo asks Jellyfin how to play the session's item. Unless a
@@ -322,45 +323,23 @@ func (s *Session) fallbackLocked(err error) bool {
 	return true
 }
 
-// resumeLadderLocked retries a transcode that sent nothing while it was
-// being opened (jfplay exit 8) when it was started at an offset: once more
-// at the same place (a fresh PlaybackInfo, so a fresh transcode), then from
-// the beginning, which a server that cannot seek this file still plays.
-// Each rung is logged for the report; a third timeout ends playback with the
-// worker's error. It reports whether it took over the worker's exit; opMu
-// is held.
-func (s *Session) resumeLadderLocked(err error) bool {
-	code := -1
+// openTimeoutError words a worker exit for a stream that sent nothing while
+// it was being opened (jfplay exit 8): the server took the request and
+// answered with no video. The playback log says so for the report; the
+// error carries the worker's exit. Other errors pass through unchanged.
+func (s *Session) openTimeoutError(err error) error {
 	var ee *exec.ExitError
-	if errors.As(err, &ee) {
-		code = ee.ExitCode()
+	if !errors.As(err, &ee) || ee.ExitCode() != workerExitOpenTimeout {
+		return err
 	}
-	if code != workerExitOpenTimeout {
-		return false
-	}
-	s.mu.Lock()
-	if s.direct || s.videoCopy || s.lastBase <= 0 || s.resumeRetries >= 2 || s.closing || s.stopRequested {
-		s.mu.Unlock()
-		return false
-	}
-	s.resumeRetries++
-	rung, offset := s.resumeRetries, s.lastBase
-	target := offset
-	if rung == 2 {
-		target = 0
-		s.notice = "Resume failed: from the start" // fits the panel's subtitle room
-	}
-	s.started = false
-	s.cmd, s.cmdDone = nil, nil
-	s.mu.Unlock()
-	if rung == 1 {
-		s.logf("stream open timed out at %d s (jfplay exit %d); asking again", offset, code)
-	} else {
-		s.logf("stream open timed out again at %d s (jfplay exit %d); starting from the beginning", offset, code)
-	}
-	_ = os.Remove(s.p.Status)
-	if err := s.startContext(target, false, s.sessionContext()); err != nil {
-		s.finishLocked(s.suppressStopCancellation(err))
-	}
-	return true
+	s.logf("stream open timed out (jfplay exit %d): the server accepted the request but sent no video", ee.ExitCode())
+	return noVideoError{err}
 }
+
+// noVideoError is the failure line for a stream that never came.
+type noVideoError struct{ err error }
+
+func (e noVideoError) Error() string {
+	return "The server accepted the request but sent no video"
+}
+func (e noVideoError) Unwrap() error { return e.err }

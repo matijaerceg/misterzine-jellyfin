@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -361,72 +362,16 @@ func (f *fallbackServer) transcodeStarts() []float64 {
 	return out
 }
 
-// A transcode started at an offset whose worker sees no stream (exit 8) is
-// asked for again, then from the beginning; the start that plays is
-// reported as usual.
-func TestResumeLadderRetriesThenFromStart(t *testing.T) {
-	f := newFallbackServer(t, ineligibleDirect)
-	p := f.player(t, []int{workerExitOpenTimeout, workerExitOpenTimeout, 0}, "1")
-	s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 375)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := waitDone(t, s); err != nil {
-		t.Fatalf("playback ended with %v after the ladder", err)
-	}
-	f.mu.Lock()
-	l := append([][]string(nil), f.launches...)
-	reports := append([]string(nil), f.reports...)
-	f.mu.Unlock()
-	if len(l) != 3 {
-		t.Fatalf("launches = %d, want three rungs: %v", len(l), l)
-	}
-	for i, want := range []struct{ base, timeout string }{{"375", "20"}, {"375", "20"}, {"0", ""}} {
-		if !containsArgPair(l[i], "--base", want.base) || hasArg(l[i], "--direct") {
-			t.Fatalf("rung %d base: %v", i, l[i])
-		}
-		if hasArg(l[i], "--open-timeout") != (want.timeout != "") || (want.timeout != "" && !containsArgPair(l[i], "--open-timeout", want.timeout)) {
-			t.Fatalf("rung %d open timeout: %v", i, l[i])
-		}
-	}
-	if starts := f.transcodeStarts(); len(starts) != 3 || starts[0] != 375 || starts[1] != 375 || starts[2] != 0 {
-		t.Fatalf("transcode starts %v, want 375, 375, 0", starts)
-	}
-	if n := s.TakeNotice(); n == "" {
-		t.Fatal("no notice for the start from the beginning")
-	}
-	want := []string{"/Sessions/Playing transcode-session", "/Sessions/Playing/Stopped transcode-session"}
-	if strings.Join(reports, ",") != strings.Join(want, ",") {
-		t.Fatalf("reports = %v, want %v", reports, want)
-	}
-}
-
-// A third timeout ends playback with the worker's error.
-func TestResumeLadderGivesUpAfterTwoRetries(t *testing.T) {
-	f := newFallbackServer(t, ineligibleDirect)
-	p := f.player(t, []int{workerExitOpenTimeout, workerExitOpenTimeout, workerExitOpenTimeout}, "1")
-	s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 375)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if waitDone(t, s) == nil {
-		t.Fatal("third timeout did not end playback with an error")
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if len(f.launches) != 3 {
-		t.Fatalf("launches = %d, want 3", len(f.launches))
-	}
-}
-
-// Only a transcode started at an offset climbs the ladder: a start from the
-// beginning has nowhere lower to go, and a direct stream's timeout is a
-// network fault, not the server's seek.
-func TestResumeLadderOnlyForOffsetTranscodes(t *testing.T) {
+// A transcode started at an offset is given the open timeout; when its
+// worker sees no stream (exit 8) playback ends with the no-video error,
+// which carries the worker's exit. A start from the beginning and a direct
+// stream get no open timeout but end the same way.
+func TestOpenTimeoutEndsPlaybackWithNoVideoError(t *testing.T) {
 	for name, tc := range map[string]struct {
-		source string
-		offset int
-	}{"from-start": {ineligibleDirect, 0}, "direct": {eligibleDirect, 10}} {
+		source  string
+		offset  int
+		timeout string
+	}{"resume": {ineligibleDirect, 375, "20"}, "from-start": {ineligibleDirect, 0, ""}, "direct": {eligibleDirect, 10, ""}} {
 		t.Run(name, func(t *testing.T) {
 			f := newFallbackServer(t, tc.source)
 			p := f.player(t, []int{workerExitOpenTimeout}, "1")
@@ -434,13 +379,21 @@ func TestResumeLadderOnlyForOffsetTranscodes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if waitDone(t, s) == nil {
-				t.Fatal("timeout was not reported")
+			err = waitDone(t, s)
+			if err == nil || !strings.Contains(err.Error(), "sent no video") {
+				t.Fatalf("playback ended with %v, want the no-video error", err)
+			}
+			var ee *exec.ExitError
+			if !errors.As(err, &ee) || ee.ExitCode() != workerExitOpenTimeout {
+				t.Fatalf("error %v does not carry the worker's exit", err)
 			}
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			if len(f.launches) != 1 || hasArg(f.launches[0], "--open-timeout") {
-				t.Fatalf("launches %v", f.launches)
+			if len(f.launches) != 1 {
+				t.Fatalf("launches %v, want one", f.launches)
+			}
+			if hasArg(f.launches[0], "--open-timeout") != (tc.timeout != "") || (tc.timeout != "" && !containsArgPair(f.launches[0], "--open-timeout", tc.timeout)) {
+				t.Fatalf("open timeout: %v", f.launches[0])
 			}
 		})
 	}

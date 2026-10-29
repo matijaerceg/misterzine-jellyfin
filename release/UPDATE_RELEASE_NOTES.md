@@ -1,12 +1,11 @@
 # MisterZine Jellyfin 0.1.0-beta.9
 
-- A resume, a seek or Skip intro that the server never answers is retried
-  instead of failing after a minute: a converted stream started part-way
-  through is given 20 seconds to arrive, then asked for again, then played
-  from the beginning, with a line on the playback panel. The playback log
-  names each attempt for Send a report. This targets servers whose
-  hardware-accelerated conversion stalls on a seek; playing from the start
-  was unaffected.
+- A resume, a seek or Skip intro that the server never answers now fails
+  after 20 seconds instead of a minute, and says what happened: the server
+  accepted the request but sent no video. The playback log carries the same
+  line for Send a report. Playing from the start is unaffected. (Seen with a
+  Plex server whose hardware-accelerated conversion stalls on a seek into
+  10-bit HEVC; the same guard applies here.)
 - Failure reports now show which playback startup stage stalled and how long
   it took. The most recent failed playback log survives playing another video
   before sending a report.
