@@ -87,11 +87,11 @@ type Session struct {
 	// forceTranscode makes every later PlaybackInfo of this session ask for a
 	// transcode; fellBack records that the one automatic fallback was used.
 	forceTranscode, fellBack bool
-	// The resume ladder (resumeLadderLocked): lastOffset is where the last
-	// start asked the stream to begin; resumeRetries counts its rungs since
+	// The resume ladder (resumeLadderLocked): lastBase is where the last
+	// start's stream begins (0 for a file seeked in place); resumeRetries counts its rungs since
 	// a start last played; notice is a line for the playback screen, taken
 	// once (TakeNotice).
-	lastOffset    int
+	lastBase      int
 	resumeRetries int
 	notice        string
 	// probedTranscode is the "audio|subtitle" selection for which the
@@ -384,7 +384,6 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	// behavior unchanged.
 	s.mu.Lock()
 	paused := s.state.Paused
-	s.lastOffset = offset
 	s.mu.Unlock()
 	audio, subtitle := selectedStreams(s.item)
 	base, inFile := offset, 0
@@ -448,6 +447,9 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	if s.direct || s.fullTimeline {
 		base, inFile = 0, offset
 	}
+	s.mu.Lock()
+	s.lastBase = base // where the stream begins: the resume ladder's offset
+	s.mu.Unlock()
 	args := []string{"--base", strconv.Itoa(base)}
 	if inFile > 0 {
 		args = append(args, "--start-in-file", strconv.Itoa(inFile))
