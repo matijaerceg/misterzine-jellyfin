@@ -225,19 +225,28 @@ func (c *Client) ShowEpisodes(ctx context.Context, showID string) ([]*Item, erro
 	return c.all(ctx, "/Shows/"+url.PathEscape(showID)+"/Episodes", nil)
 }
 
-// ShowAspect is the picture aspect of a show's first episode, 0 when the
-// server has not measured it: one small request per show.
+// ShowAspect is the picture aspect of a show's first regular episode, 0
+// when the server has not measured it: one small request per show. Specials
+// (season 0) sort first and are often a different shape, so they only
+// answer for a show whose first page holds nothing else.
 func (c *Client) ShowAspect(ctx context.Context, showID string) (float64, error) {
-	items, err := c.Items(ctx, "/Shows/"+url.PathEscape(showID)+"/Episodes", url.Values{"fields": {"Width,Height,MediaStreams"}}, 1)
+	items, err := c.Items(ctx, "/Shows/"+url.PathEscape(showID)+"/Episodes", url.Values{"fields": {"Width,Height,MediaStreams"}}, 10)
 	if err != nil || len(items) == 0 {
 		return 0, err
+	}
+	for _, it := range items {
+		if it.Season != 0 {
+			return it.Aspect, nil
+		}
 	}
 	return items[0].Aspect, nil
 }
 
 // FirstEpisodeAspects is the picture aspect of every show in a TV library
 // with an episode 1 of some season, keyed by show id and taken from its
-// lowest season: one request for the whole library. The streams come too:
+// lowest season other than specials (season 0, often a different shape;
+// a show with only specials is left to ShowAspect): one request for the
+// whole library. The streams come too:
 // a DVD rip's pixels are 720x480 whatever its picture, and only the
 // stream's aspect ratio says which shape the player shows.
 func (c *Client) FirstEpisodeAspects(ctx context.Context, section string) (map[string]float64, error) {
@@ -250,7 +259,7 @@ func (c *Client) FirstEpisodeAspects(ctx context.Context, section string) (map[s
 	out := map[string]float64{}
 	season := map[string]int{}
 	for _, it := range items {
-		if it.SeriesID == "" || it.Aspect == 0 {
+		if it.SeriesID == "" || it.Aspect == 0 || it.Season == 0 {
 			continue
 		}
 		if s, seen := season[it.SeriesID]; seen && s <= it.Season {

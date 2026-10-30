@@ -26,17 +26,20 @@ func TestShowsAreMeasuredOnceForTheFilter(t *testing.T) {
 			if q.Get("indexNumber") != "1" {
 				t.Errorf("sweep should ask for first episodes: %s", r.URL)
 			}
-			// the wide show's season 2 comes first; season 1 must win
+			// the wide show's season 2 comes first; season 1 must win, and
+			// the square show's widescreen special must not count
 			fmt.Fprint(w, `{"Items":[`+
+				`{"Id":"301","Type":"Episode","SeriesId":"43","ParentIndexNumber":0,"Width":1920,"Height":1080},`+
 				`{"Id":"201","Type":"Episode","SeriesId":"16","ParentIndexNumber":2,"Width":640,"Height":480},`+
 				`{"Id":"101","Type":"Episode","SeriesId":"16","ParentIndexNumber":1,"Width":1920,"Height":1080},`+
-				`{"Id":"102","Type":"Episode","SeriesId":"43","ParentIndexNumber":1,"Width":640,"Height":480}],"TotalRecordCount":3}`)
+				`{"Id":"102","Type":"Episode","SeriesId":"43","ParentIndexNumber":1,"Width":640,"Height":480}],"TotalRecordCount":4}`)
 		case strings.HasPrefix(r.URL.Path, "/Shows/") && strings.HasSuffix(r.URL.Path, "/Episodes"):
 			probes.Add(1)
-			if q.Get("limit") != "1" {
-				t.Errorf("probe should ask for one episode: %s", r.URL)
+			if q.Get("limit") != "10" {
+				t.Errorf("probe should ask for a short page: %s", r.URL)
 			}
-			fmt.Fprint(w, `{"Items":[{"Id":"9","Type":"Episode","Name":"Special","Width":1920,"Height":817}],"TotalRecordCount":1}`)
+			// a show with only specials is judged by its first special
+			fmt.Fprint(w, `{"Items":[{"Id":"9","Type":"Episode","Name":"Special","ParentIndexNumber":0,"Width":1920,"Height":817}],"TotalRecordCount":1}`)
 		default:
 			t.Errorf("unexpected request %s", r.URL)
 		}
@@ -139,8 +142,8 @@ func TestSeasonAspectFallsBackToParentIDAndMissingParentStaysVisible(t *testing.
 			fmt.Fprint(w, `{"Items":[]}`)
 		case r.URL.Path == "/Shows/parent-show/Episodes":
 			probed.Add(1)
-			if r.URL.Query().Get("limit") != "1" {
-				t.Errorf("probe should ask for one episode: %s", r.URL)
+			if r.URL.Query().Get("limit") != "10" {
+				t.Errorf("probe should ask for a short page: %s", r.URL)
 			}
 			fmt.Fprint(w, `{"Items":[{"Id":"ep","Type":"Episode","Width":640,"Height":480}],"TotalRecordCount":1}`)
 		default:

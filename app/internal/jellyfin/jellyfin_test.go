@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -719,4 +720,30 @@ func testClient(host, cache, device string, store TokenStore) *Client {
 	c := New(host, cache, device, store)
 	c.AllowLocalHTTP(true)
 	return c
+}
+
+// Specials sort first and are often widescreen; the probe skips them for
+// the first regular episode and only falls back to one when that is all.
+func TestShowAspectSkipsSpecials(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("limit") != "10" {
+			t.Errorf("probe should ask for a short page: %s", r.URL)
+		}
+		if strings.Contains(r.URL.Path, "/only/") {
+			fmt.Fprint(w, `{"Items":[{"Id":"1","Type":"Episode","ParentIndexNumber":0,"Width":1920,"Height":1080}],"TotalRecordCount":1}`)
+			return
+		}
+		fmt.Fprint(w, `{"Items":[`+
+			`{"Id":"1","Type":"Episode","ParentIndexNumber":0,"Width":1920,"Height":1080},`+
+			`{"Id":"2","Type":"Episode","ParentIndexNumber":1,"Width":640,"Height":480}],"TotalRecordCount":2}`)
+	}))
+	defer srv.Close()
+	c := testClient(srv.URL, t.TempDir(), "dev-1", &MemoryStore{})
+	c.Store.SetCredentials(Credentials{UserID: testUser, Token: "TESTTOKEN"})
+	if a, err := c.ShowAspect(context.Background(), "show"); err != nil || a != 1.33 {
+		t.Fatalf("regular episode should decide: %v %v", a, err)
+	}
+	if a, err := c.ShowAspect(context.Background(), "only"); err != nil || a != 1.78 {
+		t.Fatalf("specials-only show should use its special: %v %v", a, err)
+	}
 }

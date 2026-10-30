@@ -33,7 +33,10 @@ const (
 func (a *Aspects) load(dir string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.path = filepath.Join(dir, "aspects.json")
+	// aspects2.json: the old file judged some shows by a special, so every
+	// install measures once more
+	a.path = filepath.Join(dir, "aspects2.json")
+	_ = os.Remove(filepath.Join(dir, "aspects.json"))
 	a.known = map[string]float64{}
 	a.swept = nil
 	if data, err := os.ReadFile(a.path); err == nil {
