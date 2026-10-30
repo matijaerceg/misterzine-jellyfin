@@ -1,12 +1,16 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"plexcrt/internal/jellyfin"
 )
@@ -177,5 +181,91 @@ func TestSeasonAspectPreservesExistingValue(t *testing.T) {
 	}
 	if season.Aspect != 1.33 {
 		t.Fatalf("existing season aspect changed to %v", season.Aspect)
+	}
+}
+
+// resweepFixture is a server with one TV library whose first episode of
+// show 16 is 4:3, and a cache folder already holding show 16 as wide and a
+// probed specials-only show 77, swept at the given time.
+func resweepFixture(t *testing.T, swept time.Time, fourThree bool) (*App, *atomic.Int32, string) {
+	t.Helper()
+	sweeps := new(atomic.Int32)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		switch {
+		case r.URL.Path == "/UserViews":
+			fmt.Fprint(w, `{"Items":[{"Id":"2","Name":"TV","CollectionType":"tvshows"},{"Id":"3","Name":"Films","CollectionType":"movies"}]}`)
+		case r.URL.Path == "/Items" && q.Get("parentId") == "2" && q.Get("includeItemTypes") == "Episode":
+			sweeps.Add(1)
+			fmt.Fprint(w, `{"Items":[{"Id":"101","Type":"Episode","SeriesId":"16","ParentIndexNumber":1,"Width":640,"Height":480}],"TotalRecordCount":1}`)
+		default:
+			t.Errorf("unexpected request %s", r.URL)
+		}
+	}))
+	t.Cleanup(server.Close)
+	dir := t.TempDir()
+	data := fmt.Sprintf(`{"swept":%d,"shows":{"16":1.78,"77":2.35}}`, swept.Unix())
+	if err := os.WriteFile(filepath.Join(dir, "aspects2.json"), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := &App{Client: testClient(server.URL, "", dir), Cfg: &Config{FourThree: fourThree}}
+	a.SetCacheDir(dir)
+	return a, sweeps, dir
+}
+
+// idleMenus runs the idle handler past DimAfter with the menus waiting,
+// twice, and waits for any re-sweep it started.
+func idleMenus(a *App, now time.Time) {
+	a.idle(now, true)
+	a.idle(now.Add(DimAfter), true)
+	a.idle(now.Add(DimAfter+time.Second), true)
+	for i := 0; i < 500; i++ {
+		a.aspects.mu.Lock()
+		busy := a.aspects.resweeping
+		a.aspects.mu.Unlock()
+		if !busy {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// A day-old sweep is redone once while the menus sit idle: the swept show
+// takes its new shape, the probed show the sweep does not mention stays.
+func TestStaleAspectsAreSweptAgainWhenIdle(t *testing.T) {
+	a, sweeps, dir := resweepFixture(t, time.Now().Add(-25*time.Hour), true)
+	idleMenus(a, time.Now())
+	if sweeps.Load() != 1 {
+		t.Fatalf("sweeps %d, want one per TV library", sweeps.Load())
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "aspects2.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f aspectsFile
+	if err := json.Unmarshal(data, &f); err != nil {
+		t.Fatal(err)
+	}
+	if f.Shows["16"] != 1.33 || f.Shows["77"] != 2.35 {
+		t.Fatalf("saved shapes %v, want 16 replaced and 77 kept", f.Shows)
+	}
+	if time.Since(time.Unix(f.Swept, 0)) > time.Minute {
+		t.Fatalf("sweep time not renewed: %d", f.Swept)
+	}
+}
+
+func TestFreshAspectsAreNotSweptAgain(t *testing.T) {
+	a, sweeps, _ := resweepFixture(t, time.Now().Add(-time.Hour), true)
+	idleMenus(a, time.Now())
+	if sweeps.Load() != 0 {
+		t.Fatalf("a fresh sweep was redone %d times", sweeps.Load())
+	}
+}
+
+func TestAspectsAreNotSweptAgainWithTheFilterOff(t *testing.T) {
+	a, sweeps, _ := resweepFixture(t, time.Now().Add(-25*time.Hour), false)
+	idleMenus(a, time.Now())
+	if sweeps.Load() != 0 {
+		t.Fatalf("swept %d times with the filter off", sweeps.Load())
 	}
 }

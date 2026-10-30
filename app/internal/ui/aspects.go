@@ -16,18 +16,30 @@ import (
 // movie. The first time the filter needs them, every TV library is swept
 // in one request each; the few shows that leaves out are probed one by one.
 // Answers are kept on disk in the cache folder. Until a show is known it
-// stays visible.
+// stays visible. Once a day, while the menus sit idle, the libraries are
+// swept again so a replaced first episode is noticed.
 type Aspects struct {
-	mu    sync.Mutex
-	known map[string]float64 // show rating key -> aspect (0: seen, unknown)
-	path  string
-	swept chan struct{} // closed when the library sweep has finished; nil before it starts
+	mu         sync.Mutex
+	known      map[string]float64 // show rating key -> aspect (0: seen, unknown)
+	sweptAt    time.Time          // when a library sweep last finished
+	path       string
+	swept      chan struct{} // closed when the library sweep has finished; nil before it starts
+	resweeping bool          // a periodic re-sweep is running
+	retried    time.Time     // when the last re-sweep started (a failed one waits aspectRetry)
+}
+
+// aspectsFile is aspects2.json on disk.
+type aspectsFile struct {
+	Swept int64              `json:"swept"` // unix seconds; 0 before the first sweep
+	Shows map[string]float64 `json:"shows"`
 }
 
 const (
-	aspectProbes = 8                       // shows probed at once
-	aspectBudget = 6 * time.Second         // per batch; the rest stay visible until next time
-	aspectWait   = 1500 * time.Millisecond // how long a listing waits for the sweep before showing
+	aspectProbes  = 8                       // shows probed at once
+	aspectBudget  = 6 * time.Second         // per batch; the rest stay visible until next time
+	aspectWait    = 1500 * time.Millisecond // how long a listing waits for the sweep before showing
+	aspectResweep = 24 * time.Hour          // how old a sweep may get before the idle menus redo it
+	aspectRetry   = time.Hour               // between re-sweeps that did not finish
 )
 
 func (a *Aspects) load(dir string) {
@@ -38,15 +50,28 @@ func (a *Aspects) load(dir string) {
 	a.path = filepath.Join(dir, "aspects2.json")
 	_ = os.Remove(filepath.Join(dir, "aspects.json"))
 	a.known = map[string]float64{}
+	a.sweptAt = time.Time{}
 	a.swept = nil
-	if data, err := os.ReadFile(a.path); err == nil {
-		_ = json.Unmarshal(data, &a.known)
+	a.resweeping = false
+	a.retried = time.Time{}
+	var f aspectsFile
+	if data, err := os.ReadFile(a.path); err == nil && json.Unmarshal(data, &f) == nil {
+		if f.Shows != nil {
+			a.known = f.Shows
+		}
+		if f.Swept > 0 {
+			a.sweptAt = time.Unix(f.Swept, 0)
+		}
 	}
 }
 
 func (a *Aspects) save() {
 	a.mu.Lock()
-	data, err := json.Marshal(a.known)
+	f := aspectsFile{Shows: a.known}
+	if !a.sweptAt.IsZero() {
+		f.Swept = a.sweptAt.Unix()
+	}
+	data, err := json.Marshal(f)
 	path := a.path
 	a.mu.Unlock()
 	if err != nil || path == "" {
@@ -109,27 +134,72 @@ func (a *Aspects) sweep(client *jellyfin.Client, then func()) <-chan struct{} {
 	go func() {
 		defer close(done)
 		defer then()
-		secs, err := client.Sections(bg())
-		if err != nil {
-			return
-		}
-		for _, s := range secs {
-			if s.Type != "show" {
-				continue
-			}
-			found, err := client.FirstEpisodeAspects(bg(), s.Key)
-			if err != nil {
-				continue
-			}
-			a.mu.Lock()
-			for key, v := range found {
-				a.known[key] = v
-			}
-			a.mu.Unlock()
-		}
-		a.save()
+		a.sweepLibraries(client)
 	}()
 	return done
+}
+
+// resweep starts a periodic library sweep if the last one is older than
+// aspectResweep and no sweep is running; then is called on completion.
+// Shows the sweep answers for are replaced; the probed rest are kept.
+func (a *Aspects) resweep(client *jellyfin.Client, now time.Time, then func()) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.resweeping || a.path == "" || now.Sub(a.sweptAt) < aspectResweep || now.Sub(a.retried) < aspectRetry {
+		return
+	}
+	if a.swept != nil {
+		select {
+		case <-a.swept:
+		default:
+			return // the first sweep is still running
+		}
+	}
+	a.resweeping = true
+	a.retried = now
+	go func() {
+		defer then()
+		a.sweepLibraries(client)
+		a.mu.Lock()
+		a.resweeping = false
+		a.mu.Unlock()
+	}()
+}
+
+// sweepLibraries asks every TV library for its shows' first episodes,
+// records the answers and the time, and saves.
+func (a *Aspects) sweepLibraries(client *jellyfin.Client) {
+	secs, err := client.Sections(bg())
+	if err != nil {
+		return
+	}
+	for _, s := range secs {
+		if s.Type != "show" {
+			continue
+		}
+		found, err := client.FirstEpisodeAspects(bg(), s.Key)
+		if err != nil {
+			continue
+		}
+		a.mu.Lock()
+		for key, v := range found {
+			a.known[key] = v
+		}
+		a.mu.Unlock()
+	}
+	a.mu.Lock()
+	a.sweptAt = time.Now()
+	a.mu.Unlock()
+	a.save()
+}
+
+// resweepAspects redoes the library sweep once it is a day old. Cheap
+// enough to call on every idle tick of the menus.
+func (a *App) resweepAspects(now time.Time) {
+	if a.Client == nil || a.Cfg == nil || !a.Cfg.FourThree {
+		return
+	}
+	a.aspects.resweep(a.Client, now, func() { a.Later(a.refilterHome) })
 }
 
 // measureShows fills in the aspect of every show in items: from the
