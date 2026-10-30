@@ -1,0 +1,19 @@
+name: Problem report
+description: Something is not working. A report code from the app tells us almost everything.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The quickest way to get help: in the app open **Options > Send a report**, press OK, and paste the short code it shows (such as `K7M4`) below. The report carries your version, board, display settings and logs, so you do not have to type any of that. Tokens and server addresses are never included.
+        If the app does not start, **MisterZine-Jellyfin-Diagnostics** in the MiSTer menu sends the same report.
+  - type: input
+    id: code
+    attributes:
+      label: Report code
+      placeholder: K7M4
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you were doing, what you saw, and roughly when, so we can find it in the log. Anything else you think helps.
