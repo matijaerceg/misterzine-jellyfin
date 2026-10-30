@@ -25,9 +25,13 @@ func CoreLoaded() bool {
 	return ok && appCore(name)
 }
 
+// AppCoreName is the name the Jellyfin build of the decoder gives itself in
+// its config string: what MiSTer publishes as the loaded core's name.
+const AppCoreName = "MisterZine Jellyfin"
+
 // appCore reports whether a core name is the app's core.
 func appCore(name string) bool {
-	return name == "MisterZine Jellyfin" || name == "H264" // accept old installations during upgrade
+	return name == AppCoreName || name == "H264" // accept old installations during upgrade
 }
 
 // CoreName reads the name MiSTer main publishes for the currently loaded core.

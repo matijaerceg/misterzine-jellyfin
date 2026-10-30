@@ -84,6 +84,9 @@ func run() int {
 			fmt.Fprintln(os.Stderr, "MisterZine Jellyfin:", err)
 			os.Exit(1)
 		}
+		// Before the core loads: the launcher runs -check just before it asks
+		// MiSTer for the core, and main reads yc.txt only at a core load.
+		ring.PinYC(func(f string, a ...any) { fmt.Fprintf(os.Stderr, "MisterZine Jellyfin: "+f+"\n", a...) })
 	}
 	if *check {
 		fmt.Printf("Installation ready: %s (%s)\n", version, build)
