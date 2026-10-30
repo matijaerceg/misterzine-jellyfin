@@ -12,6 +12,9 @@
 # tools/seed_sweep.sh restores its own snapshot).
 #
 # SEED LEDGER (append one line per fit that ships or teaches something; never delete):
+#   2026-10-29 (Plex main e49c62f, the same RTL as Jellyfin main a2c862d apart from the version
+#     string): SEED 7 first roll closed clk_dec 103.1/104.09 MHz, clk_vid 89.03/88.35 MHz, so
+#     this netlist fits; the release build still re-rolls the seed.
 #   2026-10-29 (Direct Video DAC fix dv27 + dv27b, ported from the Plex core): no fit of
 #     this netlist yet. The Plex tester 0.1.0-beta.35.2 (the same RTL without the clk_sys
 #     pixel-repetition report, SEED 29) closed clk_dec 105.22/105.99 MHz and the reporter's
