@@ -145,11 +145,15 @@ the meaning carried over (`compat.go`).
 - **Launch.** `ring.Open` calls `LaunchCore` (MGL in `/tmp/h264ring.mgl`,
   `load_core` written once to `/dev/MiSTer_cmd`, only when `/tmp/CORENAME` is
   not `H264`; rbf `_Other/H264`, or `$MISTERZINE_H264_RBF`) and waits for the
-  heartbeat. Before any core load (the launcher's `-check` run, and every app
-  start) `ring.PinYC` appends any missing `MisterZine Jellyfin_<fps>` lines to
-  `/media/fat/yc.txt`, which MiSTer main reads at each core load: they pin the
-  composite/S-Video subcarrier increment to the core's fixed 81 MHz video clock
-  instead of main's per-load measurement (`app/internal/ring/yc.go`).
+  heartbeat. At every app start (the launcher's `-check` run included, which comes
+  before the launcher selects a core) `ring.PinYC` appends any missing
+  `MisterZine Jellyfin_<fps>` lines to `/media/fat/yc.txt`, which MiSTer main
+  reads at each core load: they pin the composite/S-Video subcarrier increment
+  to the core's fixed 81 MHz video clock instead of main's per-load
+  measurement (`app/internal/ring/yc.go`). The install writes the same lines
+  (`release/manager.py` `pin_yc`, a copy of the table that its tests compare
+  with the Go one), because the menu entry loads the core before the app
+  first runs.
 - **Input.** `input.Poll` reads the whole input region (words 48-71) as a seqlock
   (in_tail first, in_head last) when the source offers `InputRegion`, keeps its
   own event count against `ev_count` (more than 32 between reads: the oldest are
