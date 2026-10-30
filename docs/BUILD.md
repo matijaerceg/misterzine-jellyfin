@@ -28,8 +28,10 @@ older H.264 cores keep calibration preview-only. Fit/crop telemetry has been
 verified on Mister Pi with DeFlicker off and on; visual CRT confirmation
 remains pending.
 
-The app's 14:9 crop uses the same custom geometry interface. On older cores it
-falls back to Off, while the core receives its valid Letterbox setting.
+The app's Fill and 14:9 crops use the same custom geometry interface: the
+core's own Analog Aspect setting no longer shapes the picture (its fit follows
+Display Shape alone). On older cores 14:9 falls back to Off, while the core
+receives its valid Letterbox setting, and Fill is left to the core's setting.
 
 The core OSD's **Output Mode**, **Refresh Rate Match**, **Display Shape**,
 **De-flicker**, **240p Playback**, and **Play 24fps at 25fps** controls use

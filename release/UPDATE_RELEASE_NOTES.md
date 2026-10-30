@@ -1,19 +1,10 @@
-# MisterZine Jellyfin 0.1.0-beta.9
+# MisterZine Jellyfin 0.1.0-beta.10
 
-- Videos with a subtitle file beside them (an .srt next to the episode, for
-  example) played without sound when played as stored. Jellyfin numbers such
-  files before the video's own tracks, and the app handed that number to the
-  player as the track's position in the file, which pointed past the audio.
-  The app now asks for the right track, and the playback log notes the
-  mapping.
-- A resume, a seek or Skip intro that the server never answers now fails
-  after 20 seconds instead of a minute, and says what happened: the server
-  accepted the request but sent no video. The playback log carries the same
-  line for Send a report. Playing from the start is unaffected. (Seen with a
-  Plex server whose hardware-accelerated conversion stalls on a seek into
-  10-bit HEVC; the same guard applies here.)
+- Video crop set to Fill applies when playback starts again. Since the
+  decoder-core release it only took effect after changing Crop under More
+  during playback; a saved Video geometry calibration hid the fault.
 
-Uses the same qualified FPGA core as beta 8, with an updated playback worker. Settings and
+Uses the same qualified FPGA core as beta 9, with an updated playback worker. Settings and
 saved supporter access are preserved. Update through **Options > Updates**, or
 use the beta installer.
 
