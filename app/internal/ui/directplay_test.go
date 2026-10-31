@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -294,6 +295,66 @@ func TestDirectFallsBackToTranscodeOnce(t *testing.T) {
 			}
 			if strings.Join(f.reports, ",") != strings.Join(want, ",") {
 				t.Fatalf("reports = %v, want %v", f.reports, want)
+			}
+		})
+	}
+}
+
+// A stream the core decoded but never showed (exit 9) is played again at the
+// same position as a transcode of at most 854x480, once: the second exit 9
+// ends playback with the no-picture error, which carries the worker's exit.
+// After the direct fallback the small retry is still available.
+func TestNoPictureRetriesSmallTranscodeOnce(t *testing.T) {
+	for name, tc := range map[string]struct {
+		source  string
+		codes   []int
+		heights []string // each transcode PlaybackInfo's profile height
+	}{
+		"transcode": {ineligibleDirect, []int{workerExitNoPicture, workerExitNoPicture}, []string{"720", "480"}},
+		"direct":    {eligibleDirect, []int{workerExitNeedsTranscode, workerExitNoPicture, workerExitNoPicture}, []string{"720", "480"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFallbackServer(t, tc.source)
+			p := f.player(t, tc.codes, "42")
+			s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = waitDone(t, s)
+			if err == nil || !strings.Contains(err.Error(), "showed no picture") {
+				t.Fatalf("playback ended with %v, want the no-picture error", err)
+			}
+			var ee *exec.ExitError
+			if !errors.As(err, &ee) || ee.ExitCode() != workerExitNoPicture {
+				t.Fatalf("error %v does not carry the worker's exit", err)
+			}
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			if l := f.launches; len(l) != len(tc.codes) || !containsArgPair(l[len(l)-1], "--base", "42") {
+				t.Fatalf("launches %v", l)
+			}
+			var transcodes []map[string]any
+			for _, b := range f.bodies {
+				if b["EnableDirectPlay"] == false {
+					transcodes = append(transcodes, b)
+				}
+			}
+			if len(transcodes) != len(tc.heights) {
+				t.Fatalf("transcode PlaybackInfo bodies %#v", transcodes)
+			}
+			for i, want := range tc.heights {
+				profile, _ := json.Marshal(transcodes[i]["DeviceProfile"])
+				if !strings.Contains(string(profile), `"Property":"Height","Value":"`+want+`"`) {
+					t.Errorf("transcode %d profile not capped at %s lines: %s", i, want, profile)
+				}
+			}
+			last := transcodes[len(transcodes)-1]
+			if last["StartTimeTicks"] != float64(42*jellyfin.TicksPerSecond) || last["MaxStreamingBitrate"] != float64(6000*1000+containerHeadroom) {
+				t.Fatalf("small transcode body %#v", last)
+			}
+			log, _ := os.ReadFile(p.LogTo)
+			if !strings.Contains(string(log), "restarting at 42.000 s as a transcode of at most 854x480") || !strings.Contains(string(log), "small_transcode=true") {
+				t.Fatalf("log does not say so: %s", log)
 			}
 		})
 	}

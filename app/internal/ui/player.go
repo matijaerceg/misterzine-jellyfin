@@ -38,11 +38,14 @@ type Player struct {
 	// then asked for without subtitles. nil, or false, has the server burn
 	// the track into a transcode.
 	DrawsSubtitle func(itemID string, s jellyfin.Stream) bool
-	Hide          func()
-	exec          func(string, ...string) *exec.Cmd
-	stopGrace     time.Duration // how long a worker asked to stop has before it is killed; 0 is 3 s
-	reportOnce    sync.Once
-	reports       chan func()
+	// Capture is where jfplay saves the video of a playback that showed no
+	// picture; "" saves nothing.
+	Capture    string
+	Hide       func()
+	exec       func(string, ...string) *exec.Cmd
+	stopGrace  time.Duration // how long a worker asked to stop has before it is killed; 0 is 3 s
+	reportOnce sync.Once
+	reports    chan func()
 }
 
 type Session struct {
@@ -90,6 +93,9 @@ type Session struct {
 	// probedTranscode is the "audio|subtitle" selection for which the
 	// direct-play probe last got a transcode answer ("" for none).
 	probedTranscode string
+	// smallTranscode caps every later transcode of this session at 854x480;
+	// set by the no-picture retry (noPictureFallbackLocked).
+	smallTranscode bool
 	// burned is the subtitle track the running stream has burned in, "-1"
 	// for none (burnedSubtitle).
 	burned string
@@ -383,10 +389,10 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	if !reuseDirect {
 		kbps := s.capKbps()
 		s.mu.Lock()
-		force := s.forceTranscode || !p.directPlay()
+		force, small := s.forceTranscode || !p.directPlay(), s.smallTranscode
 		s.mu.Unlock()
 		burn := s.burnedSubtitle(subtitle)
-		info, err := s.playbackInfo(ctx, kbps, offset, audio, burn, force)
+		info, err := s.playbackInfo(ctx, kbps, offset, audio, burn, force, small)
 		if err != nil {
 			return err
 		}
@@ -469,7 +475,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		args = append(args, "--direct")
 	} else if base > 0 {
 		// a transcode started at an offset: jfplay exits 8 when the server
-		// sends nothing in time (openTimeoutError)
+		// sends nothing in time (workerExitError)
 		args = append(args, "--open-timeout", strconv.Itoa(int(openTimeout/time.Second)))
 	}
 	args = append(args, "--fifo", p.Fifo, "--status", p.Status)
@@ -522,6 +528,9 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	// variable so the worker cannot accidentally forward an old token.
 	cmd.Env = append(os.Environ(), "MISTERZINE_JFPLAY_OWNER="+filepath.Clean(p.Binary),
 		"JFPLAY_HEADERS=")
+	if p.Capture != "" {
+		cmd.Env = append(cmd.Env, "JFPLAY_NOPIC_CAPTURE="+p.Capture)
+	}
 	s.mu.Lock()
 	if ctx.Err() != nil || s.closing || s.stopRequested {
 		s.mu.Unlock()
@@ -546,10 +555,10 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		current, closing := s.cmd == cmd, s.closing
 		s.mu.Unlock()
 		if current && !closing {
-			if s.fallbackLocked(err) {
+			if s.fallbackLocked(err) || s.noPictureFallbackLocked(err) {
 				return
 			}
-			s.finishLocked(s.openTimeoutError(err))
+			s.finishLocked(s.workerExitError(err))
 		}
 	}()
 	return nil

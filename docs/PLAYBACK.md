@@ -48,6 +48,10 @@ error; the direct play session is reported stopped and the transcode is
 reported as a new session. The playback position is carried over to the
 transcode.
 
+When the core decodes a stream but shows no picture, the app likewise
+restarts the item once at the current position, as a transcode of at most
+854x480 (at the same bitrate) for the rest of the playback.
+
 It uses the first media source returned:
 
 - For direct play or direct stream, `jfplay` reads the item's stream and seeks

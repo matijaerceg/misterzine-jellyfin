@@ -78,14 +78,30 @@ func transcodeSize(videoKbps int) (w, h int) {
 	return 1280, 720
 }
 
+// smallTranscodeWidth and smallTranscodeHeight are the largest picture a
+// small transcode (Session.smallTranscode) is made at.
+const smallTranscodeWidth, smallTranscodeHeight = 854, 480
+
+// cappedTranscodeSize is transcodeSize at a cap, capped at 854x480 for a
+// small transcode.
+func cappedTranscodeSize(videoKbps int, small bool) (w, h int) {
+	w, h = transcodeSize(videoKbps)
+	if small && w > smallTranscodeWidth {
+		w, h = smallTranscodeWidth, smallTranscodeHeight
+	}
+	return w, h
+}
+
 // playbackDeviceProfile is the profile for a video cap in kbit/s (the
-// user's bitrate setting, never above MaxVideoKbps).
-func playbackDeviceProfile(videoKbps int) deviceProfile {
+// user's bitrate setting, never above MaxVideoKbps), with the picture at
+// most 854x480 when small: a 720p transcode the core decoded but never
+// showed is retried this way, at the same cap.
+func playbackDeviceProfile(videoKbps int, small bool) deviceProfile {
 	if videoKbps <= 0 || videoKbps > MaxVideoKbps {
 		videoKbps = MaxVideoKbps
 	}
 	video := videoKbps * 1000
-	w, h := transcodeSize(videoKbps)
+	w, h := cappedTranscodeSize(videoKbps, small)
 	base := []codecCondition{
 		{"EqualsAny", "VideoProfile", "high|main", true},
 		{"LessThanEqual", "VideoLevel", "41", false},
@@ -114,9 +130,10 @@ func playbackDeviceProfile(videoKbps int) deviceProfile {
 	}
 }
 
-// DeviceProfileJSON is the profile for PlaybackInfo, as JSON.
-func DeviceProfileJSON(videoKbps int) (json.RawMessage, error) {
-	b, err := json.Marshal(playbackDeviceProfile(videoKbps))
+// DeviceProfileJSON is the profile for PlaybackInfo, as JSON; small caps
+// the picture at 854x480 (playbackDeviceProfile).
+func DeviceProfileJSON(videoKbps int, small bool) (json.RawMessage, error) {
+	b, err := json.Marshal(playbackDeviceProfile(videoKbps, small))
 	return json.RawMessage(b), err
 }
 
@@ -125,7 +142,7 @@ func DeviceProfileJSON(videoKbps int) (json.RawMessage, error) {
 // the worker then validates the actual coded SPS. Transcode targets retain
 // their normal resolution caps through DeviceProfileJSON.
 func directProbeProfileJSON() (json.RawMessage, error) {
-	p := playbackDeviceProfile(MaxVideoKbps)
+	p := playbackDeviceProfile(MaxVideoKbps, false)
 	for i := range p.CodecProfiles {
 		conditions := p.CodecProfiles[i].Conditions[:0]
 		for _, c := range p.CodecProfiles[i].Conditions {

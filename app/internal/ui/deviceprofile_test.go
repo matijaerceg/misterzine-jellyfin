@@ -10,7 +10,7 @@ import (
 // the user's video cap, a 30 frames/s rule above 854 wide, an HLS transcode,
 // selected subtitles encoded into the video (which forces a transcode).
 func TestDeviceProfileJSON(t *testing.T) {
-	b, err := DeviceProfileJSON(4000)
+	b, err := DeviceProfileJSON(4000, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestDeviceProfileJSON(t *testing.T) {
 	}
 	// no cap, or one past the core's limit, is the core's limit
 	for _, kbps := range []int{0, 20000} {
-		if p := playbackDeviceProfile(kbps); p.MaxStreamingBitrate != MaxVideoKbps*1000+containerHeadroom {
+		if p := playbackDeviceProfile(kbps, false); p.MaxStreamingBitrate != MaxVideoKbps*1000+containerHeadroom {
 			t.Fatalf("cap %d: container limit %d", kbps, p.MaxStreamingBitrate)
 		}
 	}
@@ -74,7 +74,7 @@ func TestDeviceProfileSizeFollowsCap(t *testing.T) {
 		{3000, 1280, 720}, {8000, 1280, 720}, {0, 1280, 720},
 	} {
 		got := map[string]string{}
-		for _, c := range playbackDeviceProfile(tc.kbps).CodecProfiles[0].Conditions {
+		for _, c := range playbackDeviceProfile(tc.kbps, false).CodecProfiles[0].Conditions {
 			got[c.Property] = c.Value
 		}
 		if got["Width"] != strconv.Itoa(tc.w) || got["Height"] != strconv.Itoa(tc.h) {
@@ -84,6 +84,38 @@ func TestDeviceProfileSizeFollowsCap(t *testing.T) {
 	// the lowest step offered gets the smallest picture
 	if w, _ := transcodeSize(Bitrates[0].Kbps); w != 640 {
 		t.Fatalf("lowest step %d kbit/s is %d wide", Bitrates[0].Kbps, w)
+	}
+}
+
+// A small transcode (the no-picture retry) is at most 854x480 at the full
+// cap, so 60 frames/s stays 60 and the 30 frames/s rule above 854 wide never
+// applies; it never grows a picture a low cap already shrank.
+func TestSmallTranscodeProfile(t *testing.T) {
+	b, err := DeviceProfileJSON(8000, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p deviceProfile
+	if err := json.Unmarshal(b, &p); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, c := range p.CodecProfiles[0].Conditions {
+		got[c.Property] = c.Value
+	}
+	want := map[string]string{"Width": "854", "Height": "480", "VideoFramerate": "60", "VideoBitrate": "8000000"}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("small transcode %s = %q, want %q", k, got[k], v)
+		}
+	}
+	if p.MaxStreamingBitrate != playbackDeviceProfile(8000, false).MaxStreamingBitrate {
+		t.Errorf("small transcode container limit %d", p.MaxStreamingBitrate)
+	}
+	for _, c := range playbackDeviceProfile(500, true).CodecProfiles[0].Conditions {
+		if c.Property == "Width" && c.Value != "640" {
+			t.Errorf("small transcode at 500 kbit/s is %s wide", c.Value)
+		}
 	}
 }
 
@@ -105,7 +137,7 @@ func TestDirectProbeLeavesHeightToBlockCheck(t *testing.T) {
 	}
 	// Offering a tall source must not loosen the eventual transcode target.
 	found := false
-	for _, c := range playbackDeviceProfile(8000).CodecProfiles[0].Conditions {
+	for _, c := range playbackDeviceProfile(8000, false).CodecProfiles[0].Conditions {
 		if c.Property == "Height" && c.Value == "720" {
 			found = true
 		}

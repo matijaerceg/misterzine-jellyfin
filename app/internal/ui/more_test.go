@@ -154,7 +154,7 @@ func TestSessionBitrateRestartsWithTheNewCap(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	last := caps[len(caps)-1]
-	if want := float64(playbackDeviceProfile(2000).MaxStreamingBitrate); last != want || caps[0] == want {
+	if want := float64(playbackDeviceProfile(2000, false).MaxStreamingBitrate); last != want || caps[0] == want {
 		t.Fatalf("PlaybackInfo caps %v, want the restart at %v", caps, want)
 	}
 	if len(launches) != 2 || !containsArgPair(launches[1], "--base", "25") {
