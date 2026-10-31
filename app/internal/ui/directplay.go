@@ -36,9 +36,11 @@ const (
 	directMaxKbpsSD = 8000
 	// directSDWidth is the widest picture the core decodes at 60 frames/s.
 	directSDWidth = 854
-	// Match the worker: at most 80 blocks wide and 3,600 16x16 blocks per picture.
-	// Cropped dimensions are rounded up; jfplay checks the actual SPS before decoding.
-	directMaxWidth, directMaxBlocks = 1280, 3600
+	// Match the worker: at most 80 blocks wide and 4,096 16x16 blocks per picture
+	// (what one of the core's 2 MiB picture stores holds; 3,600 before the core
+	// accepted Quick Sync's 1280x736 coding of 720p). Cropped dimensions are
+	// rounded up; jfplay checks the actual SPS before decoding.
+	directMaxWidth, directMaxBlocks = 1280, 4096
 	directMaxBlockRate              = 108000
 	// directMaxFPSSD / directMaxFPSHD are the frame-rate limits for the two
 	// size classes; directFPSSlack absorbs 29.97-style rounding in metadata.

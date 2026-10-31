@@ -13,7 +13,7 @@ and the resume position. Unless a subtitle must be burned in, the first request 
 the server offer the file as stored without applying the configured bitrate
 limit. The app then checks the returned video details against the core's own
 limits: H.264 High or Main, level 4.1 or lower, 8-bit, at most 1280 pixels
-wide and 3,600 rounded-up 16x16 blocks per picture, at
+wide and 4,096 rounded-up 16x16 blocks per picture, at
 most 30 frames per second above 854 pixels wide (60 at or below), and an
 average bitrate of at most 6 Mbit/s above 854 pixels wide (8 Mbit/s at or
 below). It also checks the video bitrate against the **Video bitrate**
@@ -33,8 +33,10 @@ video's parameter sets and can fall back once to a bounded video transcode.
 With the **Direct play** setting off, none of this applies: every start asks
 the server for a transcode outright, within the Video bitrate.
 The audio conversion is triggered by capabilities, not a low bitrate target.
-The picture block budget permits shapes such as 968x722, but not 1280x722 or
-1920x1080; the block-rate limit is 108,000 per second with 1% rounding slack.
+The picture block budget permits shapes such as 968x722 and 1280x736 (Intel
+Quick Sync's coding of 720p), but not 1280x832 or 1920x1080; the block-rate
+limit is 108,000 per second with 1% rounding slack, so 1280x736 streams as
+stored at up to 29.6 frames per second.
 
 Jellyfin cannot report every property the core depends on (CABAC versus
 CAVLC entropy coding, MBAFF versus field-coded interlace). MBAFF is refused and
