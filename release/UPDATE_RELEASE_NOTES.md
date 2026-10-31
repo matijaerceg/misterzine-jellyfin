@@ -1,3 +1,16 @@
+# MisterZine Jellyfin 0.1.0-beta.11
+
+- Composite and S-Video colour: the core now reports its video clock count
+  over a whole frame to MiSTer main (words 19/20 of the current framework),
+  so main computes the subcarrier exactly on every start instead of from a
+  one-line measurement that landed on 80.99 or 81.01 MHz. The yc.txt lines
+  added in beta.10 stay as a fallback for MiSTer releases before August 2026.
+  The core also picks up the framework's Y/C chroma and NTSC timing fixes,
+  registered analog audio pins and a scaler state reset at VSync.
+
+Ships a new qualified FPGA core. Settings and saved supporter access are
+preserved. Update through **Options > Updates**, or use the beta installer.
+
 # MisterZine Jellyfin 0.1.0-beta.10
 
 - Video crop set to Fill applies when playback starts again. Since the
