@@ -12,6 +12,12 @@
 # tools/seed_sweep.sh restores its own snapshot).
 #
 # SEED LEDGER (append one line per fit that ships or teaches something; never delete):
+#   2026-10-30 (Jellyfin 0.1.0-beta.10, released from e5c38c1; fitted at the label commit 1659d7a,
+#     whose core tree is identical, CORE_VERSION jf-0.1.0-beta.10): SEED 42, clk_dec
+#     103.93 MHz at -40C and 102.12 MHz at 100C, clk_vid 94.88/92.64 MHz; both gates PASS; ALM
+#     40,969 (98 %), M10K 421, DSP 107, H264_jf-0.1.0-beta.10_20261031_0042.rbf (shipped). Same
+#     sweep: seeds 1/3/7/17 FAIL clk_dec (100.0, 98.45, 97.6, 99.77 MHz; seed 17 also clk_vid
+#     66.71 MHz), seed 29 timed out.
 #   2026-10-29 (Plex main e49c62f, the same RTL as Jellyfin main a2c862d apart from the version
 #     string): SEED 7 first roll closed clk_dec 103.1/104.09 MHz, clk_vid 89.03/88.35 MHz, so
 #     this netlist fits; the release build still re-rolls the seed.
