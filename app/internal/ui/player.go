@@ -67,6 +67,7 @@ type Session struct {
 	mu                                     sync.Mutex
 	cmd                                    *exec.Cmd
 	cmdDone                                chan struct{}
+	startedAt                              time.Time // when cmd started
 	lf                                     *os.File
 	state                                  jellyfin.PlayState
 	direct, fullTimeline, started, closing bool
@@ -94,8 +95,10 @@ type Session struct {
 	// direct-play probe last got a transcode answer ("" for none).
 	probedTranscode string
 	// smallTranscode caps every later transcode of this session at 854x480;
-	// set by the no-picture retry (noPictureFallbackLocked).
-	smallTranscode bool
+	// set by the no-picture retry (noPictureFallbackLocked). smallRetried
+	// records that the one re-open of a small transcode that did not open
+	// was used (smallOpenRetryLocked).
+	smallTranscode, smallRetried bool
 	// burned is the subtitle track the running stream has burned in, "-1"
 	// for none (burnedSubtitle).
 	burned string
@@ -542,6 +545,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 	}
 	launched = true
 	s.cmd = cmd
+	s.startedAt = time.Now()
 	done := make(chan struct{})
 	s.cmdDone = done
 	s.mu.Unlock()
@@ -555,7 +559,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		current, closing := s.cmd == cmd, s.closing
 		s.mu.Unlock()
 		if current && !closing {
-			if s.fallbackLocked(err) || s.noPictureFallbackLocked(err) {
+			if s.fallbackLocked(err) || s.noPictureFallbackLocked(err) || s.smallOpenRetryLocked(err) {
 				return
 			}
 			s.finishLocked(s.workerExitError(err))

@@ -157,8 +157,9 @@ func newFallbackServer(t *testing.T, direct string) *fallbackServer {
 func toString(v any) string { s, _ := v.(string); return s }
 
 // player whose workers write a playing status at position, then exit with
-// the next code from codes (0 once they run out). Its bitrate cap is 6 Mbit/s,
-// above eligibleDirect's 4.
+// the next code from codes (0 once they run out). A worker whose stream does
+// not open (exit 4) writes no status, as jfplay is still in its open then.
+// Its bitrate cap is 6 Mbit/s, above eligibleDirect's 4.
 func (f *fallbackServer) player(t *testing.T, codes []int, position string) *Player {
 	t.Helper()
 	dir := t.TempDir()
@@ -177,10 +178,65 @@ func (f *fallbackServer) player(t *testing.T, codes []int, position string) *Pla
 		if code == workerExitOpenTimeout {
 			state = "opening" // the stream never came: no picture was played
 		}
-		script := "printf 'state=" + state + "\\nposition=" + position + "\\nduration=300\\n' > '" + status + "'; sleep 0.4; exit " + strconv.Itoa(code)
+		script := "printf 'state=" + state + "\\nposition=" + position + "\\nduration=300\\n' > '" + status + "'; "
+		if code == workerExitOpenFailed {
+			script = ""
+		}
+		script += "sleep 0.4; exit " + strconv.Itoa(code)
 		return exec.Command("sh", "-c", script)
 	}
 	return p
+}
+
+// recordSleeps replaces noPictureSleep for the test with one that does not
+// wait and records each wait with the worker launch it came before.
+func (f *fallbackServer) recordSleeps(t *testing.T) func() []string {
+	t.Helper()
+	var mu sync.Mutex
+	var sleeps []string
+	noPictureSleep = func(d time.Duration) {
+		f.mu.Lock()
+		next := len(f.launches) + 1
+		f.mu.Unlock()
+		mu.Lock()
+		defer mu.Unlock()
+		sleeps = append(sleeps, d.String()+" before launch "+strconv.Itoa(next))
+	}
+	t.Cleanup(func() { noPictureSleep = time.Sleep })
+	return func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), sleeps...)
+	}
+}
+
+// transcodeBodies is every PlaybackInfo body that asked for a transcode, in
+// order.
+func (f *fallbackServer) transcodeBodies() []map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []map[string]any
+	for _, b := range f.bodies {
+		if b["EnableDirectPlay"] == false {
+			out = append(out, b)
+		}
+	}
+	return out
+}
+
+// profileHeight is the Height cap of a PlaybackInfo body's device profile.
+func profileHeight(b map[string]any) string {
+	raw, _ := json.Marshal(b["DeviceProfile"])
+	var p deviceProfile
+	if json.Unmarshal(raw, &p) != nil || len(p.CodecProfiles) == 0 {
+		return ""
+	}
+	for _, c := range p.CodecProfiles[0].Conditions {
+		if c.Property == "Height" {
+			return c.Value
+		}
+	}
+	return ""
 }
 
 const eligibleDirect = `{"Id":"source","Container":"mkv","SupportsDirectStream":true,"MediaStreams":[{"Type":"Video","Codec":"h264","Profile":"High","Level":40,"BitDepth":8,"Width":1280,"Height":720,"RealFrameRate":23.976,"BitRate":4000000}]}`
@@ -303,19 +359,23 @@ func TestDirectFallsBackToTranscodeOnce(t *testing.T) {
 // A stream the core decoded but never showed (exit 9) is played again at the
 // same position as a transcode of at most 854x480, once: the second exit 9
 // ends playback with the no-picture error, which carries the worker's exit.
-// After the direct fallback the small retry is still available.
+// After the direct fallback the small retry is still available. The server
+// is given noPictureRestartDelay before the small transcode, and the direct
+// fallback no wait.
 func TestNoPictureRetriesSmallTranscodeOnce(t *testing.T) {
 	for name, tc := range map[string]struct {
 		source  string
 		codes   []int
 		heights []string // each transcode PlaybackInfo's profile height
+		sleeps  []string
 	}{
-		"transcode": {ineligibleDirect, []int{workerExitNoPicture, workerExitNoPicture}, []string{"720", "480"}},
-		"direct":    {eligibleDirect, []int{workerExitNeedsTranscode, workerExitNoPicture, workerExitNoPicture}, []string{"720", "480"}},
+		"transcode": {ineligibleDirect, []int{workerExitNoPicture, workerExitNoPicture}, []string{"720", "480"}, []string{"1.5s before launch 2"}},
+		"direct":    {eligibleDirect, []int{workerExitNeedsTranscode, workerExitNoPicture, workerExitNoPicture}, []string{"720", "480"}, []string{"1.5s before launch 3"}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := newFallbackServer(t, tc.source)
 			p := f.player(t, tc.codes, "42")
+			sleeps := f.recordSleeps(t)
 			s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 10)
 			if err != nil {
 				t.Fatal(err)
@@ -329,23 +389,18 @@ func TestNoPictureRetriesSmallTranscodeOnce(t *testing.T) {
 				t.Fatalf("error %v does not carry the worker's exit", err)
 			}
 			f.mu.Lock()
-			defer f.mu.Unlock()
-			if l := f.launches; len(l) != len(tc.codes) || !containsArgPair(l[len(l)-1], "--base", "42") {
+			l := append([][]string(nil), f.launches...)
+			f.mu.Unlock()
+			if len(l) != len(tc.codes) || !containsArgPair(l[len(l)-1], "--base", "42") {
 				t.Fatalf("launches %v", l)
 			}
-			var transcodes []map[string]any
-			for _, b := range f.bodies {
-				if b["EnableDirectPlay"] == false {
-					transcodes = append(transcodes, b)
-				}
-			}
+			transcodes := f.transcodeBodies()
 			if len(transcodes) != len(tc.heights) {
 				t.Fatalf("transcode PlaybackInfo bodies %#v", transcodes)
 			}
 			for i, want := range tc.heights {
-				profile, _ := json.Marshal(transcodes[i]["DeviceProfile"])
-				if !strings.Contains(string(profile), `"Property":"Height","Value":"`+want+`"`) {
-					t.Errorf("transcode %d profile not capped at %s lines: %s", i, want, profile)
+				if got := profileHeight(transcodes[i]); got != want {
+					t.Errorf("transcode %d capped at %s lines, want %s", i, got, want)
 				}
 			}
 			last := transcodes[len(transcodes)-1]
@@ -356,7 +411,129 @@ func TestNoPictureRetriesSmallTranscodeOnce(t *testing.T) {
 			if !strings.Contains(string(log), "restarting at 42.000 s as a transcode of at most 854x480") || !strings.Contains(string(log), "small_transcode=true") {
 				t.Fatalf("log does not say so: %s", log)
 			}
+			if got := sleeps(); strings.Join(got, ",") != strings.Join(tc.sleeps, ",") {
+				t.Fatalf("waits %v, want %v", got, tc.sleeps)
+			}
 		})
+	}
+}
+
+// A small transcode whose stream the server closes unopened (exit 4) soon
+// after the no-picture restart is opened once more, after the same wait, at
+// the same position and still small; a second exit 4 ends playback with the
+// worker's exit. An ordinary transcode that does not open is not retried.
+func TestSmallTranscodeReopensOnce(t *testing.T) {
+	small := []string{"1.5s before launch 2", "1.5s before launch 3"}
+	for name, tc := range map[string]struct {
+		codes   []int
+		heights []string // each transcode PlaybackInfo's profile height
+		sleeps  []string
+		fails   bool
+	}{
+		"plays":    {[]int{workerExitNoPicture, workerExitOpenFailed, 0}, []string{"720", "480", "480"}, small, false},
+		"fails":    {[]int{workerExitNoPicture, workerExitOpenFailed, workerExitOpenFailed}, []string{"720", "480", "480"}, small, true},
+		"ordinary": {[]int{workerExitOpenFailed}, []string{"720"}, nil, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFallbackServer(t, ineligibleDirect)
+			p := f.player(t, tc.codes, "42")
+			sleeps := f.recordSleeps(t)
+			s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = waitDone(t, s)
+			if !tc.fails && err != nil {
+				t.Fatalf("playback ended with %v, want a clean end", err)
+			}
+			if tc.fails {
+				var ee *exec.ExitError
+				if !errors.As(err, &ee) || ee.ExitCode() != workerExitOpenFailed {
+					t.Fatalf("playback ended with %v, want the worker's open failure", err)
+				}
+			}
+			f.mu.Lock()
+			l := append([][]string(nil), f.launches...)
+			f.mu.Unlock()
+			if len(l) != len(tc.codes) {
+				t.Fatalf("launches %v, want %d", l, len(tc.codes))
+			}
+			for i := 1; i < len(l); i++ {
+				if !containsArgPair(l[i], "--base", "42") {
+					t.Fatalf("launch %d did not resume at the first worker's position: %v", i+1, l[i])
+				}
+			}
+			transcodes := f.transcodeBodies()
+			if len(transcodes) != len(tc.heights) {
+				t.Fatalf("transcode PlaybackInfo bodies %#v", transcodes)
+			}
+			for i, want := range tc.heights {
+				if got := profileHeight(transcodes[i]); got != want {
+					t.Errorf("transcode %d capped at %s lines, want %s", i, got, want)
+				}
+				if i > 0 && transcodes[i]["StartTimeTicks"] != float64(42*jellyfin.TicksPerSecond) {
+					t.Errorf("transcode %d at %v ticks, want 42 s", i, transcodes[i]["StartTimeTicks"])
+				}
+			}
+			if got := sleeps(); strings.Join(got, ",") != strings.Join(tc.sleeps, ",") {
+				t.Fatalf("waits %v, want %v", got, tc.sleeps)
+			}
+			log, _ := os.ReadFile(p.LogTo)
+			want := 0
+			if len(tc.codes) > 1 {
+				want = 1
+			}
+			if n := strings.Count(string(log), "small transcode did not open (jfplay exit 4)"); n != want || (want == 1 && !strings.Contains(string(log), "starting it once more at 42.000 s")) {
+				t.Fatalf("log has %d re-open lines, want %d: %s", n, want, log)
+			}
+		})
+	}
+}
+
+// A stop asked for while the app waits before the small transcode ends the
+// session there: no transcode is asked for and no worker started.
+func TestStopDuringNoPictureWaitStartsNothing(t *testing.T) {
+	f := newFallbackServer(t, ineligibleDirect)
+	p := f.player(t, []int{workerExitNoPicture}, "42")
+	var mu sync.Mutex
+	var s *Session
+	noPictureSleep = func(time.Duration) {
+		mu.Lock()
+		defer mu.Unlock()
+		s.mu.Lock()
+		s.stopRequested = true // what StopUI does before its Stop
+		s.mu.Unlock()
+	}
+	t.Cleanup(func() { noPictureSleep = time.Sleep })
+	mu.Lock()
+	started, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 10)
+	s = started
+	mu.Unlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		s.mu.Lock()
+		stopping := s.stopRequested
+		s.mu.Unlock()
+		if stopping || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	s.Stop()
+	if err := waitDone(t, s); err != nil {
+		t.Fatalf("playback ended with %v, want a clean end", err)
+	}
+	f.mu.Lock()
+	n := len(f.launches)
+	f.mu.Unlock()
+	if n != 1 {
+		t.Fatalf("launches %d, want only the first", n)
+	}
+	if d := f.transcodeBodies(); len(d) != 1 {
+		t.Fatalf("transcode PlaybackInfo bodies %+v, want only the first", d)
 	}
 }
 
