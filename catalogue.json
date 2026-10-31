@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.9",
-      "version": "0.1.0-beta.9",
+      "id": "beta-0.1.0-beta.10",
+      "version": "0.1.0-beta.10",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.9\n\n- Videos with a subtitle file beside them (an .srt next to the episode, for\n  example) played without sound when played as stored. Jellyfin numbers such\n  files before the video's own tracks, and the app handed that number to the\n  player as the track's position in the file, which pointed past the audio.\n  The app now asks for the right track, and the playback log notes the\n  mapping.\n- A resume, a seek or Skip intro that the server never answers now fails\n  after 20 seconds instead of a minute, and says what happened: the server\n  accepted the request but sent no video. The playback log carries the same\n  line for Send a report. Playing from the start is unaffected. (Seen with a\n  Plex server whose hardware-accelerated conversion stalls on a seek into\n  10-bit HEVC; the same guard applies here.)\n\nUses the same qualified FPGA core as beta 8, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-beta-0.1.0-beta.9.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.10\n\n- Video crop set to Fill applies when playback starts again. Since the\n  decoder-core release it only took effect after changing Crop under More\n  during playback; a saved Video geometry calibration hid the fault.\n- Theme music fades out over its last seconds instead of stopping dead.\n  The clips servers hold are mostly 30 s long and cut hard at the end,\n  which sounded like the app cutting the music off.\n- Direct Video works again through HDMI-to-VGA adapters, such as a DAC\n  feeding a 15 kHz CRT. Since the decoder-core release the core clocked the\n  HDMI transmitter at 81 MHz on Direct Video and put a broadcast-style\n  composite sync with equalizing pulses on the sync line; adapters dropped\n  lock and the screen stayed black. The transmitter now runs at 27 MHz there\n  and sends the plain composite sync the other cores use. Confirmed on the\n  reporter's adapter with a Plex Core test build of the same core.\n- Composite and S-Video colour (MiSTer.ini vga_mode=svideo or cvbs) is now\n  pinned: the installer and the app add this core's lines to the SD card's\n  yc.txt, as the other cores have, so it applies from the first start. This\n  fixes the occasional wrong colours after an OSD Reset or a new start, and\n  the dot crawl that came with them.\n- The 4:3 filter now ignores season 0 specials when judging a show, and\n  re-checks the TV libraries once a day while the menus sit dimmed.\n\nShips a new qualified FPGA core (the Direct Video fix is in the core) with an\nupdated playback worker. Settings and saved supporter access are preserved.\nUpdate through **Options > Updates**, or use the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.10/MisterZine-Jellyfin-beta-0.1.0-beta.10.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14286251,
-      "sha256": "1dfb2cdf9bb971842365cc9805a0a519fa6ee0c6b647c14cd144bf4c0d1072f0",
+      "size": 14303292,
+      "sha256": "8317db21a5b024d1f6b75cfe74822545bda940f315ba6311efb7a7dd46532bbf",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip",
-        "size": 139069742,
-        "sha256": "d24ec373cde723cddde4975ac8ccd00a4e777202f38207e1590be1e4110c42de",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.10.zip",
+        "size": 139079870,
+        "sha256": "eca811271a2ab321e9a1ce43ad63626d215abf31f79f2fd0dc80f80dd809ccec",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.10/MisterZine-Jellyfin-Source-beta-0.1.0-beta.10.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.9",
-      "version": "0.1.0-beta.9",
+      "id": "beta-0.1.0-beta.10",
+      "version": "0.1.0-beta.10",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.9\n\n- Videos with a subtitle file beside them (an .srt next to the episode, for\n  example) played without sound when played as stored. Jellyfin numbers such\n  files before the video's own tracks, and the app handed that number to the\n  player as the track's position in the file, which pointed past the audio.\n  The app now asks for the right track, and the playback log notes the\n  mapping.\n- A resume, a seek or Skip intro that the server never answers now fails\n  after 20 seconds instead of a minute, and says what happened: the server\n  accepted the request but sent no video. The playback log carries the same\n  line for Send a report. Playing from the start is unaffected. (Seen with a\n  Plex server whose hardware-accelerated conversion stalls on a seek into\n  10-bit HEVC; the same guard applies here.)\n\nUses the same qualified FPGA core as beta 8, with an updated playback worker. Settings and\nsaved supporter access are preserved. Update through **Options > Updates**, or\nuse the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-beta-0.1.0-beta.9.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.10\n\n- Video crop set to Fill applies when playback starts again. Since the\n  decoder-core release it only took effect after changing Crop under More\n  during playback; a saved Video geometry calibration hid the fault.\n- Theme music fades out over its last seconds instead of stopping dead.\n  The clips servers hold are mostly 30 s long and cut hard at the end,\n  which sounded like the app cutting the music off.\n- Direct Video works again through HDMI-to-VGA adapters, such as a DAC\n  feeding a 15 kHz CRT. Since the decoder-core release the core clocked the\n  HDMI transmitter at 81 MHz on Direct Video and put a broadcast-style\n  composite sync with equalizing pulses on the sync line; adapters dropped\n  lock and the screen stayed black. The transmitter now runs at 27 MHz there\n  and sends the plain composite sync the other cores use. Confirmed on the\n  reporter's adapter with a Plex Core test build of the same core.\n- Composite and S-Video colour (MiSTer.ini vga_mode=svideo or cvbs) is now\n  pinned: the installer and the app add this core's lines to the SD card's\n  yc.txt, as the other cores have, so it applies from the first start. This\n  fixes the occasional wrong colours after an OSD Reset or a new start, and\n  the dot crawl that came with them.\n- The 4:3 filter now ignores season 0 specials when judging a show, and\n  re-checks the TV libraries once a day while the menus sit dimmed.\n\nShips a new qualified FPGA core (the Direct Video fix is in the core) with an\nupdated playback worker. Settings and saved supporter access are preserved.\nUpdate through **Options > Updates**, or use the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.10/MisterZine-Jellyfin-beta-0.1.0-beta.10.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14286251,
-      "sha256": "1dfb2cdf9bb971842365cc9805a0a519fa6ee0c6b647c14cd144bf4c0d1072f0",
+      "size": 14303292,
+      "sha256": "8317db21a5b024d1f6b75cfe74822545bda940f315ba6311efb7a7dd46532bbf",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip",
-        "size": 139069742,
-        "sha256": "d24ec373cde723cddde4975ac8ccd00a4e777202f38207e1590be1e4110c42de",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.9/MisterZine-Jellyfin-Source-beta-0.1.0-beta.9.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.10.zip",
+        "size": 139079870,
+        "sha256": "eca811271a2ab321e9a1ce43ad63626d215abf31f79f2fd0dc80f80dd809ccec",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.10/MisterZine-Jellyfin-Source-beta-0.1.0-beta.10.zip"
       }
     }
   }
