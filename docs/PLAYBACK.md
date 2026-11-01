@@ -42,19 +42,23 @@ Jellyfin cannot report every property the core depends on (CABAC versus
 CAVLC entropy coding, MBAFF versus field-coded interlace). MBAFF is refused and
 field-coded interlace is accepted, but Jellyfin's own `IsInterlaced` flag cannot
 tell the two apart, so the app only logs it and does not decide on it. `jfplay` checks
-a direct stream's parameter sets before the first picture is shown. If the
-check fails, the core refuses the stream, or the core keeps falling behind for
-several seconds, the app restarts the item once as a transcode at the current
-position. The switch is recorded in the playback log and is not shown as an
-error; the direct play session is reported stopped and the transcode is
-reported as a new session. The playback position is carried over to the
-transcode.
+a direct stream's parameter sets before the first picture is shown, against the
+size and rate bounds the running core reports. If the check fails, the core
+refuses the stream, the core drops its pictures as too large, or the core
+keeps falling behind for several seconds, the app restarts the item once as a
+transcode at the current position. The switch is recorded in the playback log
+and is not shown as an error; the direct play session is reported stopped and
+the transcode is reported as a new session. The playback position is carried
+over to the transcode.
 
-When the core decodes a stream but shows no picture, the app likewise
-restarts the item once at the current position, as a transcode of at most
-854x480 (at the same bitrate) for the rest of the playback, after giving the
-server 1.5 s to end its previous transcode, and opens it once more if the
-server closes that first connection without sending anything.
+When the core decodes a stream but shows no picture, or drops a transcode's
+pictures as too large (the core counts such pictures without refusing the
+stream, and `jfplay` stops within about half a second of the count rising),
+the app likewise restarts the item once at the current position, as a
+transcode of at most 854x480 (at the same bitrate) for the rest of the
+playback, after giving the server 1.5 s to end its previous transcode, and
+opens it once more if the server closes that first connection without sending
+anything.
 
 It uses the first media source returned:
 
