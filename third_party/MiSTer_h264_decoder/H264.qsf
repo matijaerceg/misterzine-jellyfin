@@ -12,6 +12,13 @@
 # tools/seed_sweep.sh restores its own snapshot).
 #
 # SEED LEDGER (append one line per fit that ships or teaches something; never delete):
+#   2026-11-01 (Jellyfin 0.1.0-beta.11, fitted at the release commit b9186db: pictures up to
+#     4,096 macroblocks for Quick Sync's 1280x736, CORE_VERSION jf-0.1.0-beta.11): SEED 5,
+#     clk_dec 105.16/105.6 MHz, clk_vid 90.79/92.57 MHz; both gates PASS; ALM 40,920 (98 %),
+#     M10K 421, DSP 107, H264_jf-0.1.0-beta.11_20261101_2228.rbf (shipped). Same netlist: seed 29
+#     PASS (clk_dec 103.92/103.46, clk_vid 90.29/87.73 MHz); FAIL: the QSF's seed 13 clk_dec
+#     96.97/99.33, seed 1 clk_dec 102.65/101.11, seed 7 clk_dec 90.27/94.91, seed 42 clk_dec
+#     99.99/101.6 and clk_vid 87.98/83.42 MHz.
 #   2026-10-30 (Jellyfin 0.1.0-beta.10, released from e5c38c1; fitted at the label commit 1659d7a,
 #     whose core tree is identical, CORE_VERSION jf-0.1.0-beta.10): SEED 42, clk_dec
 #     103.93 MHz at -40C and 102.12 MHz at 100C, clk_vid 94.88/92.64 MHz; both gates PASS; ALM
