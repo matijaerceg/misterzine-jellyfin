@@ -39,7 +39,7 @@ type Player struct {
 	// the track into a transcode.
 	DrawsSubtitle func(itemID string, s jellyfin.Stream) bool
 	// Capture is where jfplay saves the video of a playback that showed no
-	// picture; "" saves nothing.
+	// picture; "" saves nothing, and the app leaves it so (a test build sets it).
 	Capture    string
 	Hide       func()
 	exec       func(string, ...string) *exec.Cmd

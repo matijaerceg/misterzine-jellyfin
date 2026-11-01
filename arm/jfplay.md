@@ -87,8 +87,8 @@ credentials. The URL is never logged unless `JFPLAY_LOG_URLS=1` is set.
 
 `JFPLAY_NOPIC_CAPTURE`, when it names a path, is where a worker that exits 9
 (the core decoded pictures but showed none) first saves the first 6 MiB of the
-video it sent, as raw Annex-B, for replay on the bench. The app sets it to
-`nopic-capture.h264` beside its settings file.
+video it sent, as raw Annex-B, for replay on the bench. The app leaves it
+unset; a test build can set it.
 
 `--audio INDEX` selects an absolute libavformat stream index.  Without it,
 FFmpeg's best audio stream is used, falling back to the first audio stream with
