@@ -3,6 +3,7 @@
 - Send a report now includes the board’s network setup and private IPv4 addresses,
   plus subnet and ARP-cache clues from failed connection attempts. Server addresses,
   hostnames, MAC addresses and public addresses are omitted from these new diagnostics.
+- Send a report now includes the composite and S-Video setup: `vga_mode`, `ntsc_mode` and the picture controls from the MiSTer INI, and whether MiSTer main will use the app's colour subcarrier lines in `yc.txt`.
 
 # MisterZine Jellyfin 0.1.0-beta.11
 
