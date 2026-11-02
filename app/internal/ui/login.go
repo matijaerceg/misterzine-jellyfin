@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"plexcrt/internal/gfx"
 	"plexcrt/internal/input"
 	"plexcrt/internal/jellyfin"
+	"plexcrt/internal/netdiag"
 )
 
 // Login is the sign-in: a server found on the local network, or the
@@ -241,10 +243,11 @@ func (l *Login) connect(hosts []string) {
 			info        *jellyfin.PublicInfo
 			ferr        error
 		)
-		for _, h := range hosts {
+		for candidate, h := range hosts {
 			c := jellyfin.New(h, "", l.app.Cfg.ClientID, nil)
 			c.AllowLocalHTTP(true) // public, credential-free probe; dial still enforces local addresses
-			i, err := c.PublicInfo(bg())
+			ctx, diagnostic := netdiag.Observe(bg(), h)
+			i, err := c.PublicInfo(ctx)
 			if err == nil && expectedID != "" && i.ID != expectedID {
 				err = jellyfin.ErrServerIdentity
 			}
@@ -253,7 +256,8 @@ func (l *Login) connect(hosts []string) {
 				host, client, info = h, c, i
 				break
 			}
-			l.app.Log.Printf("sign-in: %s: %v", h, err)
+			diagnostic.Log(l.app.Log.Printf)
+			l.app.Log.Printf("sign-in: candidate %d failed: %s", candidate+1, probeLogFailure(err))
 			if ferr == nil || errors.Is(err, jellyfin.ErrPlainHTTP) || errors.Is(err, jellyfin.ErrServerIdentity) {
 				first, ferr = h, err
 			}
@@ -287,6 +291,28 @@ func (l *Login) connect(hosts []string) {
 			}
 		})
 	}()
+}
+
+// Probe errors can embed an unsaved server's hostname/address. Log only
+// allowlisted reasons: the report cannot redact a server it has never saved.
+func probeLogFailure(err error) string {
+	var status *jellyfin.HTTPError
+	var dns *net.DNSError
+	var timeout net.Error
+	switch {
+	case errors.Is(err, jellyfin.ErrServerIdentity):
+		return "server identity mismatch"
+	case errors.Is(err, jellyfin.ErrPlainHTTP):
+		return "plain HTTP blocked"
+	case errors.As(err, &status):
+		return fmt.Sprintf("HTTP %d", status.Status)
+	case errors.As(err, &dns):
+		return "DNS lookup failed"
+	case errors.As(err, &timeout) && timeout.Timeout():
+		return "connection timed out"
+	default:
+		return "connection or server response failed"
+	}
 }
 
 // probeFailure is the line for an address that gave no Jellyfin answer.

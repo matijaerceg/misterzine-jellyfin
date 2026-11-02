@@ -483,6 +483,13 @@ days. A copy stays at `/media/fat/misterzine-jellyfin/report.txt`, and if it
 cannot be sent the screen names that file instead, which you can attach to a
 problem report. **MisterZine-Jellyfin-Diagnostics** writes the same report.
 
+Network diagnostics include interfaces, private board IPv4 addresses/prefixes, link state,
+default gateways and whether they are on-link, nameservers (public addresses redacted),
+and static IPv4 settings detected in the board's network configuration. Failed probes
+log destination subnet relationships and ARP-cache status without destination addresses.
+A cached ARP entry is not proof of a fresh reply; missing entries are inconclusive.
+Unreadable facts are marked unknown. These diagnostics omit hostnames and MAC addresses.
+
 Player startup logs distinguish opening the stream, reading its track information,
 and seeking within a directly played file, with elapsed times for each stage.
 The last 64 KiB of the most recent failed playback log is kept separately until

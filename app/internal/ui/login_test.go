@@ -1,10 +1,12 @@
 package ui
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -663,5 +665,30 @@ func TestKeyPadTypes(t *testing.T) {
 	}
 	if k.Keyboard(input.Event{Keyboard: true, ScanCode: 0x66}); k.text != "bBj" {
 		t.Fatal("Backspace did not delete")
+	}
+}
+
+func TestFailedUnsavedServerLogsNetworkFactsWithoutAddress(t *testing.T) {
+	a := signInApp(t)
+	var output bytes.Buffer
+	a.Log = log.New(&output, "", 0)
+	l := openLogin(a)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := "http://" + listener.Addr().String()
+	listener.Close()
+	l.connect([]string{host})
+	pump(t, a, "failed unsaved server", func() bool { return !l.busy })
+	got := output.String()
+	if !strings.Contains(got, "probe network: destination 1 IPv4 same_subnet=yes") || !strings.Contains(got, "candidate 1 failed") {
+		t.Fatal(got)
+	}
+	if strings.Contains(got, "127.0.0.1") || strings.Contains(got, host) {
+		t.Fatal("unsaved server leaked into log")
+	}
+	if a.Cfg.ServerURL != "" {
+		t.Fatal("failed server saved")
 	}
 }
