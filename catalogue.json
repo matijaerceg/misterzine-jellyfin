@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.11",
-      "version": "0.1.0-beta.11",
+      "id": "beta-0.1.0-beta.12",
+      "version": "0.1.0-beta.12",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.11\n\n- Composite and S-Video colour: the core now reports its video clock count\n  over a whole frame to MiSTer main (words 19/20 of the current framework),\n  so main computes the subcarrier exactly on every start instead of from a\n  one-line measurement that landed on 80.99 or 81.01 MHz. The yc.txt lines\n  added in beta.10 stay as a fallback for MiSTer releases before August 2026.\n  The core also picks up the framework's Y/C chroma and NTSC timing fixes,\n  registered analog audio pins and a scaler state reset at VSync.\n- 720p transcodes from Jellyfin servers that use Intel Quick Sync hardware encoding now show a picture; before, the screen stayed black while the sound played. Intel's encoder codes 720p as 1280x736 with a note to show only 720 lines, and the core silently refused anything larger than 1280x720. It now accepts pictures up to 4,096 blocks of 16x16 pixels, which its frame memory always had room for, so hardware encoding can stay on.\n- If the core still decodes a stream but shows none of it, or drops its pictures as too large, the app now notices (within a second for pictures that are too large, a few seconds otherwise) and restarts the item once at the same point as a transcode of at most 854x480, instead of leaving the spinner up over the sound. A file played as stored falls back to an ordinary transcode first.\n- Files coded at 1280x736 and similar sizes just over 720 lines can now play as stored, at up to 29.6 frames per second.\n\nShips a new qualified FPGA core. Settings and saved supporter access are\npreserved. Update through **Options > Updates**, or use the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.11/MisterZine-Jellyfin-beta-0.1.0-beta.11.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.12\n\n- Optional supporter chapter navigation: enable **Options > Chapters** to browse a six-thumbnail grid from the playback controls or the movie/episode page. Thumbnails appear when the server provides them. Chapters starts Off, and existing supporter codes cover it.\n- Chapter browsing pauses the picture and only moves the selection. **OK** confirms the jump; **Back** cancels. Only one confirmed jump can load at a time, and Back during loading stops playback and returns to the details page.\n- Video geometry calibration now gives clearer edge-by-edge instructions and keeps the square, circle and measuring guidance together on the shape step.\n- Stopping or switching cores while video is paused now exits the playback worker promptly.\n- Episodes now finish when audio continues past the last picture. The playback log also records the end-of-stream stages to help diagnose stuck endings.\n- Send a report includes private network/subnet clues and the composite/S-Video setup, while omitting server names, MAC addresses and public addresses from the new network diagnostics.\n\nReuses the previous release\u2019s qualified FPGA core with updated app and playback worker. Settings, calibration and saved access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on MiSTer Pi with rapid chapter browsing, confirmed jumps and cancellation.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-beta-0.1.0-beta.12.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14299858,
-      "sha256": "4b380c225ff0404c9c281e4de4b4d1640f35c7e9ed380671a115e198817d42fa",
+      "size": 14327214,
+      "sha256": "3967ec71b91165ff3e6cc286fba5831e08d3a475fc39bca31c5004186121514a",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.11.zip",
-        "size": 139092728,
-        "sha256": "cf63bf43ad2358fcfc835509e527948b36f17cb01b8e9f6fddd9865c4f7ed3d9",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.11/MisterZine-Jellyfin-Source-beta-0.1.0-beta.11.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip",
+        "size": 139106473,
+        "sha256": "2ffd50908f84816da66b133f81a11f656cf66091393b625d349c13a5fa6fecca",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.11",
-      "version": "0.1.0-beta.11",
+      "id": "beta-0.1.0-beta.12",
+      "version": "0.1.0-beta.12",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.11\n\n- Composite and S-Video colour: the core now reports its video clock count\n  over a whole frame to MiSTer main (words 19/20 of the current framework),\n  so main computes the subcarrier exactly on every start instead of from a\n  one-line measurement that landed on 80.99 or 81.01 MHz. The yc.txt lines\n  added in beta.10 stay as a fallback for MiSTer releases before August 2026.\n  The core also picks up the framework's Y/C chroma and NTSC timing fixes,\n  registered analog audio pins and a scaler state reset at VSync.\n- 720p transcodes from Jellyfin servers that use Intel Quick Sync hardware encoding now show a picture; before, the screen stayed black while the sound played. Intel's encoder codes 720p as 1280x736 with a note to show only 720 lines, and the core silently refused anything larger than 1280x720. It now accepts pictures up to 4,096 blocks of 16x16 pixels, which its frame memory always had room for, so hardware encoding can stay on.\n- If the core still decodes a stream but shows none of it, or drops its pictures as too large, the app now notices (within a second for pictures that are too large, a few seconds otherwise) and restarts the item once at the same point as a transcode of at most 854x480, instead of leaving the spinner up over the sound. A file played as stored falls back to an ordinary transcode first.\n- Files coded at 1280x736 and similar sizes just over 720 lines can now play as stored, at up to 29.6 frames per second.\n\nShips a new qualified FPGA core. Settings and saved supporter access are\npreserved. Update through **Options > Updates**, or use the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.11/MisterZine-Jellyfin-beta-0.1.0-beta.11.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.12\n\n- Optional supporter chapter navigation: enable **Options > Chapters** to browse a six-thumbnail grid from the playback controls or the movie/episode page. Thumbnails appear when the server provides them. Chapters starts Off, and existing supporter codes cover it.\n- Chapter browsing pauses the picture and only moves the selection. **OK** confirms the jump; **Back** cancels. Only one confirmed jump can load at a time, and Back during loading stops playback and returns to the details page.\n- Video geometry calibration now gives clearer edge-by-edge instructions and keeps the square, circle and measuring guidance together on the shape step.\n- Stopping or switching cores while video is paused now exits the playback worker promptly.\n- Episodes now finish when audio continues past the last picture. The playback log also records the end-of-stream stages to help diagnose stuck endings.\n- Send a report includes private network/subnet clues and the composite/S-Video setup, while omitting server names, MAC addresses and public addresses from the new network diagnostics.\n\nReuses the previous release\u2019s qualified FPGA core with updated app and playback worker. Settings, calibration and saved access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on MiSTer Pi with rapid chapter browsing, confirmed jumps and cancellation.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-beta-0.1.0-beta.12.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14299858,
-      "sha256": "4b380c225ff0404c9c281e4de4b4d1640f35c7e9ed380671a115e198817d42fa",
+      "size": 14327214,
+      "sha256": "3967ec71b91165ff3e6cc286fba5831e08d3a475fc39bca31c5004186121514a",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.11.zip",
-        "size": 139092728,
-        "sha256": "cf63bf43ad2358fcfc835509e527948b36f17cb01b8e9f6fddd9865c4f7ed3d9",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.11/MisterZine-Jellyfin-Source-beta-0.1.0-beta.11.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip",
+        "size": 139106473,
+        "sha256": "2ffd50908f84816da66b133f81a11f656cf66091393b625d349c13a5fa6fecca",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip"
       }
     }
   }
