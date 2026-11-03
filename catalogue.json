@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.12",
-      "version": "0.1.0-beta.12",
+      "id": "beta-0.1.0-beta.13",
+      "version": "0.1.0-beta.13",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.12\n\n- Optional supporter chapter navigation: enable **Options > Chapters** to browse a six-thumbnail grid from the playback controls or the movie/episode page. Thumbnails appear when the server provides them. Chapters starts Off, and existing supporter codes cover it.\n- Chapter browsing pauses the picture and only moves the selection. **OK** confirms the jump; **Back** cancels. Only one confirmed jump can load at a time, and Back during loading stops playback and returns to the details page.\n- Video geometry calibration now gives clearer edge-by-edge instructions and keeps the square, circle and measuring guidance together on the shape step.\n- Stopping or switching cores while video is paused now exits the playback worker promptly.\n- Episodes now finish when audio continues past the last picture. The playback log also records the end-of-stream stages to help diagnose stuck endings.\n- Send a report includes private network/subnet clues and the composite/S-Video setup, while omitting server names, MAC addresses and public addresses from the new network diagnostics.\n\nReuses the previous release\u2019s qualified FPGA core with updated app and playback worker. Settings, calibration and saved access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on MiSTer Pi with rapid chapter browsing, confirmed jumps and cancellation.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-beta-0.1.0-beta.12.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.13\n\n- Playback now checks picture timestamps before and during direct play. Files whose timing does not match the decoder switch once to a video transcode at the current position; ordinary compatible files keep direct play.\n- Jellyfin video transcodes now explicitly encode video at a constant frame rate, preventing a fallback that copies the same incompatible timing or reports a misleading frame rate.\n\nReuses the previous release\u2019s qualified FPGA core. Settings, calibration and saved supporter access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on DE10-Nano with direct play, timing-triggered transcoding, pause/resume and repeated seeks.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.13/MisterZine-Jellyfin-beta-0.1.0-beta.13.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14327214,
-      "sha256": "3967ec71b91165ff3e6cc286fba5831e08d3a475fc39bca31c5004186121514a",
+      "size": 14330207,
+      "sha256": "516157be485b3c2df34dd04a6f36d0545e73494ec54d2ca1cbaa8bf2eddc71c7",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip",
-        "size": 139106473,
-        "sha256": "2ffd50908f84816da66b133f81a11f656cf66091393b625d349c13a5fa6fecca",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.13.zip",
+        "size": 139111640,
+        "sha256": "2e13fe5f385b27aec92325e10c1714b6eada1db0e549d19915b2a0f7594a4234",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.13/MisterZine-Jellyfin-Source-beta-0.1.0-beta.13.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.12",
-      "version": "0.1.0-beta.12",
+      "id": "beta-0.1.0-beta.13",
+      "version": "0.1.0-beta.13",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.12\n\n- Optional supporter chapter navigation: enable **Options > Chapters** to browse a six-thumbnail grid from the playback controls or the movie/episode page. Thumbnails appear when the server provides them. Chapters starts Off, and existing supporter codes cover it.\n- Chapter browsing pauses the picture and only moves the selection. **OK** confirms the jump; **Back** cancels. Only one confirmed jump can load at a time, and Back during loading stops playback and returns to the details page.\n- Video geometry calibration now gives clearer edge-by-edge instructions and keeps the square, circle and measuring guidance together on the shape step.\n- Stopping or switching cores while video is paused now exits the playback worker promptly.\n- Episodes now finish when audio continues past the last picture. The playback log also records the end-of-stream stages to help diagnose stuck endings.\n- Send a report includes private network/subnet clues and the composite/S-Video setup, while omitting server names, MAC addresses and public addresses from the new network diagnostics.\n\nReuses the previous release\u2019s qualified FPGA core with updated app and playback worker. Settings, calibration and saved access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on MiSTer Pi with rapid chapter browsing, confirmed jumps and cancellation.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-beta-0.1.0-beta.12.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.13\n\n- Playback now checks picture timestamps before and during direct play. Files whose timing does not match the decoder switch once to a video transcode at the current position; ordinary compatible files keep direct play.\n- Jellyfin video transcodes now explicitly encode video at a constant frame rate, preventing a fallback that copies the same incompatible timing or reports a misleading frame rate.\n\nReuses the previous release\u2019s qualified FPGA core. Settings, calibration and saved supporter access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on DE10-Nano with direct play, timing-triggered transcoding, pause/resume and repeated seeks.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.13/MisterZine-Jellyfin-beta-0.1.0-beta.13.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14327214,
-      "sha256": "3967ec71b91165ff3e6cc286fba5831e08d3a475fc39bca31c5004186121514a",
+      "size": 14330207,
+      "sha256": "516157be485b3c2df34dd04a6f36d0545e73494ec54d2ca1cbaa8bf2eddc71c7",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip",
-        "size": 139106473,
-        "sha256": "2ffd50908f84816da66b133f81a11f656cf66091393b625d349c13a5fa6fecca",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.12/MisterZine-Jellyfin-Source-beta-0.1.0-beta.12.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.13.zip",
+        "size": 139111640,
+        "sha256": "2e13fe5f385b27aec92325e10c1714b6eada1db0e549d19915b2a0f7594a4234",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.13/MisterZine-Jellyfin-Source-beta-0.1.0-beta.13.zip"
       }
     }
   }
