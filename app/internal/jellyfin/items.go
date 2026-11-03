@@ -366,7 +366,7 @@ func (x *dto) item() *Item {
 	}
 	if it.Playable() {
 		it.Versions = x.versions()
-		it.Chapters = x.chapters()
+		it.Chapters = x.chaptersFor(0)
 	}
 	return it
 }

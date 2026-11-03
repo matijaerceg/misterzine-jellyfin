@@ -63,9 +63,7 @@ func (x *dto) versions() []Version {
 		if _, own := x.Trickplay[ms.ID]; own || i == 0 && len(x.Trickplay) > 0 {
 			v.Trickplay = trickplay(x.Trickplay, ms.ID)
 		}
-		if i == 0 {
-			v.Chapters = x.chapters()
-		}
+		v.Chapters = x.chaptersFor(i)
 		out = append(out, v)
 	}
 	return out
