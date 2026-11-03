@@ -44,6 +44,9 @@ type ImageQuery struct {
 // picture does, so a cached copy never goes stale. No token: images are
 // served to anyone who knows the id.
 func ImagePath(ref string, q ImageQuery) (string, url.Values, error) {
+	if path, values, err, ok := chapterImagePath(ref, q); ok {
+		return path, values, err
+	}
 	id, kind, tag, ok := ParseImageRef(ref)
 	if !ok {
 		return "", nil, errors.New("no art")

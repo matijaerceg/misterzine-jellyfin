@@ -38,3 +38,5 @@ rejects private registries and premium implementation files.
 
 Moving a file out of the current source tree does not remove older public
 commits or revoke any rights already granted under its existing license.
+
+Chapters is supplied by the private overlay and controlled by **Options > Chapters** (Off by default). Existing Jellyfin codes cover it. Public source contains metadata contracts and no-op hooks; chapter parsing, thumbnail routing, navigation, the grid and its toggle are private additions.

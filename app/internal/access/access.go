@@ -75,6 +75,7 @@ var (
 	// in place of the wordmark, or no logo (Options > Home logo).
 	NoHomeLogo       = Feature{Premium: true, Since: 202610}
 	NavigationMelody = Feature{Premium: true, Since: 202610}
+	Chapters         = Feature{Premium: true, Since: 202610}
 )
 
 // Entry names a feature for the access overview and the coverage register.
@@ -91,6 +92,7 @@ func Catalog() []Entry {
 		{"playback-theme", "Playback UI theme", PlaybackTheme},
 		{"no-home-logo", "Home logo: MisterKun or none", NoHomeLogo},
 		{"navigation-melody", "Navigation melody", NavigationMelody},
+		{"chapters", "Chapters", Chapters},
 	}
 }
 

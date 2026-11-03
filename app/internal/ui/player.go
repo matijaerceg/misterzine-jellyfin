@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -88,6 +89,7 @@ type Session struct {
 	stopRequested                          bool
 	seekID                                 uint64 // opMu owns the in-process seek sequence
 	surroundSource                         bool
+	completedSeeks                         atomic.Uint64
 	// forceTranscode makes every later PlaybackInfo of this session ask for a
 	// transcode; fellBack records that the one automatic fallback was used.
 	forceTranscode, fellBack bool
@@ -823,6 +825,7 @@ func (s *Session) Send(line string) {
 		s.mu.Unlock()
 		s.reportProgress(ps)
 		if s.tryWorkerSeek(target) {
+			s.completedSeeks.Add(1)
 			return
 		}
 		if s.sessionContext().Err() != nil {
@@ -837,6 +840,8 @@ func (s *Session) Send(line string) {
 		err = s.startContext(int(target), reuse, s.sessionContext())
 		if err != nil {
 			s.finishLocked(s.suppressStopCancellation(err))
+		} else {
+			s.completedSeeks.Add(1)
 		}
 		return
 	}
@@ -1058,6 +1063,9 @@ func (s *Session) redecideLocked(target float64) {
 		s.finishLocked(s.suppressStopCancellation(err))
 	}
 }
+
+// CompletedSeeks changes only after the new seek is acknowledged or its replacement worker starts.
+func (s *Session) CompletedSeeks() uint64 { return s.completedSeeks.Load() }
 
 // Direct reports whether the running stream is the stored file, untranscoded:
 // then the player's duration is exact. It changes on a fallback to a transcode.

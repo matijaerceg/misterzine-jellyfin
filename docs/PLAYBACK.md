@@ -204,3 +204,9 @@ later. Its full command line and status/control contract are
 documented in [`arm/jfplay.md`](../arm/jfplay.md). Seeks go to the running
 worker as `seek` commands; when it cannot seek in place, the app restarts it
 with an in-file seek for direct streams and full-timeline HLS playlists.
+
+## Chapters
+
+**Options > Chapters** enables the supporter chapter grid and starts Off. The playback Chapters button and short shoulder taps open a translucent six-scene grid over the paused picture. Browsing does not seek: OK confirms, Back cancels, and Back while a confirmed jump loads stops playback. Only one confirmed jump loads at a time. A choice made while already paused waits for Resume. Missing pictures show a placeholder; missing chapter data leaves ordinary seeking available. Chapter seeks share the normal keyframe limitations.
+
+The private overlay reads Jellyfin’s chapter ticks, names and image tags, and requests each image by its original chapter index. Alternate versions use their own chapter records when available; chapters from one edition are never reused for another.

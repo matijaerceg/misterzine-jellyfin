@@ -10,7 +10,7 @@ import (
 func (a *App) openItem(original *jellyfin.Item, at string) {
 	item := *original
 	client := a.Client
-	if item.Type == "movie" && item.Summary != "" && item.SourceID != "" {
+	if item.Type == "movie" && item.Summary != "" && item.SourceID != "" && item.ChaptersLoaded {
 		a.Push(NewPreplay(a, original))
 		return
 	}

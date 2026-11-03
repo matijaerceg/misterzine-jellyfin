@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"plexcrt/internal/chapters"
 	"strconv"
 	"strings"
 )
@@ -13,6 +14,7 @@ import (
 // version's own item, whose id is the source's, and list the last one
 // played first while it has a point.
 type Version struct {
+	Chapters  []chapters.Chapter
 	ID        string      // the source's id: the version the app records, "" in a listing's record
 	Label     string      // the server's name for it (the folder's, or the file name's own part)
 	Source    MediaSource // its streams and bitrate, as the direct-play check judges a source
@@ -61,6 +63,9 @@ func (x *dto) versions() []Version {
 		if _, own := x.Trickplay[ms.ID]; own || i == 0 && len(x.Trickplay) > 0 {
 			v.Trickplay = trickplay(x.Trickplay, ms.ID)
 		}
+		if i == 0 {
+			v.Chapters = x.chapters()
+		}
 		out = append(out, v)
 	}
 	return out
@@ -106,6 +111,7 @@ func (it *Item) UseVersion(id string) bool {
 		}
 		it.VersionID, it.SourceID, it.Trickplay = id, v.ID, v.Trickplay
 		it.SourceStreams = append([]MediaStream(nil), v.Source.MediaStreams...)
+		it.Chapters = append([]chapters.Chapter(nil), v.Chapters...)
 		if v.Aspect != 0 {
 			it.Aspect = v.Aspect
 		}

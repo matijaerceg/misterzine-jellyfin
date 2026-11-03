@@ -499,6 +499,7 @@ func (a *App) playSettled(it *jellyfin.Item, offset int, queue []*jellyfin.Item,
 		}
 		ctl := NewPlaying(a, it, queue, idx, sess.SendUI)
 		ctl.direct = sess.Direct
+		ctl.completedSeeks = sess.CompletedSeeks
 		ctl.streamModes = sess.StreamModes
 		ctl.conversionReason = sess.ConversionReason
 		ctl.sourceInfo = sess.PlaybackSource

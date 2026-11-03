@@ -540,9 +540,15 @@ In short:
 Restart playback after changing a setting that affects playback speed. There is
 no 48 Hz mode.
 
-**Options > Video calibration** shows adjustable screen edges and a square
-with a circle in it. OK selects the next edge or the square's corner, the
-D-pad moves it, and Back saves and leaves. The saved edges and width
+**Options > Video calibration** has five steps: the four screen edges, then
+Aspect ratio. On each edge, move the highlighted line into view, then back
+out until it disappears beyond that screen edge. If it cannot be hidden,
+move it as close to the edge as it will go. The arrows identify the selected
+edge and show the available movement directions; they are not alignment targets.
+On Aspect ratio, make the square as wide as it is tall, with a round circle.
+If it already looks right, leave it as it is; a ruler or tape measure is optional.
+OK selects the next step, the D-pad adjusts it, and Back saves and leaves.
+The saved edges and width
 correction also move video playback on a core that supports it (interface 1.2
 or later, which the core shipped with the app does); menus are unaffected. On
 an older H.264 core the screen is labelled **Video calibration (preview
@@ -623,3 +629,7 @@ Server outages: opening a title and changing watch state keep the controls respo
 Back cancels a pending request. A failed request offers Retry and Back; late replies
 after cancellation cannot open another page. Failed background refreshes retain
 cached content and show Server unavailable until a subsequent request succeeds.
+
+### Chapters
+
+**Options > Chapters** is an optional supporter feature, Off by default and covered by existing Jellyfin supporter codes. When enabled, movie and episode details and the playback controls offer a thumbnail grid. Shoulder taps browse chapter choices without seeking; OK confirms and Back cancels. Turning Chapters off hides chapter entries, shortcuts and timeline marks.

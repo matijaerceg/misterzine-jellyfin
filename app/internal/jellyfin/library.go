@@ -165,7 +165,7 @@ func SectionListing(section, kind, view string) (string, url.Values) {
 // and its own is the first version's (versionOffsets).
 func (c *Client) Item(ctx context.Context, id string) (*Item, error) {
 	q := c.userQuery()
-	q.Set("fields", itemFields)
+	q.Set("fields", chapterFields(itemFields))
 	var x dto
 	if err := c.getJSON(ctx, c.http, "/Items/"+url.PathEscape(id), q, &x); err != nil {
 		return nil, err
@@ -174,6 +174,10 @@ func (c *Client) Item(ctx context.Context, id string) (*Item, error) {
 		return nil, fmt.Errorf("item %s not found", id)
 	}
 	it := x.item()
+	it.ChaptersLoaded = true
+	if err := c.loadChapterVersions(ctx, it); errors.Is(err, ErrUnauthorized) {
+		return nil, err
+	}
 	if len(it.Versions) > 1 && it.Versions[0].Detailed() && c.ownResumePoints(ctx) {
 		if err := c.versionOffsets(ctx, it); errors.Is(err, ErrUnauthorized) {
 			return nil, err

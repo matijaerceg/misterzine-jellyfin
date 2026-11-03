@@ -108,3 +108,5 @@ Component licenses apply separately; source availability does not grant addition
 rights. Retained license texts and upstream notices remain with their components.
 Movie artwork belongs to its owners. This project is independent of Jellyfin and
 MiSTer.
+
+Optional supporter chapter navigation provides a six-scene thumbnail grid when **Options > Chapters** is enabled. Browsing requires confirmation before seeking and can be cancelled.
