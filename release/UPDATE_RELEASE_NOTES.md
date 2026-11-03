@@ -1,3 +1,12 @@
+# MisterZine Jellyfin 0.1.0-beta.13
+
+- Playback now checks picture timestamps before and during direct play. Files whose timing does not match the decoder switch once to a video transcode at the current position; ordinary compatible files keep direct play.
+- Jellyfin video transcodes now explicitly encode video at a constant frame rate, preventing a fallback that copies the same incompatible timing or reports a misleading frame rate.
+
+Reuses the previous release’s qualified FPGA core. Settings, calibration and saved supporter access are preserved. Update through **Options > Updates**, or use the beta installer.
+
+Verified on DE10-Nano with direct play, timing-triggered transcoding, pause/resume and repeated seeks.
+
 # MisterZine Jellyfin 0.1.0-beta.12
 
 - Optional supporter chapter navigation: enable **Options > Chapters** to browse a six-thumbnail grid from the playback controls or the movie/episode page. Thumbnails appear when the server provides them. Chapters starts Off, and existing supporter codes cover it.

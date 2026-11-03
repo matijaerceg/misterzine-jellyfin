@@ -86,6 +86,9 @@ func (c *Client) PlaybackInfo(ctx context.Context, id string, r PlaybackRequest)
 		// direct-play or remux stream for this request.
 		body["EnableDirectPlay"] = false
 		body["EnableDirectStream"] = false
+		// Disabling the delivery methods does not prohibit copying video
+		// inside an HLS transcode (for example when only audio needs work).
+		body["AllowVideoStreamCopy"] = false
 	}
 	if r.MediaSourceID != "" {
 		body["MediaSourceId"] = r.MediaSourceID

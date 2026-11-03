@@ -28,7 +28,15 @@ channels. Surround, unknown channel counts and unsupported audio codecs need
 server conversion to stereo AAC. If video passes the checks above and no
 subtitle needs burning in, the app requests video copy in the offered HLS
 stream while requiring audio conversion. The worker still checks the original
-video's parameter sets and can fall back once to a bounded video transcode.
+video's parameter sets and picture timing and can fall back once to a bounded
+video transcode.
+
+A video transcode explicitly disables video copying and asks Jellyfin to
+produce a constant frame rate. It preserves a known source rate up to 60 fps
+for sources at most 854 pixels wide that fit the decoder's block-rate budget,
+or 30 fps otherwise; missing or implausible rate
+metadata uses 30 fps. Repeating or dropping pictures keeps the original
+timeline and audio speed. Audio-only conversion continues to copy the video.
 
 With the **Direct play** setting off, none of this applies: every start asks
 the server for a transcode outright, within the Video bitrate.
@@ -43,7 +51,13 @@ CAVLC entropy coding, MBAFF versus field-coded interlace). MBAFF is refused and
 field-coded interlace is accepted, but Jellyfin's own `IsInterlaced` flag cannot
 tell the two apart, so the app only logs it and does not decide on it. `jfplay` checks
 a direct stream's parameter sets before the first picture is shown, against the
-size and rate bounds the running core reports. If the check fails, the core
+size and rate bounds the running core reports. For known progressive video it
+also checks queued picture timestamps before feeding the core, with at most
+one extra second of waiting, and continues checking during playback. Sustained
+disagreement with the nominal rate requests a transcode; timestamp rounding,
+B-picture reordering and isolated outliers are tolerated. The check resets
+after seeking and does not classify files with missing timestamps or unknown
+scan type. If either check fails, the core
 refuses the stream, the core drops its pictures as too large, or the core
 keeps falling behind for several seconds, the app restarts the item once as a
 transcode at the current position. The switch is recorded in the playback log

@@ -261,7 +261,62 @@ func (s *Session) playbackInfo(ctx context.Context, kbps, offset int, audio, sub
 	if len(info.MediaSources) == 0 {
 		return nil, fmt.Errorf("Jellyfin offered no playable media source")
 	}
+	// HLS may still copy the video even with direct delivery disabled.
+	// A video transcode must both re-encode and normalize picture timing;
+	// otherwise a variable-rate source can come back with the same problem.
+	for i := range info.MediaSources {
+		src := &info.MediaSources[i]
+		if src.TranscodingURL == "" {
+			continue
+		}
+		u, err := url.Parse(src.TranscodingURL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid video transcode URL")
+		}
+		rate := transcodeFrameRate(src.MediaStreams, s.item.SourceStreams)
+		q := u.Query()
+		for key := range q {
+			if strings.EqualFold(key, "VideoCodec") || strings.EqualFold(key, "AllowVideoStreamCopy") || strings.EqualFold(key, "Framerate") {
+				q.Del(key)
+			}
+		}
+		q.Set("VideoCodec", "h264")
+		q.Set("AllowVideoStreamCopy", "false")
+		q.Set("Framerate", strconv.FormatFloat(rate, 'f', 6, 64))
+		u.RawQuery = q.Encode()
+		src.TranscodingURL = u.String()
+		src.VideoCopy = false
+	}
 	return info, nil
+}
+
+// Keep a known source rate within the decoder's output budget. A fixed-rate
+// conversion preserves source timestamps by repeating/dropping pictures, not
+// by changing the movie's speed. Missing or nonsensical metadata uses 30 fps.
+func transcodeFrameRate(streams, original []jellyfin.MediaStream) float64 {
+	for _, list := range [][]jellyfin.MediaStream{original, streams} {
+		for _, st := range list {
+			if !strings.EqualFold(st.Type, "Video") {
+				continue
+			}
+			rate := st.RealFrameRate
+			if rate <= 0 || math.IsNaN(rate) || math.IsInf(rate, 0) {
+				rate = st.AverageFrameRate
+			}
+			if rate < 10 || rate > 120 || math.IsNaN(rate) || math.IsInf(rate, 0) {
+				continue
+			}
+			limit := directMaxFPSHD
+			if st.Width > 0 && st.Width <= directSDWidth && st.Height > 0 && st.Height <= 720 {
+				blocks := ((st.Width + 15) / 16) * ((st.Height + 15) / 16)
+				if float64(blocks)*math.Min(rate, directMaxFPSSD) <= directMaxBlockRate {
+					limit = directMaxFPSSD
+				}
+			}
+			return math.Min(rate, limit)
+		}
+	}
+	return 30
 }
 
 // Match the chosen track, including the server's default when none was named.

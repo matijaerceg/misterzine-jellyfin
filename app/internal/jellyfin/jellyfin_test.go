@@ -594,7 +594,7 @@ func TestWatchedAndPlayback(t *testing.T) {
 	json.Unmarshal(f.body["POST /Items/f17e0000000000000000000000000002/PlaybackInfo"], &sent)
 	if sent["UserId"] != testUser || sent["StartTimeTicks"] != float64(900000000) || sent["AudioStreamIndex"] != float64(1) ||
 		sent["SubtitleStreamIndex"] != float64(-1) || sent["AlwaysBurnInSubtitleWhenTranscoding"] != nil ||
-		sent["EnableDirectPlay"] != nil || sent["EnableDirectStream"] != nil ||
+		sent["EnableDirectPlay"] != nil || sent["EnableDirectStream"] != nil || sent["AllowVideoStreamCopy"] != nil ||
 		sent["DeviceProfile"].(map[string]any)["MaxStreamingBitrate"] != float64(3000000) {
 		t.Fatalf("playback info body %v", sent)
 	}
@@ -624,7 +624,7 @@ func TestWatchedAndPlayback(t *testing.T) {
 	var selected map[string]any
 	json.Unmarshal(f.body["POST /Items/f17e0000000000000000000000000002/PlaybackInfo"], &selected)
 	if selected["SubtitleStreamIndex"] != float64(2) || selected["AlwaysBurnInSubtitleWhenTranscoding"] != true ||
-		selected["EnableDirectPlay"] != false || selected["EnableDirectStream"] != false {
+		selected["EnableDirectPlay"] != false || selected["EnableDirectStream"] != false || selected["AllowVideoStreamCopy"] != false {
 		t.Fatalf("selected subtitle request %v", selected)
 	}
 	_, err = c.PlaybackInfo(ctx, "f17e0000000000000000000000000002", PlaybackRequest{
@@ -635,7 +635,7 @@ func TestWatchedAndPlayback(t *testing.T) {
 	}
 	var forced map[string]any
 	json.Unmarshal(f.body["POST /Items/f17e0000000000000000000000000002/PlaybackInfo"], &forced)
-	if forced["EnableDirectPlay"] != false || forced["EnableDirectStream"] != false ||
+	if forced["EnableDirectPlay"] != false || forced["EnableDirectStream"] != false || forced["AllowVideoStreamCopy"] != false ||
 		forced["AlwaysBurnInSubtitleWhenTranscoding"] != nil || forced["MaxStreamingBitrate"] != float64(5000000) {
 		t.Fatalf("forced transcode request %v", forced)
 	}
