@@ -13,11 +13,11 @@ import (
 	"plexcrt/internal/jellyfin"
 )
 
-// Subtitles. A text track (jellyfin.Stream.Text: SRT, ASS, WebVTT ...) is
+// Subtitles. A text track (jellyfin.Stream.Text: SRT, WebVTT ...) is
 // fetched from the server as SRT and drawn by the app on the overlay, over
 // the video, at the size chosen in Options (Subtitle size). It needs no
 // transcode, and choosing one, turning it off or changing its size does
-// not restart the stream. Picture tracks (PGS, VobSub, DVB) are burned
+// not restart the stream. ASS/SSA and picture tracks (PGS, VobSub, DVB) are burned
 // into a transcode by Jellyfin, and so is a text track in a script the
 // glyph atlases lack (Cyrillic, Greek, CJK ...): Jellyfin takes no size
 // with a request, and its burn-in scales with the picture, so the setting

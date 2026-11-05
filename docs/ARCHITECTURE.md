@@ -58,8 +58,8 @@ H.264 core (next section). The playback launcher (`ui/player.go`,
 (`ui/deviceprofile.go`), runs `jfplay` on the direct stream or the HLS
 transcode, reports progress, seeks in place (restarting the player when it
 cannot), and sets the core's Analog Aspect for the crop choice. Text subtitles
-are fetched as SRT and drawn on the overlay (`ui/subtitles.go`); picture
-subtitles are burned in by the server.
+other than ASS/SSA are fetched as SRT and drawn on the overlay
+(`ui/subtitles.go`); ASS/SSA and picture subtitles are burned in by the server.
 
 What still carries the Plex app's shape:
 

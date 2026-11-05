@@ -114,9 +114,9 @@ type Stream struct {
 	Language string // the server's language code, "" unknown
 	Selected bool
 	Channels int // source audio channels; zero for subtitle tracks or unknown
-	// Text marks a text subtitle track (SRT, ASS, WebVTT ...) the server
-	// can hand over as a file (SubtitleText); picture subtitles (PGS,
-	// VobSub) can only be burned into a transcode.
+	// Text marks a subtitle track the app can draw from an SRT file
+	// (SubtitleText). ASS/SSA stays with the server to preserve its styles,
+	// positioning and drawings, as do picture subtitles (PGS, VobSub).
 	Text bool
 }
 
@@ -382,7 +382,7 @@ func tracks(streams []MediaStream) (asp float64, audio, subs []Stream) {
 			}
 		case "Audio", "Subtitle":
 			s := Stream{ID: strconv.Itoa(st.Index), Title: streamTitle(st), Language: st.Language, Selected: st.IsDefault,
-				Channels: st.Channels, Text: st.Type == "Subtitle" && st.IsTextSubtitleStream && st.SupportsExternalStream}
+				Channels: st.Channels, Text: textSubtitle(st)}
 			if st.Type == "Audio" {
 				audio = append(audio, s)
 			} else {
@@ -391,6 +391,13 @@ func tracks(streams []MediaStream) (asp float64, audio, subs []Stream) {
 		}
 	}
 	return asp, audio, subs
+}
+
+// textSubtitle excludes ASS/SSA even when the server can convert it to SRT:
+// flattening those tracks loses layout and can expose drawing commands as text.
+func textSubtitle(st MediaStream) bool {
+	return st.Type == "Subtitle" && st.IsTextSubtitleStream && st.SupportsExternalStream &&
+		!strings.EqualFold(st.Codec, "ass") && !strings.EqualFold(st.Codec, "ssa")
 }
 
 // streamTitle is the server's display title, folded; a title in a script

@@ -236,11 +236,13 @@ the gateway sends `AuthHeader()` instead. `DirectStreamURL` builds
 `/Videos/{id}/stream.{container}?static=true&mediaSourceId=...` for sources
 that `SupportsDirectStream`. Audio/subtitle choices are stream indexes
 (`Stream.ID`), sent per play in `PlaybackInfo` and in the reports. A subtitle
-stream with `IsTextSubtitleStream` and `SupportsExternalStream` is a text track
+stream with `IsTextSubtitleStream` and `SupportsExternalStream`, except codecs
+`ass` and `ssa` (case-insensitive), is a drawable text track
 (`Stream.Text`): `SubtitleText` fetches it, and `PlaybackInfo` is then sent
 `SubtitleStreamIndex=-1` because the app draws it. A start position in the
 subtitle path would drop the cues before it and shift the rest, so the app
-never sends one.
+never sends one. ASS/SSA tracks keep their selected index and use the server's
+burn-in path, preserving styles and drawings instead of requesting SRT.
 
 ## 4. Where Jellyfin 12.2 differed from expectations
 

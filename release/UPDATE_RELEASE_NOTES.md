@@ -1,3 +1,14 @@
+# MisterZine Jellyfin 0.1.0-beta.14
+
+- ASS and SSA subtitles are now burned into the video by the server, including downloadable external tracks. This preserves styled text, karaoke, positioning and drawings instead of flattening them into plain text or showing drawing commands. Selecting these subtitles requires server video transcoding.
+- Plain SRT and WebVTT subtitles continue to use the app overlay.
+
+Reuses the previous release’s qualified FPGA core and playback worker. Settings, calibration and saved supporter access are preserved. Update through **Options > Updates**, or use the beta installer.
+
+Verified on DE10-Nano with embedded and external styled subtitles, plain subtitles, subtitles off, pause/resume and forward/backward seeking.
+
+Known beta limitation: switching from ASS burn-in to plain subtitles while paused can leave the picture black until playback resumes.
+
 # MisterZine Jellyfin 0.1.0-beta.13
 
 - Playback now checks picture timestamps before and during direct play. Files whose timing does not match the decoder switch once to a video transcode at the current position; ordinary compatible files keep direct play.

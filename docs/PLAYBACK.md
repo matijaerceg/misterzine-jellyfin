@@ -177,11 +177,11 @@ peaks before output. Stereo sources are unchanged. Changing boost during playbac
 does not restart the stream; audio already queued may retain its previous gain
 briefly. The separate worker volume control only attenuates sound.
 
-Text subtitle tracks (SRT, ASS/SSA, WebVTT and other formats Jellyfin reports as
-text it can deliver separately) are drawn by the app. It fetches the whole track
-as SRT from `/Videos/{id}/{source}/Subtitles/{index}/Stream.srt`, keeps the cue
-text only (styling, positioning and ASS effects are dropped) and draws the cues as
-white type on a translucent box, centred along the bottom of the safe area. The
+Plain text subtitle tracks (SRT, WebVTT and other formats Jellyfin reports as
+text it can deliver separately, except ASS/SSA) are drawn by the app. It fetches
+the whole track as SRT from `/Videos/{id}/{source}/Subtitles/{index}/Stream.srt`, keeps the cue
+text only and draws the cues as white type with a dark outline or optional
+translucent box, centred along the bottom of the safe area. The
 stream is requested without subtitles, so it can still play as stored, and
 choosing another text track or Off changes the overlay without restarting the
 stream. Cue times follow the worker's reported position and run on from its
@@ -196,8 +196,11 @@ Extra large (200%) for the drawn subtitles. Normal is 22-pixel type on the
 show at once. A change applies from the next subtitle painted, without a
 restart.
 
-Picture subtitles (PGS, VobSub, DVB) are burned into the video by Jellyfin. The
-app requests a video transcode with the chosen subtitle index; this requires
+ASS/SSA subtitles are always burned into the video by Jellyfin, preserving
+their styling, positioning, karaoke effects and drawings instead of converting
+them to plain text. This applies to embedded and external tracks, even when
+Jellyfin offers an SRT conversion. Picture subtitles (PGS, VobSub, DVB) are
+burned in too. The app requests a video transcode with the chosen subtitle index; this requires
 server-side video transcoding permission. The overlay fonts cover ASCII; Latin
 letters with accents (Latin-1 and Latin Extended-A) are drawn as their base
 letters. A text track in which more than one letter in twenty falls outside them (Cyrillic, Greek, Arabic, CJK and

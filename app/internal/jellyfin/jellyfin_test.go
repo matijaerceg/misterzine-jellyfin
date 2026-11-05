@@ -532,9 +532,8 @@ func TestFoldLatinExtended(t *testing.T) {
 	}
 }
 
-// A text subtitle the server can hand over is marked Text and fetched whole
-// as SRT; a picture subtitle, or a text one the server cannot deliver on its
-// own, is not.
+// Plain text the server can hand over is marked Text and fetched whole as
+// SRT; ASS/SSA, pictures and text unavailable separately are burned in.
 func TestSubtitleTracks(t *testing.T) {
 	var x dto
 	if err := json.Unmarshal([]byte(`{"Id":"film","Type":"Movie","MediaSources":[{"Id":"src","MediaStreams":[
@@ -560,6 +559,23 @@ func TestSubtitleTracks(t *testing.T) {
 	r := f.reqs[len(f.reqs)-1]
 	if r.Method != "GET" || r.URL.Path != "/Videos/film/src/Subtitles/2/Stream.srt" || r.URL.RawQuery != "" {
 		t.Fatalf("subtitle request %s %s", r.Method, r.URL)
+	}
+}
+
+func TestStyledSubtitleTracksStayWithServer(t *testing.T) {
+	for _, codec := range []string{"ass", "ASS", "ssa", "SSA", "srt", "subrip", "webvtt"} {
+		t.Run(codec, func(t *testing.T) {
+			var x dto
+			if err := json.Unmarshal([]byte(`{"Id":"film","Type":"Movie","MediaSources":[{"Id":"src","MediaStreams":[
+				{"Type":"Subtitle","Index":2,"Codec":"`+codec+`","IsTextSubtitleStream":true,"SupportsExternalStream":true}]}]}`), &x); err != nil {
+				t.Fatal(err)
+			}
+			it := x.item()
+			wantText := codec == "srt" || codec == "subrip" || codec == "webvtt"
+			if len(it.Subs) != 1 || it.Subs[0].Text != wantText {
+				t.Fatalf("%s subtitle %+v, want overlay=%v", codec, it.Subs, wantText)
+			}
+		})
 	}
 }
 

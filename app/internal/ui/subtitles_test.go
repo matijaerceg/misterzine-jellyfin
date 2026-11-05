@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -354,8 +355,14 @@ func TestPlayingFetchesTextSubtitles(t *testing.T) {
 
 // A text track the app draws leaves the stream free to play as stored;
 // switching between drawn tracks or turning them off keeps the stream, and
-// a picture track is burned into a transcode with a restart.
+// a picture or ASS/SSA track is burned into a transcode with a restart.
 func TestSessionDrawnSubtitlesKeepTheStream(t *testing.T) {
+	for _, codec := range []string{"pgs", "ass", "ssa"} {
+		t.Run(codec, func(t *testing.T) { testSessionSubtitlesKeepTheStream(t, codec) })
+	}
+}
+
+func testSessionSubtitlesKeepTheStream(t *testing.T, burnCodec string) {
 	type request struct {
 		subtitle any
 		burn     any
@@ -363,10 +370,20 @@ func TestSessionDrawnSubtitlesKeepTheStream(t *testing.T) {
 	var mu sync.Mutex
 	var requests []request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/Items/film" {
+			_, _ = w.Write([]byte(`{"Id":"film","Type":"Movie","MediaSources":[{"Id":"src","MediaStreams":[
+				{"Type":"Subtitle","Index":3,"Codec":"srt","IsDefault":true,"IsTextSubtitleStream":true,"SupportsExternalStream":true},
+				{"Type":"Subtitle","Index":4,"Codec":"webvtt","IsTextSubtitleStream":true,"SupportsExternalStream":true},
+				{"Type":"Subtitle","Index":5,"Codec":"` + burnCodec + `","IsTextSubtitleStream":` + strconv.FormatBool(burnCodec != "pgs") + `,"SupportsExternalStream":true}]}]}`))
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/PlaybackInfo") {
 			var body map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Error(err)
+			}
+			if body["SubtitleStreamIndex"] == float64(5) && (body["EnableDirectPlay"] != false || body["EnableDirectStream"] != false || body["AllowVideoStreamCopy"] != false) {
+				t.Error("burned subtitle allowed direct play or video copy")
 			}
 			mu.Lock()
 			requests = append(requests, request{body["SubtitleStreamIndex"], body["AlwaysBurnInSubtitleWhenTranscoding"]})
@@ -383,8 +400,9 @@ func TestSessionDrawnSubtitlesKeepTheStream(t *testing.T) {
 	defer srv.Close()
 	dir := t.TempDir()
 	status := dir + "/status"
+	a := &App{}
 	p := &Player{Client: testClient(srv.URL, "synthetic-token", ""), Binary: "jfplay", Fifo: dir + "/fifo", Status: status, LogTo: dir + "/log",
-		DrawsSubtitle: func(_ string, s jellyfin.Stream) bool { return s.Text }}
+		DrawsSubtitle: a.drawsSubtitle}
 	var cmdMu sync.Mutex
 	var child *exec.Cmd
 	launches := 0
@@ -396,7 +414,10 @@ func TestSessionDrawnSubtitlesKeepTheStream(t *testing.T) {
 		cmdMu.Unlock()
 		return cmd
 	}
-	item := &jellyfin.Item{ID: "film", SourceID: "src", Subs: []jellyfin.Stream{{ID: "3", Text: true, Selected: true}, {ID: "4", Text: true}, {ID: "5"}}}
+	item, err := p.Client.Item(bg(), "film")
+	if err != nil {
+		t.Fatal(err)
+	}
 	s, err := p.Start(item, 20)
 	if err != nil {
 		t.Fatal(err)
@@ -430,7 +451,7 @@ func TestSessionDrawnSubtitlesKeepTheStream(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	// the start's probe; the picture track's probe-less transcode; the
+	// the start's probe; the burned track's probe-less transcode; the
 	// drawn track's probe again
 	want := []request{{float64(-1), nil}, {float64(5), true}, {float64(-1), nil}}
 	if len(requests) != len(want) {

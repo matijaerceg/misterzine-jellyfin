@@ -76,8 +76,8 @@ what it does to your library or your MiSTer.
   limited to lower widths; see [playback details](docs/PLAYBACK.md).
 - Pause, seeking, audio and subtitle track choice, skip intro and credits,
   autoplay and shuffle.
-- Text subtitles drawn by the app in three sizes, without a transcode;
-  picture subtitles burned into the picture by the server. A surround downmix
+- Plain text subtitles drawn by the app in three sizes, without a transcode;
+  ASS/SSA and picture subtitles burned into the picture by the server. A surround downmix
   boost with peak limiting.
 - Display modes and refresh matching are selected in the core's OSD, including
   240p/288p playback and 23.976/24-to-25 film speed-up on PAL output. Film

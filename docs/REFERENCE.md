@@ -333,15 +333,14 @@ subtitle tracks chosen on a page or during playback are saved for that movie,
 or for the whole show, and passed with every play. Until you choose, the
 server's defaults are used.
 
-Text subtitle tracks (SRT, ASS/SSA, WebVTT) are drawn by the app over the
+Plain text subtitle tracks (such as SRT and WebVTT) are drawn by the app over the
 picture, as white type with a thin dark outline
 (or on a translucent box, see below), centred along the bottom of the
 screen. The video is sent without them, so a film with text subtitles can still
 play untranscoded, and turning text subtitles on or off, choosing another text
 track or changing their size does not restart the video. Only the words are
-shown: styling, positioning and effects in ASS/SSA tracks are left out, and
-accented letters lose their accents. Long lines wrap; up to six lines show at a
-time.
+shown, and accented letters lose their accents. Long lines wrap; up to six
+lines show at a time.
 Subtitles step aside while the controls, a list, the seek strip or a skip
 button are on screen.
 
@@ -359,7 +358,9 @@ and is saved for future playback. During playback, Left and Right on
 behind each line in place of the outline. A change shows on the next cue drawn,
 including one already on screen.
 
-Picture subtitles (PGS, VobSub, DVB) are burned into the picture by Jellyfin.
+ASS/SSA subtitles are burned into the picture by Jellyfin to preserve their
+styling, positioning, karaoke effects and drawings. Picture subtitles
+(PGS, VobSub, DVB) are burned in too.
 The server must transcode the video for that, so it needs permission to
 transcode for your account. Choosing one, or changing from one, restarts the
 stream at the same position; the server can take a while to start the new
