@@ -624,4 +624,13 @@ set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL MAXIMUM
 #   (100C/-40C). 41,024 ALMs, 421 M10K, 107 DSP. All 48 DV1 setup/hold
 #   checks passed (minimum slack +0.236 ns). The sweep stopped at seed 5.
 #   Test build H264_dv1_crop_s5_dev-dv1-crop_20261105_2025.rbf.
+# 2026-11-06 (jf-0.1.0-beta.15, RetroTINK 4K DV1 Auto-Crop), MHz at 100C/-40C:
+#   Seed 5 missed clock margin. Decoder 99.3/100.21, video 96.03/93.34 MHz; 41,093 ALMs; DV1 minimum +0.275 ns.
+#   Seed 29 missed clock margin. Decoder 101.77/100.52, video 84.72/88.35 MHz; 41,099 ALMs; DV1 minimum +0.315 ns.
+#   Seed 42 missed clock margin. Decoder 99.25/99.3, video 90.64/89.57 MHz; 41,082 ALMs; DV1 minimum +0.230 ns.
+#   Seed 1 missed clock margin. Decoder 88.12/91.02, video 90.54/89.44 MHz; 41,022 ALMs; DV1 minimum +0.230 ns.
+#   Seed 12 missed clock margin. Decoder 98.75/99.99, video 91.51/90.48 MHz; 40,953 ALMs; DV1 minimum +0.254 ns.
+#   Seed 12 (maximum router timing effort) missed clock margin. Decoder 99.4/100.53, video 95.1/90.41 MHz; 40,953 ALMs; DV1 minimum +0.262 ns.
+#   Seed 29 (maximum router timing effort) qualified. Decoder 106.19/107.08, video 90.28/87.28 MHz; 41,099 ALMs; DV1 minimum +0.277 ns.
+#   All 48 DV1 checks passed on the winning fit at 56390ba6.
 set_global_assignment -name SEED 29
