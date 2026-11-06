@@ -146,6 +146,16 @@ stay hidden. `direct_video=1` sends the core's own timing, and with
 attached. A `[video=...]` section applies only when it names the core's
 current video mode, which MiSTer measures once the core runs.
 
+## Direct Video through a RetroTINK 4K
+
+If enabling the RT4K's MiSTer DV1 Auto-Crop cuts off the left side of the
+picture, leave Auto-Crop off as a workaround. The beta.10 and beta.11 cores
+corrected the Direct Video transmitter clock and pixel repetition but still
+reported the horizontal crop offset in the faster internal clock's units.
+Releases through beta.14 reuse those cores. The source now converts that
+offset to HDMI samples as well; it requires a rebuilt core, and RT4K
+hardware confirmation is pending.
+
 ## What has been checked
 
 These recommendations follow from how the core and MiSTer's scaler work. The

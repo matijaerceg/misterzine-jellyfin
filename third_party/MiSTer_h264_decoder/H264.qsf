@@ -603,4 +603,25 @@ set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL NORMAL
 #   and video 84.79/81.77 MHz. SEED 7 failed decoder 99.27/100.62 MHz.
 #   SEED 9 qualified: decoder 102.16/104.16 MHz, video 91.49/89.10 MHz;
 #   40,985 ALMs, 421 M10K, 107 DSP; H264_buttons_20261019_0322.rbf.
-set_global_assignment -name SEED 13
+# 2026-11-05 (dev-dv1-crop, first fit, working tree based on 3755845a):
+#   SEED 13 failed decoder margin: 101.02/98.89 MHz; video 91.96/87.97 MHz.
+#   41,000 ALMs, 421 M10K, 107 DSP. No release image packed.
+#   Direct crop division also violated clk_vid -> clk_sys setup by 20.312 ns;
+#   capture its input on clk_sys before division for the next fit.
+# 2026-11-05 (dev-dv1-crop, registered crop input): SEED 13, decoder
+#   100.97/100.67 MHz (101.4 required), video 93.22/88.83 MHz, 41,026 ALMs.
+#   Crop setup/hold passed at all four corners. Pixel repetition still had
+#   -6.657 ns setup on the old crossing. Capture that input on clk_sys too.
+# 2026-11-05 (dev-dv1-crop, both DV1 inputs registered). MHz at 100C/-40C:
+#   SEED 9:  decoder 97.15/97.74, video 85.73/88.85, 41,002 ALMs.
+#   SEED 7:  decoder 98.53/99.03, video 68.58/71.08, 41,038 ALMs.
+#   SEED 12: decoder 98.20/100.93, video 86.35/87.55, 40,930 ALMs.
+#   All three passed the DV1 setup/hold audit at all four timing corners.
+#   All missed the 101.4 MHz decoder gate; only seed 12 passed the 86 MHz
+#   video gate. No seed qualified in this three-seed run.
+# 2026-11-05 (dev-dv1-crop, same RTL, working tree based on 3755845a):
+#   SEED 5 qualified: decoder 102.31/103.08 MHz, video 91.10/92.11 MHz
+#   (100C/-40C). 41,024 ALMs, 421 M10K, 107 DSP. All 48 DV1 setup/hold
+#   checks passed (minimum slack +0.236 ns). The sweep stopped at seed 5.
+#   Test build H264_dv1_crop_s5_dev-dv1-crop_20261105_2025.rbf.
+set_global_assignment -name SEED 5

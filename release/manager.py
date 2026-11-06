@@ -2039,15 +2039,20 @@ def run(root):
     if not recovered:
         threading.Thread(target=upkeep_after_start, args=(root, state['current']), daemon=True).start()
     folder = root / 'releases' / state['current']
+    return run_with_core(root, folder, folder)
+
+
+def run_with_core(root, folder, core_folder):
+    """Launch the installed app with the core selected for this session."""
     card = root.parent
-    rbf = (folder / 'H264.rbf').relative_to(card).with_suffix('').as_posix()
+    rbf = core_file(root, core_folder).relative_to(card).with_suffix('').as_posix()
     args = [str(folder / 'plexcrt'), '-config', str(root / 'plexcrt.json'),
             '-cache', str(root / 'cache'), '-player', str(folder / 'jfplay'),
             '-ffmpeg', str(folder / 'ffmpeg')]
     # Validate runtime dependencies before switching cores: once MiSTer loads
     # the H264 image, it displays color bars until the app can start.
     subprocess.run(args + ['-check'], check=True)
-    if not ensure_selected_core(card, root, folder):
+    if not ensure_selected_core(card, root, core_folder):
         raise RuntimeError('The selected Jellyfin H264 core did not load; return to the MiSTer menu and retry.')
     # The INI check for Options, now that main has read the INI for the core.
     env = dict(os.environ, MISTERZINE_H264_RBF=rbf, MISTERZINE_PLEX_DISPLAY=display_env(card))
