@@ -1,3 +1,7 @@
+# MisterZine Jellyfin 0.1.0-beta.15
+
+Fixes a picture shifted to the left or cut off at the left edge when using MiSTer Direct Video with RetroTINK 4K Auto-Crop enabled. Open **Options > Updates** to install the new core, or use the beta installer.
+
 # MisterZine Jellyfin 0.1.0-beta.14
 
 - ASS and SSA subtitles are now burned into the video by the server, including downloadable external tracks. This preserves styled text, karaoke, positioning and drawings instead of flattening them into plain text or showing drawing commands. Selecting these subtitles requires server video transcoding.
