@@ -583,7 +583,7 @@ set_global_assignment -name VERILOG_MACRO "QUARTUS=1"
 # and audio plays against the core's own clock, not Linux's (docs/architecture.md "Audio").
 set_global_assignment -name VERILOG_MACRO "MISTER_DISABLE_ALSA=1"
 set_global_assignment -name FITTER_AGGRESSIVE_ROUTABILITY_OPTIMIZATION ALWAYS
-set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL NORMAL
+set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL MAXIMUM
 # 2026-10-17 (dev-steady, c550d9a): SEED 7, clk_dec 102.38/103.11 MHz,
 # clk_vid 95.93/95.45 MHz, ALM 41,031 (98%), M10K 421, DSP 107.
 # H264_steady_20261017_2025.rbf; seed 1 missed decoder margin at 100.49/100.02 MHz.
