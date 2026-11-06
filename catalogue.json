@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.14",
-      "version": "0.1.0-beta.14",
+      "id": "beta-0.1.0-beta.15",
+      "version": "0.1.0-beta.15",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.14\n\n- ASS and SSA subtitles are now burned into the video by the server, including downloadable external tracks. This preserves styled text, karaoke, positioning and drawings instead of flattening them into plain text or showing drawing commands. Selecting these subtitles requires server video transcoding.\n- Plain SRT and WebVTT subtitles continue to use the app overlay.\n\nReuses the previous release\u00e2\u20ac\u2122s qualified FPGA core and playback worker. Settings, calibration and saved supporter access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on DE10-Nano with embedded and external styled subtitles, plain subtitles, subtitles off, pause/resume and forward/backward seeking.\n\nKnown beta limitation: switching from ASS burn-in to plain subtitles while paused can leave the picture black until playback resumes.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.14/MisterZine-Jellyfin-beta-0.1.0-beta.14.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.15\n\nFixes a picture shifted to the left or cut off at the left edge when using MiSTer Direct Video with RetroTINK 4K Auto-Crop enabled. Open **Options > Updates** to install the new core, or use the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-beta-0.1.0-beta.15.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14330321,
-      "sha256": "7aec69b498c96f9ea9ec0803715ad895812441dec8fa042434f2e84041828613",
+      "size": 14329637,
+      "sha256": "c49c222ee23846e831ed8c38c43fb448b0e6acf6578fac57a84d2111bf13f0c2",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.14.zip",
-        "size": 139112878,
-        "sha256": "3a41d6fb717d6b1ae89d558d3b6c6dc011c55077927d24968685043da380c531",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.14/MisterZine-Jellyfin-Source-beta-0.1.0-beta.14.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip",
+        "size": 139136678,
+        "sha256": "4e3fb0f12e3c71a771b8110263b7e9094ac52bc395f934f773b3d87d32fbbb7f",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.14",
-      "version": "0.1.0-beta.14",
+      "id": "beta-0.1.0-beta.15",
+      "version": "0.1.0-beta.15",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.14\n\n- ASS and SSA subtitles are now burned into the video by the server, including downloadable external tracks. This preserves styled text, karaoke, positioning and drawings instead of flattening them into plain text or showing drawing commands. Selecting these subtitles requires server video transcoding.\n- Plain SRT and WebVTT subtitles continue to use the app overlay.\n\nReuses the previous release\u00e2\u20ac\u2122s qualified FPGA core and playback worker. Settings, calibration and saved supporter access are preserved. Update through **Options > Updates**, or use the beta installer.\n\nVerified on DE10-Nano with embedded and external styled subtitles, plain subtitles, subtitles off, pause/resume and forward/backward seeking.\n\nKnown beta limitation: switching from ASS burn-in to plain subtitles while paused can leave the picture black until playback resumes.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.14/MisterZine-Jellyfin-beta-0.1.0-beta.14.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.15\n\nFixes a picture shifted to the left or cut off at the left edge when using MiSTer Direct Video with RetroTINK 4K Auto-Crop enabled. Open **Options > Updates** to install the new core, or use the beta installer.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-beta-0.1.0-beta.15.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14330321,
-      "sha256": "7aec69b498c96f9ea9ec0803715ad895812441dec8fa042434f2e84041828613",
+      "size": 14329637,
+      "sha256": "c49c222ee23846e831ed8c38c43fb448b0e6acf6578fac57a84d2111bf13f0c2",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.14.zip",
-        "size": 139112878,
-        "sha256": "3a41d6fb717d6b1ae89d558d3b6c6dc011c55077927d24968685043da380c531",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.14/MisterZine-Jellyfin-Source-beta-0.1.0-beta.14.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip",
+        "size": 139136678,
+        "sha256": "4e3fb0f12e3c71a771b8110263b7e9094ac52bc395f934f773b3d87d32fbbb7f",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip"
       }
     }
   }
