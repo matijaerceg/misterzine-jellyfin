@@ -624,4 +624,4 @@ set_global_assignment -name ROUTER_TIMING_OPTIMIZATION_LEVEL MAXIMUM
 #   (100C/-40C). 41,024 ALMs, 421 M10K, 107 DSP. All 48 DV1 setup/hold
 #   checks passed (minimum slack +0.236 ns). The sweep stopped at seed 5.
 #   Test build H264_dv1_crop_s5_dev-dv1-crop_20261105_2025.rbf.
-set_global_assignment -name SEED 12
+set_global_assignment -name SEED 29
