@@ -255,6 +255,10 @@ func TestGatewayReportsFailuresWithoutAddresses(t *testing.T) {
 		{false, 500, "the server answered HTTP 500", false},
 		{false, 0, "the server refused the connection", false},
 	}
+	// playlist failures and those before the last delivered media do not count
+	if n, last := g.Trailing(); n != 2 || last != want[4] {
+		t.Errorf("trailing failures: %d, newest %+v", n, last)
+	}
 	mu.Lock()
 	defer mu.Unlock()
 	if len(got) != len(want) {

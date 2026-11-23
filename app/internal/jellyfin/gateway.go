@@ -32,6 +32,19 @@ type Gateway struct {
 	mu             sync.Mutex
 	onFailure      func(GatewayFailure)
 	delivered      bool // a media request (not a playlist) has been answered
+	// trailing counts the media requests that failed since the last one the
+	// server answered; lastFailure is the newest of them.
+	trailing    int
+	lastFailure GatewayFailure
+}
+
+// Trailing is how many media requests have failed since the server last
+// answered one, with the newest of those failures: above zero once a stream
+// has ended, its last requests got no media.
+func (g *Gateway) Trailing() (int, GatewayFailure) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.trailing, g.lastFailure
 }
 
 // GatewayFailure is a worker request the gateway answered with 502. It
@@ -82,10 +95,15 @@ func (g *Gateway) fail(w http.ResponseWriter, r *http.Request, playlist bool, st
 		return
 	}
 	g.mu.Lock()
-	fn, before := g.onFailure, !g.delivered
+	fn := g.onFailure
+	f := GatewayFailure{Playlist: playlist, Status: status, Reason: reason, BeforeMedia: !g.delivered}
+	if !playlist {
+		g.trailing++
+		g.lastFailure = f
+	}
 	g.mu.Unlock()
 	if fn != nil {
-		fn(GatewayFailure{Playlist: playlist, Status: status, Reason: reason, BeforeMedia: before})
+		fn(f)
 	}
 }
 
@@ -269,6 +287,7 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 	g.mu.Lock()
 	g.delivered = true
+	g.trailing = 0
 	g.mu.Unlock()
 	if r.Method != "HEAD" {
 		io.Copy(w, reader)

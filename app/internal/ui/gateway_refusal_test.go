@@ -175,6 +175,79 @@ func TestGatewayFailureLogIsBounded(t *testing.T) {
 	}
 }
 
+// A stream the server stops sending part-way ends as jfplay's clean exit;
+// the session reports it as lost unless it was at its end or recovered.
+func TestStreamTheServerStoppedSendingIsAFailure(t *testing.T) {
+	refuseAfterFirst := func(n int) int {
+		if n == 1 {
+			return 200
+		}
+		return 500
+	}
+	for _, test := range []struct {
+		name     string
+		position string
+		media    func(int) int
+		requests int
+		want     string
+	}{
+		{"lost mid-way", "111", refuseAfterFirst, 4, "The server stopped sending video (HTTP 500)"},
+		{"refused at the very end", "290", refuseAfterFirst, 4, ""},
+		{"recovered", "111", func(n int) int {
+			if n == 2 {
+				return 500
+			}
+			return 200
+		}, 3, ""},
+		{"no failure", "111", func(int) int { return 200 }, 2, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := newFallbackServer(t, eligibleDirect)
+			f.media = test.media
+			p := f.player(t, nil, test.position)
+			p.DirectPlay = func() bool { return false }
+			status := p.Status
+			p.exec = func(_ string, args ...string) *exec.Cmd {
+				f.mu.Lock()
+				f.launches = append(f.launches, append([]string(nil), args...))
+				f.mu.Unlock()
+				return exec.Command("sh", "-c", "printf 'state=ended\\nposition="+test.position+"\\nduration=300\\n' > '"+status+"'; exec sleep 1")
+			}
+			s, err := p.Start(&jellyfin.Item{ID: "item", SourceID: "source"}, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := 0; i < test.requests; i++ {
+				f.workerGet(t)
+			}
+			err = waitDone(t, s)
+			if test.want == "" {
+				if err != nil {
+					t.Fatalf("session ended with %v, want a clean end", err)
+				}
+				return
+			}
+			var lost streamLostError
+			if !errors.As(err, &lost) || err.Error() != test.want {
+				t.Fatalf("session ended with %v, want %q", err, test.want)
+			}
+			data, err := os.ReadFile(p.LogTo + ".failed")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "app: stream lost: the last 3 media requests failed (the server answered HTTP 500) and playback ended at 111 of 300 s\n"; !strings.Contains(string(data), want) {
+				t.Errorf("playback log lacks %q:\n%s", want, data)
+			}
+		})
+	}
+}
+
+func TestStreamLostWording(t *testing.T) {
+	if got := (streamLostError{0}).Error(); got != "The server stopped sending video (connection lost)" {
+		t.Error(got)
+	}
+}
+
 // A stop that arrives with the refusal wins: no failure is shown for a
 // playback the user already left.
 func TestRefusalAfterStopIsNotAFailure(t *testing.T) {

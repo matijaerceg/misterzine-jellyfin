@@ -568,7 +568,7 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 			if s.fallbackLocked(err) || s.noPictureFallbackLocked(err) || s.smallOpenRetryLocked(err) {
 				return
 			}
-			s.finishLocked(s.workerExitError(err))
+			s.finishLocked(s.workerExitError(s.streamLostLocked(err, gateway)))
 		}
 	}()
 	return nil

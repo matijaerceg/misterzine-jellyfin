@@ -624,6 +624,49 @@ func (e transcodeRefusedError) Error() string {
 	return "The server could not transcode this title (HTTP " + strconv.Itoa(e.status) + ")"
 }
 
+// streamLostLocked turns a worker's clean end into a failure when the server
+// stopped sending the stream part-way. A server that refuses a playing
+// stream's segments (its transcoder died, or the server went away) makes
+// the HLS demuxer skip every segment left in the playlist and report the end
+// of the input, so jfplay plays out what it has and exits 0 as it does at a
+// real ending, and the app would return to its menu without a word. The
+// signs are the gateway's last media requests all failing and a position
+// more than streamLostMargin short of the end; the margin is the one the
+// playback screen uses to call an item finished. Any other exit, an unknown
+// duration and a failure the stream recovered from pass through. opMu is held.
+func (s *Session) streamLostLocked(err error, g *jellyfin.Gateway) error {
+	if err != nil || g == nil {
+		return err
+	}
+	n, last := g.Trailing()
+	if n == 0 {
+		return nil
+	}
+	st := readPlayerStatus(s.p.Status)
+	position, e1 := strconv.ParseFloat(st["position"], 64)
+	duration, e2 := strconv.ParseFloat(st["duration"], 64)
+	if e1 != nil || e2 != nil || duration <= 0 || position >= duration-streamLostMargin {
+		return nil
+	}
+	s.logf("stream lost: the last %d media requests failed (%s) and playback ended at %.0f of %.0f s", n, last.Reason, position, duration)
+	return streamLostError{last.Status}
+}
+
+// streamLostMargin is how far from its end, in seconds, a stream may stop
+// and still be taken as finished.
+const streamLostMargin = 30
+
+// streamLostError is the failure line for a stream the server stopped
+// sending; status is the server's last answer, 0 when the connection failed.
+type streamLostError struct{ status int }
+
+func (e streamLostError) Error() string {
+	if e.status == 0 {
+		return "The server stopped sending video (connection lost)"
+	}
+	return "The server stopped sending video (HTTP " + strconv.Itoa(e.status) + ")"
+}
+
 // noVideoError is the failure line for a stream that never came.
 type noVideoError struct{ err error }
 
