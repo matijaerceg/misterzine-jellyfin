@@ -74,6 +74,8 @@ playback, after giving the server 1.5 s to end its previous transcode, and
 opens it once more if the server closes that first connection without sending
 anything.
 
+Every stream request the app's loopback gateway cannot serve is recorded in the playback log with its cause: the server's HTTP status, a failed connection, or a playlist the app would not pass on. The lines name no address, path or credential, and only the first three of a stream are kept. When the server accepts a transcode and then refuses its first video segment, which Jellyfin does when its transcoder fails to start, the app ends playback at once with "The server could not transcode this title" and the server's status, instead of waiting for the stream to time out. A stream played as stored, and a stream that was already playing, keep the handling described above.
+
 It uses the first media source returned:
 
 - For direct play or direct stream, `jfplay` reads the item's stream and seeks

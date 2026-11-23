@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -13,6 +14,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -26,6 +29,85 @@ type Gateway struct {
 	origin, prefix string
 	client         *http.Client
 	closeIdle      func()
+	mu             sync.Mutex
+	onFailure      func(GatewayFailure)
+	delivered      bool // a media request (not a playlist) has been answered
+}
+
+// GatewayFailure is a worker request the gateway answered with 502. It
+// carries no address, path or credential, so it can go into the playback log.
+type GatewayFailure struct {
+	// Playlist tells a playlist request from one for media (a file or a
+	// segment); judged from the request path when the server sent none.
+	Playlist bool
+	// Status is the server's HTTP status; 0 when there was no answer or the
+	// answer was a playlist the gateway would not pass on.
+	Status int
+	// Reason says what happened, in words for the log.
+	Reason string
+	// BeforeMedia is true until the server has answered one media request:
+	// the failure is of the stream's start, not of a stream that was playing.
+	BeforeMedia bool
+}
+
+// Refused reports whether the server answered the request and said no,
+// rather than the connection failing.
+func (f GatewayFailure) Refused() bool { return f.Status != 0 }
+
+func (f GatewayFailure) String() string {
+	kind := "media"
+	if f.Playlist {
+		kind = "playlist"
+	}
+	when := "after media was delivered"
+	if f.BeforeMedia {
+		when = "before any media was delivered"
+	}
+	return kind + " request failed " + when + ": " + f.Reason
+}
+
+// OnFailure names the function told of every request answered with 502. It
+// runs on the request's goroutine; set it before the worker has the URL.
+func (g *Gateway) OnFailure(fn func(GatewayFailure)) {
+	g.mu.Lock()
+	g.onFailure = fn
+	g.mu.Unlock()
+}
+
+// fail answers the worker with 502 and tells the session why. A request the
+// worker itself gave up (it exited, or the gateway closed) is not a failure.
+func (g *Gateway) fail(w http.ResponseWriter, r *http.Request, playlist bool, status int, reason, public string) {
+	http.Error(w, public, 502)
+	if r.Context().Err() != nil {
+		return
+	}
+	g.mu.Lock()
+	fn, before := g.onFailure, !g.delivered
+	g.mu.Unlock()
+	if fn != nil {
+		fn(GatewayFailure{Playlist: playlist, Status: status, Reason: reason, BeforeMedia: before})
+	}
+}
+
+// connectionReason words a failed request without the address it names.
+func connectionReason(err error) string {
+	var netErr net.Error
+	var certErr *tls.CertificateVerificationError
+	switch {
+	case errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout()):
+		return "the connection to the server timed out"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "the server refused the connection"
+	case errors.Is(err, syscall.ECONNRESET) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF):
+		return "the server closed the connection without an answer"
+	case errors.As(err, &certErr):
+		return "the server's certificate was not accepted"
+	}
+	return "the connection to the server failed"
+}
+
+func playlistPath(path string) bool {
+	return strings.HasSuffix(strings.ToLower(path), ".m3u8")
 }
 
 func (c *Client) NewGateway(ctx context.Context, tlsWorker ...string) (*Gateway, error) {
@@ -151,13 +233,13 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := g.client.Do(request)
 	if err != nil {
-		http.Error(w, "secure playback connection failed", 502)
+		g.fail(w, r, playlistPath(u.Path), 0, connectionReason(err), "secure playback connection failed")
 		return
 	}
 	defer resp.Body.Close()
 	// Never forward a redirect, cookie, or server-generated authentication URL.
 	if resp.StatusCode != 200 && resp.StatusCode != 206 {
-		http.Error(w, "playback request refused", 502)
+		g.fail(w, r, playlistPath(u.Path), resp.StatusCode, "the server answered HTTP "+strconv.Itoa(resp.StatusCode), "playback request refused")
 		return
 	}
 	reader := bufio.NewReader(resp.Body)
@@ -166,12 +248,12 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if playlist && r.Method != "HEAD" {
 		data, err := io.ReadAll(io.LimitReader(reader, (4<<20)+1))
 		if err != nil || len(data) > 4<<20 {
-			http.Error(w, "invalid playlist", 502)
+			g.fail(w, r, true, 0, "the server's playlist could not be read or is over 4 MB", "invalid playlist")
 			return
 		}
 		data, err = g.playlist(data, resp.Request.URL)
 		if err != nil {
-			http.Error(w, "unsafe playlist refused", 502)
+			g.fail(w, r, true, 0, "the server's playlist names an address the app does not allow", "unsafe playlist refused")
 			return
 		}
 		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
@@ -185,6 +267,9 @@ func (g *Gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
+	g.mu.Lock()
+	g.delivered = true
+	g.mu.Unlock()
 	if r.Method != "HEAD" {
 		io.Copy(w, reader)
 	}

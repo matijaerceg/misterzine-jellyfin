@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"plexcrt/internal/jellyfin"
@@ -554,6 +556,72 @@ func (s *Session) workerExitError(err error) error {
 		return tooLargeError{err}
 	}
 	return err
+}
+
+// gatewayFailed takes a request the gateway answered with 502 (the server
+// said no, or the connection or its playlist failed). Each goes into the
+// playback log, where a report shows which side failed. A transcode whose
+// first media request the server refuses is not coming: Jellyfin answers so
+// when its transcoder did not start, and jfplay would otherwise wait out its
+// socket timeout on a black screen. That ends playback at once, with the
+// server's status. A stream played as stored, a remux, a small transcode
+// that still has its one re-open (smallOpenRetryLocked) and a stream that
+// was already playing keep the worker's own handling. It runs on the
+// gateway's goroutine; w is the gateway's own.
+//
+// Only a stream's first gatewayLogLimit failures are logged: a server that
+// refuses every segment of a playing stream is asked for each one left in
+// the playlist, hundreds in a second, and the lines would push the rest of
+// the playback out of the report.
+func (s *Session) gatewayFailed(g *jellyfin.Gateway, f jellyfin.GatewayFailure, w *gatewayWatch) {
+	switch n := w.failures.Add(1); {
+	case n <= gatewayLogLimit:
+		s.logf("gateway: %s", f)
+	case n == gatewayLogLimit+1:
+		s.logf("gateway: more requests of this stream failed; not logged")
+	}
+	if !f.Refused() || !f.BeforeMedia || f.Playlist {
+		return
+	}
+	s.mu.Lock()
+	leave := s.direct || s.videoCopy || (s.smallTranscode && !s.smallRetried) || s.closing || s.stopRequested
+	s.mu.Unlock()
+	if leave {
+		return
+	}
+	w.end.Do(func() { go s.endRefused(g, f.Status) })
+}
+
+// gatewayWatch is what a session keeps for one gateway's failures.
+type gatewayWatch struct {
+	failures atomic.Int32
+	end      sync.Once
+}
+
+const gatewayLogLimit = 3
+
+// endRefused ends the session whose gateway g had its first media request
+// refused, unless the session has moved on from that stream meanwhile.
+func (s *Session) endRefused(g *jellyfin.Gateway, status int) {
+	s.opMu.Lock()
+	defer s.opMu.Unlock()
+	s.mu.Lock()
+	gone := s.closing || s.stopRequested || s.gateway != g
+	s.mu.Unlock()
+	if gone {
+		return
+	}
+	s.logf("transcode refused (HTTP %d): the server accepted the request but refused its first video; ending playback", status)
+	s.stopProcessLocked()
+	s.finishLocked(transcodeRefusedError{status})
+}
+
+// transcodeRefusedError is the failure line for a transcode the server
+// refused to deliver.
+type transcodeRefusedError struct{ status int }
+
+func (e transcodeRefusedError) Error() string {
+	return "The server could not transcode this title (HTTP " + strconv.Itoa(e.status) + ")"
 }
 
 // noVideoError is the failure line for a stream that never came.

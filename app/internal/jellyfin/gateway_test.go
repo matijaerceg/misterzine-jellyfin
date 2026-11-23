@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -193,4 +194,84 @@ func TestGatewayPreservesProxyPathAndCancelsDownloads(t *testing.T) {
 		t.Fatal("gateway left upstream download running")
 	}
 	<-done
+}
+
+func TestGatewayReportsFailuresWithoutAddresses(t *testing.T) {
+	other := httptest.NewServer(http.NotFoundHandler())
+	foreign := other.URL
+	other.Close()
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/main.m3u8":
+			io.WriteString(w, "#EXTM3U\n#EXTINF:1,\nsegment0.ts\n")
+		case "/foreign.m3u8":
+			io.WriteString(w, "#EXTM3U\n"+foreign+"/segment.ts\n")
+		case "/gone.m3u8":
+			w.WriteHeader(404)
+		case "/good.ts":
+			io.WriteString(w, "media bytes")
+		default:
+			w.WriteHeader(500)
+		}
+	}))
+	defer s.Close()
+	c := New(s.URL, "", "device", nil)
+	c.AllowLocalHTTP(true)
+	g := gatewayFor(t, c)
+	var mu sync.Mutex
+	var got []GatewayFailure
+	g.OnFailure(func(f GatewayFailure) {
+		mu.Lock()
+		got = append(got, f)
+		mu.Unlock()
+	})
+	for _, step := range []struct {
+		path   string
+		status int
+	}{{"/main.m3u8", 200}, {"/segment0.ts", 502}, {"/gone.m3u8", 502}, {"/foreign.m3u8", 502}, {"/good.ts", 200}, {"/segment1.ts", 502}} {
+		local, err := g.URL(s.URL + step.path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := http.Get(local)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != step.status {
+			t.Fatalf("%s: status %d, want %d", step.path, resp.StatusCode, step.status)
+		}
+	}
+	// the server stops answering: a connection failure, not a refusal
+	local, _ := g.URL(s.URL + "/segment2.ts")
+	s.Close()
+	if resp, err := http.Get(local); err == nil {
+		resp.Body.Close()
+	}
+	want := []GatewayFailure{
+		{false, 500, "the server answered HTTP 500", true},
+		{true, 404, "the server answered HTTP 404", true},
+		{true, 0, "the server's playlist names an address the app does not allow", true},
+		{false, 500, "the server answered HTTP 500", false},
+		{false, 0, "the server refused the connection", false},
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != len(want) {
+		t.Fatalf("failures: %+v", got)
+	}
+	for i, f := range got {
+		if f != want[i] {
+			t.Errorf("failure %d: %+v, want %+v", i, f, want[i])
+		}
+		if f.Refused() != (want[i].Status != 0) {
+			t.Errorf("failure %d: Refused() = %v", i, f.Refused())
+		}
+		if line := f.String(); strings.Contains(line, "127.0.0.1") || strings.Contains(line, "segment") {
+			t.Errorf("failure %d names an address or a path: %s", i, line)
+		}
+	}
+	if line := got[0].String(); line != "media request failed before any media was delivered: the server answered HTTP 500" {
+		t.Errorf("log line: %s", line)
+	}
 }

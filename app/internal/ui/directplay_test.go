@@ -119,6 +119,10 @@ type fallbackServer struct {
 	srv      *httptest.Server
 	client   *jellyfin.Client
 	launches [][]string
+	// media answers a request for the stream itself with a status, counting
+	// requests from 1; nil answers as the reports are (204).
+	media     func(n int) int
+	mediaHits int
 }
 
 func newFallbackServer(t *testing.T, direct string) *fallbackServer {
@@ -138,6 +142,15 @@ func newFallbackServer(t *testing.T, direct string) *fallbackServer {
 				return
 			}
 			_, _ = w.Write([]byte(`{"PlaySessionId":"direct-session","MediaSources":[` + f.direct + `]}`))
+			return
+		}
+		if f.media != nil && (r.URL.Path == "/stream.ts" || strings.HasPrefix(r.URL.Path, "/Videos/")) {
+			f.mu.Lock()
+			f.mediaHits++
+			status := f.media(f.mediaHits)
+			f.mu.Unlock()
+			w.WriteHeader(status)
+			_, _ = w.Write([]byte("media"))
 			return
 		}
 		var body map[string]any

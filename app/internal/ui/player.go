@@ -513,7 +513,11 @@ func (s *Session) startContext(offset int, reuseDirect bool, ctx context.Context
 		gateway.Close()
 		return err
 	}
+	s.mu.Lock() // endRefused compares it from the gateway's side
 	s.gateway = gateway
+	s.mu.Unlock()
+	watch := &gatewayWatch{}
+	gateway.OnFailure(func(f jellyfin.GatewayFailure) { s.gatewayFailed(gateway, f, watch) })
 	launched := false
 	defer func() {
 		if !launched {
