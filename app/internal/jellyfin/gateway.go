@@ -102,7 +102,10 @@ func (g *Gateway) fail(w http.ResponseWriter, r *http.Request, playlist bool, st
 		g.lastFailure = f
 	}
 	g.mu.Unlock()
+	// The failure callback can stop the worker and close this connection.
+	// Send the recorded HTTP error before notifying it.
 	if fn != nil {
+		_ = http.NewResponseController(w).Flush()
 		fn(f)
 	}
 }
