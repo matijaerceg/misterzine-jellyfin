@@ -2,43 +2,43 @@
   "schema": 1,
   "releases": {
     "beta": {
-      "id": "beta-0.1.0-beta.15",
-      "version": "0.1.0-beta.15",
+      "id": "beta-0.1.0-beta.16",
+      "version": "0.1.0-beta.16",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.15\n\nFixes a picture shifted to the left or cut off at the left edge when using MiSTer Direct Video with RetroTINK 4K Auto-Crop enabled. Open **Options > Updates** to install the new core, or use the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-beta-0.1.0-beta.15.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.16\n\nIf Jellyfin accepts a request to convert a video but refuses to send the first segment, the player now tells you immediately and shows the server's error code.\n\nIf the server stops sending video well before the end of a movie or episode, the player explains the interruption when the buffered video runs out. Playback reports now include more detail about what failed.\n\nUpdate through **Options > Updates** or use the beta installer. This app update reuses the beta.15 FPGA core and playback worker.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.16/MisterZine-Jellyfin-beta-0.1.0-beta.16.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14329637,
-      "sha256": "c49c222ee23846e831ed8c38c43fb448b0e6acf6578fac57a84d2111bf13f0c2",
+      "size": 14335624,
+      "sha256": "fb4d8948fc3d98905abbeb05948a3f4912157ac1b9de0d6a23597634a62dc899",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip",
-        "size": 139136678,
-        "sha256": "4e3fb0f12e3c71a771b8110263b7e9094ac52bc395f934f773b3d87d32fbbb7f",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.16.zip",
+        "size": 139143629,
+        "sha256": "0f09ddac9c10c8fd4140991bdee436ab3b814e8c6b39bb7795ba0fff0c845aba",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.16/MisterZine-Jellyfin-Source-beta-0.1.0-beta.16.zip"
       }
     }
   },
   "current": {
     "beta": {
-      "id": "beta-0.1.0-beta.15",
-      "version": "0.1.0-beta.15",
+      "id": "beta-0.1.0-beta.16",
+      "version": "0.1.0-beta.16",
       "channel": "beta",
-      "notes": "# MisterZine Jellyfin 0.1.0-beta.15\n\nFixes a picture shifted to the left or cut off at the left edge when using MiSTer Direct Video with RetroTINK 4K Auto-Crop enabled. Open **Options > Updates** to install the new core, or use the beta installer.\n",
-      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-beta-0.1.0-beta.15.zip",
+      "notes": "# MisterZine Jellyfin 0.1.0-beta.16\n\nIf Jellyfin accepts a request to convert a video but refuses to send the first segment, the player now tells you immediately and shows the server's error code.\n\nIf the server stops sending video well before the end of a movie or episode, the player explains the interruption when the buffered video runs out. Playback reports now include more detail about what failed.\n\nUpdate through **Options > Updates** or use the beta installer. This app update reuses the beta.15 FPGA core and playback worker.\n",
+      "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.16/MisterZine-Jellyfin-beta-0.1.0-beta.16.zip",
       "db_url": "https://raw.githubusercontent.com/matijaerceg/misterzine-jellyfin/distribution/beta.json.zip",
-      "size": 14329637,
-      "sha256": "c49c222ee23846e831ed8c38c43fb448b0e6acf6578fac57a84d2111bf13f0c2",
+      "size": 14335624,
+      "sha256": "fb4d8948fc3d98905abbeb05948a3f4912157ac1b9de0d6a23597634a62dc899",
       "access": {
         "batch": "misterzine-2026-10"
       },
       "source": {
-        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip",
-        "size": 139136678,
-        "sha256": "4e3fb0f12e3c71a771b8110263b7e9094ac52bc395f934f773b3d87d32fbbb7f",
-        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.15/MisterZine-Jellyfin-Source-beta-0.1.0-beta.15.zip"
+        "filename": "MisterZine-Jellyfin-Source-beta-0.1.0-beta.16.zip",
+        "size": 139143629,
+        "sha256": "0f09ddac9c10c8fd4140991bdee436ab3b814e8c6b39bb7795ba0fff0c845aba",
+        "url": "https://github.com/matijaerceg/misterzine-jellyfin/releases/download/v0.1.0-beta.16/MisterZine-Jellyfin-Source-beta-0.1.0-beta.16.zip"
       }
     }
   }
