@@ -1,3 +1,11 @@
+# MisterZine Jellyfin 0.1.0-beta.16
+
+If Jellyfin accepts a request to convert a video but refuses to send the first segment, the player now tells you immediately and shows the server's error code.
+
+If the server stops sending video well before the end of a movie or episode, the player explains the interruption when the buffered video runs out. Playback reports now include more detail about what failed.
+
+Update through **Options > Updates** or use the beta installer. This app update reuses the beta.15 FPGA core and playback worker.
+
 # MisterZine Jellyfin 0.1.0-beta.15
 
 Fixes a picture shifted to the left or cut off at the left edge when using MiSTer Direct Video with RetroTINK 4K Auto-Crop enabled. Open **Options > Updates** to install the new core, or use the beta installer.
